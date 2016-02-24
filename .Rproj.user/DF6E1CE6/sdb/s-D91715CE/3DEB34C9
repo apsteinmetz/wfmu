@@ -1,0 +1,17 @@
+{
+    "contents" : "# # install.packages(\"devtools\")\n# # require(devtools)\n# # install_url(\"http://www.omegahat.org/Rstem/Rstem_0.4-1.tar.gz\")\n# # install_url(\"http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.1.tar.gz\")\n# # install_url(\"http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.2.tar.gz\")\n# \nlibrary(rvest)\n# library(stringi)\n# library(tm)\n# library(\"plyr\")\n# library(\"ggplot2\")\n# library(\"wordcloud\")\n# library(\"RColorBrewer\")\n# library(\"SnowballC\")\n# library(sentiment)\n# library(\"stringr\")\nlibrary(xml2)\n# library(data.table)\n# \n# \n\n\n#actual work. testing above\n# ----------------------------------------------\nallDJURLs <-\"http://wfmu.org/playlists\"\nplayListRaw<- html(allDJURLs)\n\n# get the urls of the each DJs RSS playlist feed\nt<-html_nodes(playListRaw,\"ul\")[2] %>% html_nodes(xpath='//a[contains(.,\"Playlists\")]')  %>% html_attr(name=\"href\") \nDJURLs<-paste(\"http://wfmu.org\",t,sep=\"\")[-1]\n#--------------------------------------------------------------------------\n#get all playlists for a DJ\n# TROUBLE all play list tables are not the same. Headers might not match\ngetPlaylist <- function(plURL,dj) {\n  playlist = data.frame()\n  for (i in 1:length(plURL)) {\n    print(paste(dj,i))\n    # first two columns contain artist and track name, leave the rest\n    temp <- (html(plURL[i])%>%html_node(xpath=\"//table[2]\")%>%html_table(fill=TRUE))\n    # try to correct tables without headers\n    if (names(temp)[1]==\"X1\") {\n      names(temp)<- temp[1,]\n      temp <- temp[-1,]\n      \n    }\n    # order of artist, track(or title) varies.   Fix it\n    if (dim(temp)[2]>1) {  #ignore single column playlists  \n      if (names(temp)[1]==\"Artist\") {\n        playlist<-rbind(playlist,cbind(dj,temp[\"Artist\"],Track=temp[,2]))\n     }\n      else {\n       playlist<-rbind(playlist,cbind(dj,temp[\"Artist\"],Track=temp[,1]))\n      \n      }\n    }\n  }\n  return(playlist)\n}\n\n# #---------------------------------------------------\n# get the URLs of the playlists for a DJ\nallDJPlayLists = data.frame()\nDJKey = data.frame()\nfor (n in 1:length(DJURLs)) {\n  singleDJ<- html(DJURLs[n])\n  playlistURL<-html_nodes(singleDJ,xpath = \"//guid\") %>%html_text()\n  showName <- html_node(singleDJ,\"title\")%>%html_text()\n  showName <- sub(\"WFMU's recent playlists from \",\"\",showName)\n  DJ <- sub(\".xml\",\"\",sub(\"http://wfmu.org/playlistfeed/\",\"\",DJURLs[n]))\n  DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))\n  allDJPlayLists = rbind(allDJPlayLists, getPlaylist(plURL = playlistURL,dj = DJ))\n}  \n\n",
+    "created" : 1456164048589.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3719407969",
+    "id" : "3DEB34C9",
+    "lastKnownWriteTime" : 1456168868,
+    "path" : "~/R/wfmu/scrapeplaylists.R",
+    "project_path" : "scrapeplaylists.R",
+    "properties" : {
+    },
+    "relative_order" : 4,
+    "source_on_save" : true,
+    "type" : "r_source"
+}
