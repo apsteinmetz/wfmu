@@ -36,9 +36,10 @@ getPlaylist <- function(plURL,dj) {
   for (i in 1:length(plURL)) {
     print(paste(dj,i))
     # first two columns contain artist and track name, leave the rest
-    temp <- (html(plURL[i])%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE))
+    temp <- html(plURL[i])%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE)
+    #temp<-html(plURL[i])%>%html_nodes("table")%>%.[2]%>%html_table(fill=TRUE)
     # try to correct tables without headers
-    if (names(temp)[1]=="X1") {
+    if (is.null(names(temp)) || names(temp)[1]=="X1") {
       names(temp)<- temp[1,]
       temp <- temp[-1,]
       
