@@ -144,3 +144,11 @@ as.data.frame(content)
 # rbindlist(playList,fill=TRUE)
 # playTable<-data.frame(date=NULL,description=NULL,url=NULL)
 # 
+basic <- html("<p class='a'><b>Bold text</b></p>")
+p <- html_node(basic, "p")
+p
+# Can subset with numbers to extract children
+p[[1]]
+# Use html_attr to get attributes
+html_attr(p, "class")
+

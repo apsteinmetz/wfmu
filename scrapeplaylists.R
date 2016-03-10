@@ -13,7 +13,7 @@ library(rvest)
 # library("RColorBrewer")
 # library("SnowballC")
 # library(sentiment)
-# library("stringr")
+library("stringr")
 library(xml2)
 # library(data.table)
 # 
@@ -28,6 +28,11 @@ playListRaw<- html(allDJURLs)
 # get the urls of the each DJs RSS playlist feed
 t<-html_nodes(playListRaw,"ul")[2] %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
 DJURLs<-paste("http://wfmu.org",t,sep="")[-1]
+# above got the RSS feed links but we want the longer list of shows.  Below modifies
+# the URL to get the right link
+DJURLs<- gsub("playlistfeed","playlists",DJURLs)
+DJURLs<- gsub(".xml","",DJURLs)
+
 #--------------------------------------------------------------------------
 #get all playlists for a DJ
 # TROUBLE all play list tables are not the same. Headers might not match
@@ -64,10 +69,13 @@ allDJPlayLists = data.frame()
 DJKey = data.frame()
 for (n in 1:length(DJURLs)) {
   singleDJ<- html(DJURLs[n])
-  playlistURL<-html_nodes(singleDJ,xpath = "//guid") %>%html_text()
+  pl<-html_nodes(singleDJ,xpath="//a")%>%html_attr("href")
+  # doesn't quite work
+  playlistURL<-paste(allDJURLs,"/shows", pl[str_detect(pl,"Playlist")],sep="")
+  #playlistURL<-html_nodes(singleDJ,xpath = "//guid") %>%html_text()
   showName <- html_node(singleDJ,"title")%>%html_text()
-  showName <- sub("WFMU's recent playlists from ","",showName)
-  DJ <- sub(".xml","",sub("http://wfmu.org/playlistfeed/","",DJURLs[n]))
+  showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
+  DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
   DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
   allDJPlayLists = rbind(allDJPlayLists, getPlaylist(plURL = playlistURL,dj = DJ))
 }  
