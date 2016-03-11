@@ -4,7 +4,6 @@
 # # install_url("http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.1.tar.gz")
 # # install_url("http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.2.tar.gz")
 # 
-library(rvest)
 # library(stringi)
 # library(tm)
 # library("plyr")
@@ -12,9 +11,13 @@ library(rvest)
 # library("wordcloud")
 # library("RColorBrewer")
 # library("SnowballC")
-# library(sentiment)
-library("stringr")
+# library(sentiment)library(rvest)
+
+library(rvest)
+library(stringr)
+library(XML)
 library(xml2)
+library(dplyr)
 # library(data.table)
 # 
 # 
@@ -23,6 +26,7 @@ library(xml2)
 #actual work. testing above
 # ----------------------------------------------
 allDJURLs <-"http://wfmu.org/playlists"
+ROOT_URL<-"http://wfmu.org"
 playListRaw<- html(allDJURLs)
 
 # get the urls of the each DJs RSS playlist feed
@@ -65,18 +69,37 @@ getPlaylist <- function(plURL,dj) {
 
 # #---------------------------------------------------
 # get the URLs of the playlists for a DJ
-allDJPlayLists = data.frame()
-DJKey = data.frame()
-for (n in 1:length(DJURLs)) {
-  singleDJ<- html(DJURLs[n])
-  pl<-html_nodes(singleDJ,xpath="//a")%>%html_attr("href")
-  # doesn't quite work
-  playlistURL<-paste(allDJURLs,"/shows", pl[str_detect(pl,"Playlist")],sep="")
-  #playlistURL<-html_nodes(singleDJ,xpath = "//guid") %>%html_text()
-  showName <- html_node(singleDJ,"title")%>%html_text()
-  showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
-  DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
-  DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
-  allDJPlayLists = rbind(allDJPlayLists, getPlaylist(plURL = playlistURL,dj = DJ))
-}  
+getDJPlaylistURLs<-function() {
+  allDJPlayLists = data.frame()
+  DJKey = data.frame()
+  for (n in 1:length(DJURLs)) {
+    singleDJ<- html(DJURLs[n])
+    pl<-html_nodes(singleDJ,xpath="//a")%>%html_attr("href")
+    #format for newer shows
+    pl1<-paste(ROOT_URL, na.omit(pl[str_detect(pl,"playlists/shows")]),sep="")
+    # format for older shows
+    pl2<-paste(ROOT_URL, na.omit(pl[str_detect(pl,"Playlist")]),sep="")
+    playlistURL<-c(pl1,pl2)
+    showName <- html_node(singleDJ,"title")%>%html_text()
+    showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
+    DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
+    DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
+    allDJPlayLists = rbind(allDJPlayLists, getPlaylist(plURL = playlistURL,dj = DJ))
+  }  
+}
 
+getDJArtistNames<-function(DJURLs)
+  URL_BRANCH<- "/artistkeywords.php/"
+  for (page in DJURLs) {
+    singleDJ<- html(page)
+    showName <- html_node(singleDJ,"title")%>%html_text()
+    showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
+    DJ <- sub("http://wfmu.org/playlists/","",page)
+    artistListPage <- paste(ROOT_URL,URL_BRANCH,DJ, sep="")
+    artistList<-html(artistListPage) #%>%html_text()
+    #DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
+    #allDJPlayLists = rbind(allDJPlayLists, getPlaylist(plURL = playlistURL,dj = DJ))
+  }  
+
+
+  
