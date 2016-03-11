@@ -1,17 +1,4 @@
-# # install.packages("devtools")
-# # require(devtools)
-# # install_url("http://www.omegahat.org/Rstem/Rstem_0.4-1.tar.gz")
-# # install_url("http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.1.tar.gz")
-# # install_url("http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.2.tar.gz")
-# 
-# library(stringi)
-# library(tm)
-# library("plyr")
-# library("ggplot2")
-# library("wordcloud")
-# library("RColorBrewer")
-# library("SnowballC")
-# library(sentiment)library(rvest)
+# scrape playlists
 
 library(rvest)
 library(stringr)
@@ -19,8 +6,6 @@ library(XML)
 library(xml2)
 library(dplyr)
 # library(data.table)
-# 
-# 
 
 
 # ----------------------------------------------
@@ -112,3 +97,7 @@ getDJArtistNames<-function(DJURLs) {
 
 #DJURLS<-getDJURLs()
 allDJArtists <- getDJArtistNames(DJURLs) 
+allDJArtists <- filter(allDJArtists,artist!="")
+# artists are a factor by default. change it to character
+allDJArtists$artist<-as.character(allDJArtists$artist)
+save(allDJArtists,file="allDJArtists.RData")
