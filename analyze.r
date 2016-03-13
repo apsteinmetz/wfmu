@@ -93,7 +93,12 @@ combineTwoArtistWords()
 test<-filter(allDJArtists,DJ=="GK")
 djDocs<-combineAllArtists()
 
-# maybe use longest word in artist name as having the most info content
-findLongestWord(test$artist[1])
+load("djDocs.RData")
 
-sentence<-test$artist[1]
+#docs <- data.frame(author=c("me","you"),texts=c("This is a text.", "This another one."))
+djCorpus <- Corpus(VectorSource(djDocs$artists))
+
+for (i in 1:length(djCorpus)) {
+  meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
+}
+djdtm<-documentTermMatrix(djCorpus)
