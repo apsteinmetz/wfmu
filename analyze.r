@@ -39,7 +39,7 @@ cleanUpArtists<- function() {
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\&"," ")
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\."," ")
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\#"," ")
-  allDJArtists$artist<-str_trim(allDJArtists$artist)
+
   #did we create any null entries
   allDJArtists<-filter(allDJArtists,artist!="")
   
@@ -51,6 +51,8 @@ cleanUpArtists<- function() {
   for (w in joinWords){
     allDJArtists$artist<-str_replace_all(allDJArtists$artist,w," ")
   }  
+  # strip leading/trailing whitespace
+  allDJArtists$artist<-str_trim(allDJArtists$artist)
 
 }
 
@@ -68,7 +70,16 @@ combineTwoArtistWords <- function(){
   #combine first two words
   print("Trying to make sense of artist names")
   t<-str_split_fixed(allDJArtists$artist,pattern="[ ]+",n=3)[,1:2]
+  
   allDJArtists$artistToken2<-apply(t,MARGIN=1,FUN=paste,collapse="")
+
+  #now that tokens are created extract unique ones for each dj so mulitples don't occur
+  aristTokens<- data.frame()
+  for (dj in levels(allDJArtists$DJ)){
+    t<-allDJArtists%>%filter(DJ==dj)%>%select(artistToken2)%>%unique()
+    artistTokens<-rbind(data.frame(dj=dj,artistToken2=t))
+  }
+    
 }
 
 combineAllArtists <- function(){
@@ -108,7 +119,7 @@ for (i in 1:length(djCorpus)) {
   meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
 }
 
-djdtm<-documentTermMatrix(djCorpus)
+djdtm<-DocumentTermMatrix(djCorpus)
 #for wordcloud of most widely played artists
 djtdm<-TermDocumentMatrix(djCorpus)
 m <- as.matrix(djtdm)
