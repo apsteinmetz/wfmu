@@ -1,5 +1,10 @@
 #analyze list of artists to find DJ similarity
 
+
+#force git to overwrite local files on pull. run from git shell
+#git fetch --all
+#git reset --hard origin/master
+
 # # install.packages("devtools")
 # # require(devtools)
 # # install_url("http://www.omegahat.org/Rstem/Rstem_0.4-1.tar.gz")
@@ -42,7 +47,7 @@ cleanUpArtists<- function() {
   # first make all lower cast
   print("Stripping ambiguous words")
   allDJArtists$artist<-str_to_lower(allDJArtists$artist)
-  joinWords <- c("with","feat","featuring","vs","versus","and","the")
+  joinWords <- c("with ","feat ","featuring ","vs ","versus ","and ","the ")
   for (w in joinWords){
     allDJArtists$artist<-str_replace_all(allDJArtists$artist,w," ")
   }  
@@ -90,8 +95,9 @@ combineTwoArtistWords()
 #combine words into one document per DJ
 
 
-test<-filter(allDJArtists,DJ=="GK")
+# test<-filter(allDJArtists,DJ=="GK")
 djDocs<-combineAllArtists()
+save(djDocs,file="djDocs.RData")
 
 load("djDocs.RData")
 
@@ -101,4 +107,11 @@ djCorpus <- Corpus(VectorSource(djDocs$artists))
 for (i in 1:length(djCorpus)) {
   meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
 }
+
 djdtm<-documentTermMatrix(djCorpus)
+#for wordcloud of most widely played artists
+djtdm<-TermDocumentMatrix(djCorpus)
+m <- as.matrix(djtdm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+head(d, 10)
