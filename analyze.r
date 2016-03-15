@@ -22,7 +22,7 @@ library("SnowballC")
 
 
 
-cleanUpArtists<- function() {
+# cleanUpArtists<- function() {
 
 # one artist is all punctuation so give !!! special treatment
   allDJArtists$artist<-str_replace(allDJArtists$artist,"!!!","chkchkchk")
@@ -41,7 +41,7 @@ cleanUpArtists<- function() {
   
   allDJArtists$artist<-str_to_lower(allDJArtists$artist)
   # I choose to strip out the stuff below though dealing with it might get better analysis
-  #remove parentheticals
+  #remove any text in parentheses
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\(.*\\)","")
   # remove 'featuring' or 'with' artists
   # I chose not to remove "Versus" because that is a band name
@@ -50,15 +50,22 @@ cleanUpArtists<- function() {
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"(live @ |live on|@).+","")
   # get rid of 'interview'
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"(interview w|interview)","")
-  #get rid of the marathon finale
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"hoof mouth sinfonia","")
   
   # get rid of unspecified artists
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"unknown artist(s| )|unknown","")
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"various artists|various","")
   
-    #now some connecting words that might be spelled/used variantly
-  # first make all lower cast
+  #get rid of the marathon finale
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"hoof mouth sinfonia|ho mouth sinfonia","")
+  
+  #make "new york" one word.  Lots of bands start with the term
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"new york","newyork")
+  
+  #make "x ray" one word. hopefully we've stripped out the dash already.Lots of bands start with the term
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"x ray","xray")
+  
+  #now some connecting words that might be spelled/used variantly
+
   print("Stripping filler words")
   joinWords <- c("and ","the ","of ")
   for (w in joinWords){
@@ -69,7 +76,7 @@ cleanUpArtists<- function() {
 
   #did we create any null entries
   allDJArtists<-filter(allDJArtists,artist!="")
-}
+# }
 
 
 
@@ -79,7 +86,7 @@ combineArtistWords <- function(){
   artistToken1<-str_replace_all(allDJArtists$artist," ","")
 }
 
-combineTwoArtistWords <- function(){
+#------------------- combineTwoArtistWords <- function(){
   # we replaced all punctuation with spaces
   #maybe strip spaces and combine all artist Words
   #combine first two words
@@ -95,42 +102,43 @@ combineTwoArtistWords <- function(){
   for (dj in levels(allDJArtists$DJ)){
     print(dj)
     t<-allDJArtists%>%filter(DJ==dj)%>%select(artistToken2)%>%unique()
-    if (nrow(t) >0) artistTokens<-rbind(artistTokens,data.frame(dj=dj,artistToken2=t))
+    if (nrow(t) >0) artistTokens<-rbind(artistTokens,data.frame(DJ=dj,artistToken2=t))
   }
-    
-}
+  rm(t)
+  save(artistTokens,file="artistTokens.RData")
+#}
 
 combineAllArtists <- function(){
   t<- data.frame()
-  for (dj in levels(artistTokens$dj)){
+  for (dj in levels(artistTokens$DJ)){
     #put all words in string for each DJ
-    print("Creating artist documents")
-  print(dj)  
-  t<-rbind(t,data.frame(DJ=dj,artists= artistTokens$artistToken2%>%
+    print(paste("Creating artist documents",dj))
+  t<-rbind(t,data.frame(DJ=dj,artists= artistTokens%>%
                           filter(DJ==dj)%>%
                           select(artistToken2)%>% 
-                          unlist()%>%paste(collapse=" ")))
-             }
-  
+                          unlist()%>%paste(collapse=" ")%>%
+                          str_replace_all("[^a-z ]","")%>%as.character()))
+  }
+  #artists should not have factor levels
+  t$artists<-as.character(t$artists)
   return(t)
 }
 
 # ----------------- MAIN --------------
 load("allDJArtists.RData")
-cleanUpArtists()
+#cleanUpArtists()
 #expiriment with different algorithms to uniquely identify artist
-combineTwoArtistWords()
+#combineTwoArtistWords()
 
 #combine words into one document per DJ
 
-
+load("artistTokens.RData")
 # test<-filter(allDJArtists,DJ=="GK")
 djDocs<-combineAllArtists()
 save(djDocs,file="djDocs.RData")
 
 load("djDocs.RData")
 
-#docs <- data.frame(author=c("me","you"),texts=c("This is a text.", "This another one."))
 djCorpus <- Corpus(VectorSource(djDocs$artists))
 
 for (i in 1:length(djCorpus)) {
@@ -140,14 +148,16 @@ for (i in 1:length(djCorpus)) {
 #make a word cloud
 #djdtm<-DocumentTermMatrix(djCorpus)
 #for wordcloud of most widely played artists
+scaleFactor=3
 djtdm<-TermDocumentMatrix(djCorpus)
 m <- as.matrix(djtdm)
 v <- sort(rowSums(m),decreasing=TRUE)
 d <- data.frame(word = names(v),freq=v)
-head(d, 10)
+t<-head(d, 200)
+print(t)
 
-set.seed(1234)
-wordcloud(words = d$word, freq = d$freq, min.freq = 1,
-          max.words=200, random.order=FALSE, rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"))
+#scalefactor magnifies differences for wordcloud
+wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=50, random.order=FALSE,rot.per=0.35, 
+             colors=brewer.pal(8, "Dark2"),scale = c(3,.03))
+
 
