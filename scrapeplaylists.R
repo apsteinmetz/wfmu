@@ -53,6 +53,26 @@ getPlaylist <- function(plURL,dj) {
   return(playlist)
 }
 
+
+
+
+# #---------------------------------------------------
+# get the shownames for a DJ
+getShowNames<-function(DJURLs) {
+  DJKey = data.frame()
+  for (n in 1:length(DJURLs)) {
+    singleDJ<- html(DJURLs[n])
+    showName <- html_node(singleDJ,"title")%>%html_text()
+    showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
+    showName<-str_replace(showName,'WFMU:',"")
+    showName<-str_replace(showName,':Playlists and Archives',"")
+    DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
+    DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
+    print(showName)
+  }  
+  save(DJKey,file="DJKey.RData")
+}
+
 # #---------------------------------------------------
 # get the URLs of the playlists for a DJ
 getDJPlaylistURLs<-function(DJURLs) {
@@ -88,14 +108,15 @@ getDJArtistNames<-function(DJURLs) {
     artistListPage <- paste(ROOT_URL,URL_BRANCH,DJ, sep="")
     artistList<-html(artistListPage)%>%html_node(xpath="//body/div")%>%html_text()%>%str_split("\n")
     DJArtists<-data.frame(DJ,artist=unlist(artistList))
-    allDJArtists = rbind(allDJArtists,DJArtists)
+    if (nrow(DJArtists) >0) allDJArtists = rbind(allDJArtists,DJArtists)
+    #remove factor level of DJs with no artists
     save(allDJArtists,file="allDJArtists.RData")
   }
   return(allDJArtists)
 }  
 
-
-#DJURLS<-getDJURLs()
+#-------------- MAIN -----------------
+DJURLS<-getDJURLs()
 allDJArtists <- getDJArtistNames(DJURLs) 
 allDJArtists <- filter(allDJArtists,artist!="")
 # artists are a factor by default. change it to character
