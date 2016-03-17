@@ -99,7 +99,7 @@ combineArtistWords <- function(allDJArtists,numWords){
   allDJArtists$artistToken2<-apply(t,MARGIN=1,FUN=paste,collapse="")
 
   
-  
+
   #now that tokens are created extract unique ones for each dj so mulitples don't occur
   # the zillion flavors of "Sun Ra..." will show up for each DJ only once
   # not perfect.  There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
@@ -151,20 +151,21 @@ artistTokens<-combineArtistWords(allDJArtists,numWords=2)
 djDocs<-combineAllArtists()
 save(djDocs,file="djDocs.RData")
 
-load("djDocs.RData")
+#load("djDocs.RData")
 
 djCorpus <- Corpus(VectorSource(djDocs$artists))
 
 for (i in 1:length(djCorpus)) {
-  meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
+  meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]
 }
 
 #make a word cloud
-#djdtm<-DocumentTermMatrix(djCorpus)
 #for wordcloud of most widely played artists
 #removing sparse terms at 0.99 means that artists played by less than 3 DJs will be dropped
-djtdm<-TermDocumentMatrix(djCorpus)
-djtdmS<-removeSparseTerms(djtdm,0.6)
+
+djtdm<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(0.80)
+
+
 m <- as.matrix(djtdm)
 v <- sort(rowSums(m),decreasing=TRUE)
 d <- data.frame(word = names(v),freq=v)
@@ -179,8 +180,28 @@ wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=100, random.order=
              colors=brewer.pal(8, "Dark2"),scale = c(3,.2))
 
 
-#cluster analysis
+
 #dd <- as.dist((1 - cor(t(m)))/2)
 #network graph
 ga<-graph.adjacency(t(m))
+
+#put DJs in rows, artists in columns
+#get roughly top 400 artists
+djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(0.80)
+m2<-as.matrix(djdtm)
+rownames(m2)<-djDocs$DJ
+save(m2,file="docTermMatrix.RData")
+docMatrix<-m2 %*% t(m2)
+library(igraph)
+# build a graph from the above matrix
+g <- graph.adjacency(docMatrix, weighted=T, mode = "undirected")
+ # remove loops
+g <- simplify(g)
+#set labels and degrees of vertices
+V(g)$label <- V(g)$name
+V(g)$degree <- degree(g)
+# set seed to make the layout reproducible
+set.seed(3952)
+layout1 <- layout.fruchterman.reingold(g)
+plot(g, layout=layout1)
 
