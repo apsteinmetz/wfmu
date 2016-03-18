@@ -136,6 +136,50 @@ combineAllArtists <- function(){
   return(t)
 }
 
+delete.isolates <- function(graph) {
+  #isolates <- which(degree(graph, mode = mode) == 0) - 1
+  #delete.vertices(graph, isolates)
+  return(delete.vertices(graph,V(graph)[degree(graph)==0]))
+}
+
+plotNetwork <- function(docMatrix) {
+  library(igraph)
+  #put DJs in rows, artists in columns
+  #get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
+  djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(0.6)
+  m2<-as.matrix(djdtm)
+  rownames(m2)<-djDocs$DJ
+  save(m2,file="docTermMatrix.RData")
+  
+  #create document matrix of commonalities
+  docMatrix<-m2 %*% t(m2)
+  # get rid of DJs with no association to anybody after making matrix sparse
+  # if complete matrix is used this will have no effect
+  orphans<-row.names(docMatrix[rowSums(docMatrix)==0,])
+  print(orphans)
+  docMatrix<-docMatrix[rowSums(docMatrix)!=0,rowSums(docMatrix)!=0]
+  # build a graph from the above matrix
+  g <- graph.adjacency(docMatrix, weighted=T, mode = "undirected")
+  # remove loops
+  g <- simplify(g)
+  #set labels and degrees of vertices
+  V(g)$label <- V(g)$name
+  V(g)$degree <- degree(g)
+  g2 <- delete.edges(g, which(E(g)$weight <10))
+  g2<-delete.isolates(g2)
+  # set seed to make the layout reproducible
+  set.seed(3952)
+  layout1 <- layout.fruchterman.reingold(g2)
+  plot(g2, layout=layout1)
+  
+  #if we want to export to gephis plot tool
+  #library(rgexf) 
+  #wfmugraph<-igraph.to.gexf(g2)
+  #print(wfmugraf,file="wfmugraf.gexf")
+  
+}
+
+
 # ----------------- MAIN --------------
 load("allDJArtists.RData")
 allDJArtists<-cleanUpArtists(allDJArtists)
@@ -143,26 +187,28 @@ allDJArtists<-cleanUpArtists(allDJArtists)
 
 #combine first numWords words in artist name into a single token
 artistTokens<-combineArtistWords(allDJArtists,numWords=2)
-#save(artistTokens,file="artistTokens.RData")
+save(artistTokens,file="artistTokens.RData")
+#load("artistTokens.RData")
 
 #combine words into one document per DJ
 
-load("artistTokens.RData")
 djDocs<-combineAllArtists()
 save(djDocs,file="djDocs.RData")
+#load("djDocs.RData")
 
-load("djDocs.RData")
-
+print("Create document corpus")
 djCorpus <- Corpus(VectorSource(djDocs$artists))
 
 for (i in 1:length(djCorpus)) {
   meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]
 }
-
+#--------------------------------------------------------------------------------------------------
 #make a word cloud
 #for wordcloud of most widely played artists
-#removing sparse terms at 0.99 means that artists played by less than 3 DJs will be dropped
+#removing sparse terms at 0.99 means that artists played by fewer than 50 DJs will be dropped
+#and will return about 400 artists
 
+print("Make a term document matrix")
 djtdm<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(0.80)
 
 
@@ -174,6 +220,7 @@ rownames(t)<-NULL
 print(t)
 save(t,file='artistfreq.txt',ascii = TRUE)
 
+print("Create Word Cloud")
 #scalefactor magnifies differences for wordcloud
 scaleFactor=3
 wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=100, random.order=FALSE,rot.per=0.35, 
@@ -181,36 +228,4 @@ wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=100, random.order=
 
 
 
-#dd <- as.dist((1 - cor(t(m)))/2)
-#network graph
-ga<-graph.adjacency(t(m))
-
-#put DJs in rows, artists in columns
-#get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
-djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(0.8)
-m2<-as.matrix(djdtm)
-rownames(m2)<-djDocs$DJ
-save(m2,file="docTermMatrix.RData")
-
-#create document matrix of commonalities
-docMatrix<-m2 %*% t(m2)
-# get rid of DJs with no association to anybody after making matrix sparse
-# if complete matrix is used this will have no effect
-orphans<-row.names(docMatrix[rowSums(docMatrix)==0,])
-docMatrix2<-docMatrix[rowSums(docMatrix)!=0,rowSums(docMatrix)!=0]
-
-library(igraph)
-# build a graph from the above matrix
-g <- graph.adjacency(docMatrix2, weighted=T, mode = "undirected")
- # remove loops
-g <- simplify(g)
-#set labels and degrees of vertices
-V(g)$label <- V(g)$name
-V(g)$degree <- degree(g)
-# set seed to make the layout reproducible
-set.seed(3952)
-layout1 <- layout.fruchterman.reingold(g)
-plot(g, layout=layout1)
-gefx<-igraph.to.gexf(g)
-print(wfmugraf,file="wfmugraf.gexf")
 
