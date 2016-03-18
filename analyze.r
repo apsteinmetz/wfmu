@@ -147,11 +147,11 @@ artistTokens<-combineArtistWords(allDJArtists,numWords=2)
 
 #combine words into one document per DJ
 
-#load("artistTokens.RData")
+load("artistTokens.RData")
 djDocs<-combineAllArtists()
 save(djDocs,file="djDocs.RData")
 
-#load("djDocs.RData")
+load("djDocs.RData")
 
 djCorpus <- Corpus(VectorSource(djDocs$artists))
 
@@ -186,15 +186,22 @@ wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=100, random.order=
 ga<-graph.adjacency(t(m))
 
 #put DJs in rows, artists in columns
-#get roughly top 400 artists
-djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(0.80)
+#get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
+djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(0.8)
 m2<-as.matrix(djdtm)
 rownames(m2)<-djDocs$DJ
 save(m2,file="docTermMatrix.RData")
+
+#create document matrix of commonalities
 docMatrix<-m2 %*% t(m2)
+# get rid of DJs with no association to anybody after making matrix sparse
+# if complete matrix is used this will have no effect
+orphans<-row.names(docMatrix[rowSums(docMatrix)==0,])
+docMatrix2<-docMatrix[rowSums(docMatrix)!=0,rowSums(docMatrix)!=0]
+
 library(igraph)
 # build a graph from the above matrix
-g <- graph.adjacency(docMatrix, weighted=T, mode = "undirected")
+g <- graph.adjacency(docMatrix2, weighted=T, mode = "undirected")
  # remove loops
 g <- simplify(g)
 #set labels and degrees of vertices
@@ -204,4 +211,6 @@ V(g)$degree <- degree(g)
 set.seed(3952)
 layout1 <- layout.fruchterman.reingold(g)
 plot(g, layout=layout1)
+gefx<-igraph.to.gexf(g)
+print(wfmugraf,file="wfmugraf.gexf")
 
