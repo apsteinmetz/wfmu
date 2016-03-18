@@ -119,7 +119,23 @@ combineArtistWords <- function(allDJArtists,numWords){
   #rm(t)
   return(artistTokens)
 }
-
+#-------------------------------------------------------------------------------------
+addArtistCount<- function(DJKey,artistTokens) {
+  t <- data.frame()
+  nm <- names(DJKey)
+  for (dj in levels(DJKey$DJ)){
+    #put all words in string for each DJ
+    #assumes dj is in artistTokens because testing for it is too slow
+    artistCount<- artistTokens%>%filter(DJ==dj)%>%nrow()
+    t<-rbind(t,artistCount)
+    print(paste(dj, " has played ",artistCount," artists",sep=""))
+  }
+  DJKey<-cbind(DJKey,t)
+  names(DJKey)<-c(names(DJKey[1:2]),"artistCount")
+  return(DJKey)
+}
+  
+#-------------------------------------------------------------  
 combineAllArtists <- function(){
   t<- data.frame()
   for (dj in levels(artistTokens$DJ)){
@@ -182,19 +198,28 @@ plotNetwork <- function(docMatrix) {
 
 # ----------------- MAIN --------------
 load("allDJArtists.RData")
+
 allDJArtists<-cleanUpArtists(allDJArtists)
-#expiriment with different algorithms to uniquely identify artist
 
 #combine first numWords words in artist name into a single token
 artistTokens<-combineArtistWords(allDJArtists,numWords=2)
+load("DJKey.RData")
+DJKey<-addArtistCount(DJKey,artistTokens)
+
+
+#get rid of Artists with less than 50 artists, ever
+DJKey<-filter(DJKey,artistCount>50)
+artistTokens<-semi_join(artistTokens,DJKey)
+
 save(artistTokens,file="artistTokens.RData")
-#load("artistTokens.RData")
+load("artistTokens.RData")
+
+
 
 #combine words into one document per DJ
-
 djDocs<-combineAllArtists()
 save(djDocs,file="djDocs.RData")
-#load("djDocs.RData")
+load("djDocs.RData")
 
 print("Create document corpus")
 djCorpus <- Corpus(VectorSource(djDocs$artists))
@@ -226,6 +251,4 @@ scaleFactor=3
 wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=100, random.order=FALSE,rot.per=0.35, 
              colors=brewer.pal(8, "Dark2"),scale = c(3,.2))
 
-
-
-
+#who has played the most artists?
