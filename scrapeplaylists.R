@@ -24,6 +24,24 @@ getDJURLs <- function(){
   return(DJURLs)
 }
 #--------------------------------------------------------------------------
+#-------------------------------------------
+getDJURLs2 <- function(){
+  # current shows //li+//table
+  # off mic shows //*+[(@id = "bench")]//table
+  rawDJURLs<- html(paste(ROOT_URL,"/playlists",sep=""))
+  # get the urls of the each DJs RSS playlist feed
+  t<-html_attr(rawDJURLs,xpath='//li+//table') %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
+  DJURLs<-paste("http://wfmu.org",t,sep="")[-1]
+  t2<-html_nodes(rawDJURLs,"ul")[2] %>%html_nodes("table")
+  t2<-t2[8]%>%html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href")
+  offMicURLs<-paste("http://wfmu.org",t2,sep="")[-1]
+  # above got the RSS feed links but we want the longer list of shows.  Below modifies
+  # the URL to get the right link
+  DJURLs<- gsub("playlistfeed","playlists",DJURLs)
+  DJURLs<- gsub(".xml","",DJURLs)
+  return(DJURLs)
+}
+#--------------------------------------------------------------------------
 #get all playlists for a DJ
 # TROUBLE all play list tables are not the same. Headers might not match
 getPlaylist <- function(plURL,dj) {
@@ -92,8 +110,10 @@ getDJPlaylistURLs<-function(DJURLs) {
     DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
     allDJPlayLists = rbind(allDJPlayLists, getPlaylist(plURL = playlistURL,dj = DJ))
   }  
+  return(allDJPlayLists)
 }
 
+# Get all Artists
 getDJArtistNames<-function(DJURLs) {
   # scrape artist names for all DJs from the link at the bottom of each DJ page
   allDJArtists<-data.frame()
@@ -118,6 +138,7 @@ getDJArtistNames<-function(DJURLs) {
 #-------------- MAIN -----------------
 DJURLS<-getDJURLs()
 allDJArtists <- getDJArtistNames(DJURLs) 
+
 allDJArtists <- filter(allDJArtists,artist!="")
 # artists are a factor by default. change it to character
 allDJArtists$artist<-as.character(allDJArtists$artist)

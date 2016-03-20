@@ -104,6 +104,7 @@ combineArtistWords <- function(allDJArtists,numWords){
   # the zillion flavors of "Sun Ra..." will show up for each DJ only once
   # not perfect.  There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
   print("Create list of unique artist names for each DJ")
+  #artistTokens<-allDJArtists%>%select(DJ,artistToken2)%>%group_by(DJ)%>%distinct(artistToken2)
   artistTokens<- data.frame()
   for (dj in levels(allDJArtists$DJ)){
     print(dj)
@@ -203,13 +204,24 @@ allDJArtists<-cleanUpArtists(allDJArtists)
 
 #combine first numWords words in artist name into a single token
 artistTokens<-combineArtistWords(allDJArtists,numWords=2)
-load("DJKey.RData")
-DJKey<-addArtistCount(DJKey,artistTokens)
 
+
+load("DJKey.RData")
+
+DJKey<-addArtistCount(DJKey,artistTokens)
+save(DJKey,file="DJKey.RData")
 
 #get rid of Artists with less than 50 artists, ever
 DJKey<-filter(DJKey,artistCount>50)
 artistTokens<-semi_join(artistTokens,DJKey)
+
+#now sort it and sort factors
+DJKey<-arrange(DJKey,desc(artistCount))
+DJKey$ShowName<-factor(DJKey$ShowName,as.character(DJKey$ShowName))
+DJKey$DJ<-factor(DJKey$DJ,as.character(DJKey$DJ))
+
+#What DJs have played the most artists
+ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip()
 
 save(artistTokens,file="artistTokens.RData")
 load("artistTokens.RData")
@@ -248,7 +260,7 @@ save(t,file='artistfreq.txt',ascii = TRUE)
 print("Create Word Cloud")
 #scalefactor magnifies differences for wordcloud
 scaleFactor=3
-wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=100, random.order=FALSE,rot.per=0.35, 
+wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=200, random.order=FALSE,rot.per=0.35, 
              colors=brewer.pal(8, "Dark2"),scale = c(3,.2))
 
 #who has played the most artists?
