@@ -26,28 +26,28 @@ cleanUpArtists<- function(allDJArtists) {
 # one artist is all punctuation so give !!! special treatment
   allDJArtists$artist<-str_replace(allDJArtists$artist,"!!!","chkchkchk")
   # now change some common punctuation to space
-  #I'm sure there is a more elegant way to do this.
   print("Stripping Punctuation")
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\*"," ")
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,'\\['," ")
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,'\\]'," ")
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,'[!:"/+,]'," ")
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\'"," ")
+
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\&"," ")
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\."," ")
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\#"," ")
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\-"," ")
   
   allDJArtists$artist<-str_to_lower(allDJArtists$artist)
   # I choose to strip out the stuff below though dealing with it might get better analysis
   #remove any text in parentheses
   print("Stripping filler words")
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"\\(.*\\)","")
+  # get rid of anything between parenthesis
+  #tricky regex to handle cases of multiple parentheticals in one artist
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"(\\([^(]+\\))","")
   # remove 'featuring' or 'with' artists
   # I chose not to remove "Versus" because that is a band name
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"(feat |featuring |with |vs |vs\\.).+","")
   # get rid of 'live' identifier
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"(live @ |live on|@).+","")
+
+  #now get rid of remaining non-word characters except space
+
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"[^a-z^ ^0-9]","")
+  
+  
   # get rid of 'interview'
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"(interview w|interview)","")
   
@@ -65,11 +65,7 @@ cleanUpArtists<- function(allDJArtists) {
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"x ray","xray")
   
   #now some connecting words that might be spelled/used variantly
-
-  joinWords <- c("and ","the ","of ")
-  for (w in joinWords){
-    allDJArtists$artist<-str_replace_all(allDJArtists$artist,w," ")
-  }  
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"and | of | the"," ")
   # strip leading/trailing whitespace
   allDJArtists$artist<-str_trim(allDJArtists$artist)
 
@@ -80,14 +76,12 @@ cleanUpArtists<- function(allDJArtists) {
   
 }
 
-
-
 #combineArtistWords <- function(){
   # we replaced all punctuation with spaces
   #maybe strip spaces and combine all artist Words
 #  artistToken1<-str_replace_all(allDJArtists$artist," ","")
 #}
-
+#-----------------------------------------------------------------------------
 combineArtistWords <- function(allDJArtists,numWords){
   # we replaced all punctuation with spaces
   #maybe strip spaces and combine all artist Words
@@ -96,43 +90,29 @@ combineArtistWords <- function(allDJArtists,numWords){
   #does this break if numWords> number of words?
   t<-str_split_fixed(allDJArtists$artist,pattern="[ ]+",n=numWords+1)[,1:numWords]
   
-  allDJArtists$artistToken2<-apply(t,MARGIN=1,FUN=paste,collapse="")
-
-  
+  allDJArtists$artistToken<-apply(t,MARGIN=1,FUN=paste,collapse="")
 
   #now that tokens are created extract unique ones for each dj so mulitples don't occur
   # the zillion flavors of "Sun Ra..." will show up for each DJ only once
   # not perfect.  There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
   print("Create list of unique artist names for each DJ")
-  #artistTokens<-allDJArtists%>%select(DJ,artistToken2)%>%group_by(DJ)%>%distinct(artistToken2)
-  artistTokens<- data.frame()
-  for (dj in levels(allDJArtists$DJ)){
-    print(dj)
-    t<-allDJArtists%>%filter(DJ==dj)%>%select(artistToken2)%>%unique()
-    if (nrow(t) >0) artistTokens<-rbind(artistTokens,data.frame(DJ=dj,artistToken2=t))
-  }
-  # some very popular artists can have their names shortened to make more room
-  # on the wordcloud because you know exactly who we're talking about
-  artistTokens$artistToken2<-str_replace_all(artistTokens$artistToken2,"rollingstones","stones")
-  artistTokens$artistToken2<-str_replace_all(artistTokens$artistToken2,"enniomorricone","morricone") #only on WFMU!
-  artistTokens$artistToken2<-str_replace_all(artistTokens$artistToken2,"davidbowie","bowie")
-  artistTokens$artistToken2<-str_replace_all(artistTokens$artistToken2,"bobdylan","dylan")
+  artistTokens<-allDJArtists%>%select(DJ,artistToken)%>%group_by(DJ)%>%distinct(artistToken)
+
+    print("Combining iconic 2-name artists into one name to save space in wordcloud")
+  artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"rollingstones","stones")
+  artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"enniomorricone","morricone") #only on WFMU!
+  artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"davidbowie","bowie")
+  artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"bobdylan","dylan")
   #rm(t)
   return(artistTokens)
 }
 #-------------------------------------------------------------------------------------
 addArtistCount<- function(DJKey,artistTokens) {
-  t <- data.frame()
-  nm <- names(DJKey)
-  for (dj in levels(DJKey$DJ)){
-    #put all words in string for each DJ
-    #assumes dj is in artistTokens because testing for it is too slow
-    artistCount<- artistTokens%>%filter(DJ==dj)%>%nrow()
-    t<-rbind(t,artistCount)
-    print(paste(dj, " has played ",artistCount," artists",sep=""))
-  }
-  DJKey<-cbind(DJKey,t)
-  names(DJKey)<-c(names(DJKey[1:2]),"artistCount")
+  DJKey<-artistTokens%>%summarise(count=n())%>%inner_join(DJKey)%>%arrange(desc(count))
+  names(DJKey)<-c("DJ","artistCount","ShowName")
+  # make DJs a factor
+  DJKey$ShowName<-factor(DJKey$ShowName,as.character(DJKey$ShowName))
+  DJKey$DJ<-factor(DJKey$DJ,as.character(DJKey$DJ))
   return(DJKey)
 }
   
@@ -144,14 +124,16 @@ combineAllArtists <- function(){
     print(paste("Creating artist documents",dj))
   t<-rbind(t,data.frame(DJ=dj,artists= artistTokens%>%
                           filter(DJ==dj)%>%
-                          select(artistToken2)%>% 
+                          select(artistToken)%>% 
                           unlist()%>%paste(collapse=" ")%>%
                           str_replace_all("[^a-z ]","")%>%as.character()))
   }
   #artists should not have factor levels
   t$artists<-as.character(t$artists)
+  t<-filter(t,artists!="")
   return(t)
 }
+#------------------------------------------------------------
 
 delete.isolates <- function(graph) {
   #isolates <- which(degree(graph, mode = mode) == 0) - 1
@@ -159,6 +141,7 @@ delete.isolates <- function(graph) {
   return(delete.vertices(graph,V(graph)[degree(graph)==0]))
 }
 
+#------------------------------------------------------------
 plotNetwork <- function(docMatrix) {
   library(igraph)
   #put DJs in rows, artists in columns
@@ -197,7 +180,7 @@ plotNetwork <- function(docMatrix) {
 }
 
 
-# ----------------- MAIN --------------
+# --------------------------------------------------------------------------- MAIN --------------
 load("allDJArtists.RData")
 
 allDJArtists<-cleanUpArtists(allDJArtists)
@@ -209,24 +192,20 @@ artistTokens<-combineArtistWords(allDJArtists,numWords=2)
 load("DJKey.RData")
 
 DJKey<-addArtistCount(DJKey,artistTokens)
-save(DJKey,file="DJKey.RData")
+#save(DJKey,file="DJKey.RData")
 
-#get rid of Artists with less than 50 artists, ever
-DJKey<-filter(DJKey,artistCount>50)
+#get rid of Artists with less than 100 artists, ever.  Probably not a music show
+DJKey<-filter(DJKey,artistCount>100)
 artistTokens<-semi_join(artistTokens,DJKey)
+#regroup
+artistTokens<-artistTokens%>%group_by(DJ)
 
-#now sort it and sort factors
-DJKey<-arrange(DJKey,desc(artistCount))
-DJKey$ShowName<-factor(DJKey$ShowName,as.character(DJKey$ShowName))
-DJKey$DJ<-factor(DJKey$DJ,as.character(DJKey$DJ))
 
 #What DJs have played the most artists
 ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip()
 
 save(artistTokens,file="artistTokens.RData")
 load("artistTokens.RData")
-
-
 
 #combine words into one document per DJ
 djDocs<-combineAllArtists()
@@ -263,4 +242,4 @@ scaleFactor=3
 wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=200, random.order=FALSE,rot.per=0.35, 
              colors=brewer.pal(8, "Dark2"),scale = c(3,.2))
 
-#who has played the most artists?
+
