@@ -65,7 +65,10 @@ cleanUpArtists<- function(allDJArtists) {
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"x ray","xray")
   
   #now some connecting words that might be spelled/used variantly
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"and | of | the"," ")
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"and | of | the "," ")
+
+  #and leading "the"
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"^the "," ")
   # strip leading/trailing whitespace
   allDJArtists$artist<-str_trim(allDJArtists$artist)
 
@@ -109,7 +112,7 @@ combineArtistWords <- function(allDJArtists,numWords){
 #-------------------------------------------------------------------------------------
 addArtistCount<- function(DJKey,artistTokens) {
   DJKey<-artistTokens%>%summarise(count=n())%>%inner_join(DJKey)%>%arrange(desc(count))
-  names(DJKey)<-c("DJ","artistCount","ShowName")
+  names(DJKey)<-c("DJ","artistCount","ShowName","onMic")
   # make DJs a factor
   DJKey$ShowName<-factor(DJKey$ShowName,as.character(DJKey$ShowName))
   DJKey$DJ<-factor(DJKey$DJ,as.character(DJKey$DJ))
@@ -119,14 +122,18 @@ addArtistCount<- function(DJKey,artistTokens) {
 #-------------------------------------------------------------  
 combineAllArtists <- function(){
   t<- data.frame()
+  #make sure there aren't extra levels
+  artistTokens$DJ<-factor(artistTokens$DJ,as.character(unique(artistTokens$DJ)))
   for (dj in levels(artistTokens$DJ)){
     #put all words in string for each DJ
     print(paste("Creating artist documents",dj))
-  t<-rbind(t,data.frame(DJ=dj,artists= artistTokens%>%
+  t<-rbind(t,data.frame(DJ=dj,
+                        artists= artistTokens%>%
                           filter(DJ==dj)%>%
                           select(artistToken)%>% 
                           unlist()%>%paste(collapse=" ")%>%
-                          str_replace_all("[^a-z ]","")%>%as.character()))
+                          str_replace_all("[^a-z ]","")%>%as.character(),
+                        onMic=DJKey%>%filter(DJ==dj)%>%select(onMic)))
   }
   #artists should not have factor levels
   t$artists<-as.character(t$artists)
@@ -201,8 +208,11 @@ artistTokens<-semi_join(artistTokens,DJKey)
 artistTokens<-artistTokens%>%group_by(DJ)
 
 
+
 #What DJs have played the most artists
 ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip()
+#what onMic DJs have the most artist diversity
+ggplot(DJKey%>%filter(onMic==TRUE)%>%.[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip()
 
 save(artistTokens,file="artistTokens.RData")
 load("artistTokens.RData")
@@ -216,7 +226,9 @@ print("Create document corpus")
 djCorpus <- Corpus(VectorSource(djDocs$artists))
 
 for (i in 1:length(djCorpus)) {
-  meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]
+  meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]  
+  meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
+  meta(djCorpus[[i]], tag="onMic") <- djDocs$onMic[i]
 }
 #--------------------------------------------------------------------------------------------------
 #make a word cloud
@@ -225,7 +237,10 @@ for (i in 1:length(djCorpus)) {
 #and will return about 400 artists
 
 print("Make a term document matrix")
-djtdm<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(0.80)
+#djtdm<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(0.80)
+#just onMic?
+idx <- meta(djCorpus, "onMic") == TRUE
+djtdm<-TermDocumentMatrix(djCorpus[idx])%>%removeSparseTerms(0.80)
 
 
 m <- as.matrix(djtdm)
@@ -239,7 +254,7 @@ save(t,file='artistfreq.txt',ascii = TRUE)
 print("Create Word Cloud")
 #scalefactor magnifies differences for wordcloud
 scaleFactor=3
-wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=200, random.order=FALSE,rot.per=0.35, 
-             colors=brewer.pal(8, "Dark2"),scale = c(3,.2))
+wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=300, random.order=FALSE,rot.per=0.35, 
+             colors=brewer.pal(8, "Dark2"),scale = c(4,.3))
 
 

@@ -10,6 +10,7 @@ library(dplyr)
 
 # ----------------------------------------------
 ROOT_URL<-"http://wfmu.org"
+LAST_DJ<-"AH" #last currently on-mic DJ in DJ list  Need to smartly detect this
 
 #-------------------------------------------
 getDJURLs <- function(){
@@ -83,11 +84,15 @@ getShowNames<-function(DJURLs) {
     showName <- html_node(singleDJ,"title")%>%html_text()
     showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     showName<-str_replace(showName,'WFMU:',"")
-    showName<-str_replace(showName,':Playlists and Archives',"")
+    showName<-str_replace_all(showName,':Playlists and Archives',"")
     DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
     DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
     print(showName)
-  }  
+  }
+  # now identifty those DJs which are currently ON MIC
+  # wish I could figure out how to identify ON MIC by scraping
+  DJKey$onMic <- FALSE
+  DJKey$onMic[1:which(DJKey$DJ==LAST_DJ)]<-TRUE
   save(DJKey,file="DJKey.RData")
 }
 
@@ -95,7 +100,7 @@ getShowNames<-function(DJURLs) {
 # get the URLs of the playlists for a DJ
 getDJPlaylistURLs<-function(DJURLs) {
   allDJPlayLists = data.frame()
-  DJKey = data.frame()
+  #DJKey = data.frame()
   for (n in 1:length(DJURLs)) {
     singleDJ<- html(DJURLs[n])
     pl<-html_nodes(singleDJ,xpath="//a")%>%html_attr("href")
@@ -104,10 +109,10 @@ getDJPlaylistURLs<-function(DJURLs) {
     # format for older shows
     pl2<-paste(ROOT_URL, na.omit(pl[str_detect(pl,"Playlist")]),sep="")
     playlistURL<-c(pl1,pl2)
-    showName <- html_node(singleDJ,"title")%>%html_text()
-    showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
+    #showName <- html_node(singleDJ,"title")%>%html_text()
+    #showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
-    DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
+    #DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
     allDJPlayLists = rbind(allDJPlayLists, getPlaylist(plURL = playlistURL,dj = DJ))
   }  
   return(allDJPlayLists)
@@ -136,7 +141,8 @@ getDJArtistNames<-function(DJURLs) {
 }  
 
 #-------------- MAIN -----------------
-DJURLS<-getDJURLs()
+DJURLs<-getDJURLs()
+getShowNames(DJURLs)
 allDJArtists <- getDJArtistNames(DJURLs) 
 
 allDJArtists <- filter(allDJArtists,artist!="")
