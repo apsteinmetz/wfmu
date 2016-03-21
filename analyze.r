@@ -237,7 +237,7 @@ for (i in 1:length(djCorpus)) {
 #and will return about 400 artists
 
 print("Make a term document matrix")
-#djtdm<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(0.80)
+djtdm<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(0.80)
 #just onMic?
 idx <- meta(djCorpus, "onMic") == TRUE
 djtdm<-TermDocumentMatrix(djCorpus[idx])%>%removeSparseTerms(0.80)
@@ -255,6 +255,6 @@ print("Create Word Cloud")
 #scalefactor magnifies differences for wordcloud
 scaleFactor=3
 wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=300, random.order=FALSE,rot.per=0.35, 
-             colors=brewer.pal(8, "Dark2"),scale = c(4,.3))
+             colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 
 
