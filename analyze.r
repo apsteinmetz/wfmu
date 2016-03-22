@@ -153,11 +153,22 @@ plotNetwork <- function(docMatrix) {
   library(igraph)
   #put DJs in rows, artists in columns
   #get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
-  djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(0.6)
+  idx <- meta(djCorpus, "onMic") == TRUE
+  djdtm<-DocumentTermMatrix(djCorpus[idx]) %>% removeSparseTerms(0.8)
   m2<-as.matrix(djdtm)
-  rownames(m2)<-djDocs$DJ
+  rownames(m2)<-djDocs$DJ[which(djDocs$onMic==TRUE)]
   save(m2,file="docTermMatrix.RData")
   
+  #get euclidean distance
+  d<-dist(m2)
+  
+  
+  CLUSTERS<-5
+  #make a plot
+  clusplot(as.matrix(d), kmeans(d,CLUSTERS)$cluster, color=T, shade=T, labels=2, lines=0) 
+  
+  as.matrix(d)["TW",]
+  intersect(artistTokens[which(artistTokens$DJ=="TW"),]$artistToken,artistTokens[which(artistTokens$DJ=="MS"),]$artistToken)
   #create document matrix of commonalities
   docMatrix<-m2 %*% t(m2)
   # get rid of DJs with no association to anybody after making matrix sparse
