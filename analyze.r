@@ -19,6 +19,7 @@ library("wordcloud")
 library("RColorBrewer")
 library("SnowballC")
 library(igraph)
+library(cluster)
 
 
 cleanUpArtists<- function(allDJArtists) {
@@ -74,6 +75,7 @@ cleanUpArtists<- function(allDJArtists) {
 
   #did we create any null entries
   allDJArtists<-filter(allDJArtists,artist!="")
+  allDJArtists<-filter(allDJArtists,artist!="artist")
   
   return(allDJArtists)
   
@@ -101,7 +103,7 @@ combineArtistWords <- function(allDJArtists,numWords){
   print("Create list of unique artist names for each DJ")
   artistTokens<-allDJArtists%>%select(DJ,artistToken)%>%group_by(DJ)%>%distinct(artistToken)
 
-    print("Combining iconic 2-name artists into one name to save space in wordcloud")
+  print("Combining iconic 2-name artists into one name to save space in wordcloud")
   artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"rollingstones","stones")
   artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"enniomorricone","morricone") #only on WFMU!
   artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"davidbowie","bowie")
@@ -147,7 +149,32 @@ delete.isolates <- function(graph) {
   #delete.vertices(graph, isolates)
   return(delete.vertices(graph,V(graph)[degree(graph)==0]))
 }
-
+#-----------------------------------------------------------
+library(Matrix)
+jaccard <- function(m) {
+  ## common values:
+  A = tcrossprod(m)
+  ## indexes for non-zero common values
+  im = which(A > 0, arr.ind=TRUE)
+  ## counts for each row
+  b = rowSums(m)
+  
+  ## only non-zero values of common
+  Aim = A[im]
+  
+  ## Jacard formula: #common / (#i + #j - #common)
+  J = sparseMatrix(
+    i = im[,1],
+    j = im[,2],
+    x = Aim / (b[im[,1]] + b[im[,2]] - Aim),
+    dims = dim(A)
+  )
+  
+  #preserve row/column names, if any
+  rownames(J)<-rownames(m)
+  colnames(J)<-rownames(m)
+  return( J )
+}
 #------------------------------------------------------------
 plotNetwork <- function(docMatrix) {
   library(igraph)
@@ -160,15 +187,18 @@ plotNetwork <- function(docMatrix) {
   save(m2,file="docTermMatrix.RData")
   
   #get euclidean distance
-  d<-dist(m2)
+  # d<-dist(m2)
+  j<-jaccard(m2)
   
   
   CLUSTERS<-5
   #make a plot
-  clusplot(as.matrix(d), kmeans(d,CLUSTERS)$cluster, color=T, shade=T, labels=2, lines=0) 
+  clusplot(as.matrix(j), kmeans(j,CLUSTERS)$cluster, color=T, shade=T, labels=2, lines=0) 
   
-  as.matrix(d)["TW",]
-  intersect(artistTokens[which(artistTokens$DJ=="TW"),]$artistToken,artistTokens[which(artistTokens$DJ=="MS"),]$artistToken)
+  whichDJ <- "TW"
+  likeDJs<-data.frame(similarity=as.matrix(j)[whichDJ,])
+  
+  intersect(artistTokens[which(artistTokens$DJ==whichDJ),]$artistToken,artistTokens[which(artistTokens$DJ=="MS"),]$artistToken)
   #create document matrix of commonalities
   docMatrix<-m2 %*% t(m2)
   # get rid of DJs with no association to anybody after making matrix sparse
@@ -237,6 +267,7 @@ print("Create document corpus")
 djCorpus <- Corpus(VectorSource(djDocs$artists))
 
 for (i in 1:length(djCorpus)) {
+  meta(djCorpus[[i]], tag="ID") <- djDocs$DJ[i]  
   meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]  
   meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
   meta(djCorpus[[i]], tag="onMic") <- djDocs$onMic[i]
