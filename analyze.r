@@ -178,6 +178,7 @@ jaccard <- function(m) {
 #------------------------------------------------------------
 plotNetwork <- function(docMatrix) {
   library(igraph)
+  library(proxy)
   #put DJs in rows, artists in columns
   #get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
   idx <- meta(djCorpus, "onMic") == TRUE
@@ -188,32 +189,45 @@ plotNetwork <- function(docMatrix) {
   
   #get euclidean distance
   # d<-dist(m2)
-  j<-jaccard(m2)
-  
+  #j<-jaccard(m2)
+  j<-simil(m2,method="Jaccard")
   
   CLUSTERS<-5
   #make a plot
   clusplot(as.matrix(j), kmeans(j,CLUSTERS)$cluster, color=T, shade=T, labels=2, lines=0) 
   
+  #djs for example
   whichDJ <- "TW"
+  compareDJ<-"TM"
   likeDJs<-data.frame(similarity=as.matrix(j)[whichDJ,])
+  likeDJs<-likeDJs%>%add_rownames(var="DJ")
+  likeDJs<-arrange(likeDJs,similarity)
   
-  intersect(artistTokens[which(artistTokens$DJ==whichDJ),]$artistToken,artistTokens[which(artistTokens$DJ=="MS"),]$artistToken)
+  commonArtists<-intersect(artistTokens[which(artistTokens$DJ==whichDJ),]$artistToken,artistTokens[which(artistTokens$DJ==compareDJ),]$artistToken)
+  sample(commonArtists,20)
+  
+  
+  # create graph
+  g<-as.matrix(j)%>%melt()%>%as.data.frame()%>%graph.data.frame()
+  
   #create document matrix of commonalities
-  docMatrix<-m2 %*% t(m2)
+  #docMatrix<-m2 %*% t(m2)
   # get rid of DJs with no association to anybody after making matrix sparse
   # if complete matrix is used this will have no effect
-  orphans<-row.names(docMatrix[rowSums(docMatrix)==0,])
-  print(orphans)
-  docMatrix<-docMatrix[rowSums(docMatrix)!=0,rowSums(docMatrix)!=0]
+  #orphans<-row.names(docMatrix[rowSums(docMatrix)==0,])
+  #print(orphans)
+  #docMatrix<-docMatrix[rowSums(docMatrix)!=0,rowSums(docMatrix)!=0]
   # build a graph from the above matrix
-  g <- graph.adjacency(docMatrix, weighted=T, mode = "undirected")
+  #g <- graph.adjacency(docMatrix, weighted=T, mode = "undirected")
   # remove loops
   g <- simplify(g)
   #set labels and degrees of vertices
   V(g)$label <- V(g)$name
   V(g)$degree <- degree(g)
-  g2 <- delete.edges(g, which(E(g)$weight <10))
+  E(g)$weight<-E(g)$value
+  
+  #remove edges with similarity less than 0.1 Jaccard
+  g2 <- delete.edges(g, which(E(g)$value <0.10))
   g2<-delete.isolates(g2)
   # set seed to make the layout reproducible
   set.seed(3952)
@@ -221,9 +235,9 @@ plotNetwork <- function(docMatrix) {
   plot(g2, layout=layout1)
   
   #if we want to export to gephis plot tool
-  #library(rgexf) 
-  #wfmugraph<-igraph.to.gexf(g2)
-  #print(wfmugraf,file="wfmugraf.gexf")
+  library(rgexf) 
+  wfmugraph<-igraph.to.gexf(g2)
+  print(wfmugraf,file="wfmugraf.gexf")
   
 }
 
