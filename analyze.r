@@ -20,6 +20,8 @@ library("RColorBrewer")
 library("SnowballC")
 library(igraph)
 library(cluster)
+library(reshape2)
+library(proxy)
 
 
 cleanUpArtists<- function(allDJArtists) {
@@ -150,35 +152,34 @@ delete.isolates <- function(graph) {
   return(delete.vertices(graph,V(graph)[degree(graph)==0]))
 }
 #-----------------------------------------------------------
-library(Matrix)
-jaccard <- function(m) {
-  ## common values:
-  A = tcrossprod(m)
-  ## indexes for non-zero common values
-  im = which(A > 0, arr.ind=TRUE)
-  ## counts for each row
-  b = rowSums(m)
+assignClusters<-function(djCorpus=djCorpus,DJKey=DJKey,CLUSTERS=5) {
+  SPARSE = 0.8
+  # idx <- meta(djCorpus, "onMic") == onMic
+  # djdtm<-DocumentTermMatrix(djCorpus[idx]) %>% removeSparseTerms(SPARSE)
+  djdtm<-DocumentTermMatrix(djCorpus) %>% removeSparseTerms(SPARSE)
+  m2<-as.matrix(djdtm)
+  rownames(m2)<-djDocs$DJ
+  save(m2,file="docTermMatrix.RData")
   
-  ## only non-zero values of common
-  Aim = A[im]
+  # get similarity
+  j<-simil(m2,method="Jaccard")
   
-  ## Jacard formula: #common / (#i + #j - #common)
-  J = sparseMatrix(
-    i = im[,1],
-    j = im[,2],
-    x = Aim / (b[im[,1]] + b[im[,2]] - Aim),
-    dims = dim(A)
-  )
   
-  #preserve row/column names, if any
-  rownames(J)<-rownames(m)
-  colnames(J)<-rownames(m)
-  return( J )
+  # find similarity clusters
+  #make a plot
+  clust<-kmeans(j,CLUSTERS)$cluster
+  djCluster<-cbind(DJ=names(clust),data.frame(cluster=clust))
+  DJKey<-arrange(inner_join(DJKey,djCluster),cluster)
+  
+  
+  clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
+  #list DJ clusters
+  return (DJKey)
 }
 #------------------------------------------------------------
 plotNetwork <- function(docMatrix) {
-  library(igraph)
   library(proxy)
+  library(igraph)
   #put DJs in rows, artists in columns
   #get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
   idx <- meta(djCorpus, "onMic") == TRUE
@@ -192,9 +193,17 @@ plotNetwork <- function(docMatrix) {
   #j<-jaccard(m2)
   j<-simil(m2,method="Jaccard")
   
+  
+  # find similarity clusters
   CLUSTERS<-5
   #make a plot
-  clusplot(as.matrix(j), kmeans(j,CLUSTERS)$cluster, color=T, shade=T, labels=2, lines=0) 
+  clust<-kmeans(j,CLUSTERS)$cluster
+  djCluster<-cbind(DJ=names(clust),data.frame(cluster=clust))
+  temp<-arrange(inner_join(DJKey,djCluster),cluster)
+
+  
+  clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
+  #list DJ clusters
   
   #djs for example
   whichDJ <- "TW"
@@ -262,6 +271,8 @@ artistTokens<-semi_join(artistTokens,DJKey)
 #regroup
 artistTokens<-artistTokens%>%group_by(DJ)
 
+save(artistTokens,file="artistTokens.RData")
+load("artistTokens.RData")
 
 
 #What DJs have played the most artists
@@ -269,22 +280,24 @@ ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_f
 #what onMic DJs have the most artist diversity
 ggplot(DJKey%>%filter(onMic==TRUE)%>%.[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip()
 
-save(artistTokens,file="artistTokens.RData")
-load("artistTokens.RData")
 
 #combine words into one document per DJ
+# don't try to display djDocs. It's a monster and will hang machine!
 djDocs<-combineAllArtists()
 save(djDocs,file="djDocs.RData")
 load("djDocs.RData")
 
 print("Create document corpus")
 djCorpus <- Corpus(VectorSource(djDocs$artists))
+DJKey<-assignClusters(djCorpus,DJKey)
+djDocs<-inner_join(djDocs,DJKey[,c("DJ","cluster")])
 
 for (i in 1:length(djCorpus)) {
   meta(djCorpus[[i]], tag="ID") <- djDocs$DJ[i]  
   meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]  
   meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
   meta(djCorpus[[i]], tag="onMic") <- djDocs$onMic[i]
+  meta(djCorpus[[i]], tag="cluster") <- djDocs$cluster[i]
 }
 #--------------------------------------------------------------------------------------------------
 #make a word cloud
@@ -295,7 +308,7 @@ for (i in 1:length(djCorpus)) {
 print("Make a term document matrix")
 djtdm<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(0.80)
 #just onMic?
-idx <- meta(djCorpus, "onMic") == TRUE
+idx <- meta(djCorpus, "cluster") == 5
 djtdm<-TermDocumentMatrix(djCorpus[idx])%>%removeSparseTerms(0.80)
 
 
@@ -305,7 +318,7 @@ d <- data.frame(word = names(v),freq=v)
 t<-head(d, 200)
 rownames(t)<-NULL
 print(t)
-save(t,file='artistfreq.txt',ascii = TRUE)
+#save(t,file='artistfreq.txt',ascii = TRUE)
 
 print("Create Word Cloud")
 #scalefactor magnifies differences for wordcloud
