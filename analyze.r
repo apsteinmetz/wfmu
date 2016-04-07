@@ -22,6 +22,7 @@ library(igraph)
 library(cluster)
 library(reshape2)
 library(proxy)
+library(Matrix)
 
 #get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
 SPARSE<- 0.95 #sparsity of term document matrices
@@ -84,12 +85,6 @@ cleanUpArtists<- function(allDJArtists) {
   return(allDJArtists)
   
 }
-
-#combineArtistWords <- function(){
-  # we replaced all punctuation with spaces
-  #maybe strip spaces and combine all artist Words
-#  artistToken1<-str_replace_all(allDJArtists$artist," ","")
-#}
 #-----------------------------------------------------------------------------
 combineArtistWords <- function(allDJArtists,numWords){
   # we replaced all punctuation with spaces
@@ -124,7 +119,6 @@ addArtistCount<- function(DJKey,artistTokens) {
   DJKey$DJ<-factor(DJKey$DJ,as.character(DJKey$DJ))
   return(DJKey)
 }
-  
 #-------------------------------------------------------------  
 combineAllArtists <- function(){
   t<- data.frame()
@@ -147,21 +141,39 @@ combineAllArtists <- function(){
   return(t)
 }
 #------------------------------------------------------------
-
 delete.isolates <- function(graph) {
   #isolates <- which(degree(graph, mode = mode) == 0) - 1
   #delete.vertices(graph, isolates)
   return(delete.vertices(graph,V(graph)[degree(graph)==0]))
 }
-
-
+#-----------------------------------------------------------
+jaccard <- function(m) {
+  #http://stackoverflow.com/questions/36220585/efficient-jaccard-similarity-documenttermmatrix
+  ## common values:
+  A <- tcrossprod(m)
+  im <- which(A > 0, arr.ind=TRUE, useNames = FALSE)
+  b <- rowSums(m)
+  Aim <- A[im]
+  J<-sparseMatrix(
+    i = im[,1],
+    j = im[,2],
+    x = Aim / (b[im[,1]] + b[im[,2]] - Aim),
+    dims = dim(A)
+  )
+  
+  #preserve row/column names, if any
+  rownames(J)<-rownames(m)
+  colnames(J)<-rownames(m)
+  return( J )
+}  
 #-----------------------------------------------------------
 getSimilarity<-function(djdtm=djdtm){
   m2<-as.matrix(djdtm)
   rownames(m2)<-djDocs$DJ
 
   # get similarity
-  j<-simil(m2,method="Jaccard")
+  #j<-simil(m2,method="Jaccard")
+  j<-jaccard(m2)
   save(j,file="djSimilarity.RData")
   return(j)
 }
@@ -185,7 +197,7 @@ assignClusters<-function(j,CLUSTERS=5) {
   
   clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
   #list DJ clusters
-  return (clust)
+  #return (clust)
 }
 #------------------------------------------------------------
 plotNetwork <- function(docMatrix) {
@@ -259,7 +271,6 @@ plotNetwork <- function(docMatrix) {
   print(wfmugraf,file="wfmugraf.gexf")
   
 }
-
 #--------------------------------------------------------------------------------------------------
 makeWordCloud<-function(djtdm=djtdm,maxWords=100) {
   #for wordcloud of most widely played artists
@@ -289,7 +300,11 @@ makeWordCloud<-function(djtdm=djtdm,maxWords=100) {
 }
 #------------------------------------------------------------------
 #plot stuff depending on onmic or offmic status
-
+plotStuff<-function(djtdm=djdtm,j=j,DJKey=DJkey){
+  makeWordCloud(djtdm)
+  assignClusters(j)
+  print(DJKey$ShowName)
+}  
 # --------------------------------------------------------------------------- MAIN --------------
 load("allDJArtists.RData")
 
@@ -346,7 +361,7 @@ djtdm<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
 
 
 micStatus=c("on","off","both")
-mic<-micStatus[1]
+mic<-micStatus[2]
 #idx <- switch(mic,
 #              on = (meta(djCorpus, "onMic") == TRUE),
 #              off = (meta(djCorpus, "onMic") == FALSE),
@@ -363,16 +378,18 @@ djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == FALSE])%>%remo
 
 djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
 
-#wordCloud
+# get similarity index matrix using Jaccard
+j<-getSimilarity(djdtm)
+
+onDJs<- DJKey%>%filter(onMic==TRUE)%>%select(DJ)%>%unlist()%>%as.vector()
+offDJs<-DJKey%>%filter(onMic==FALSE)%>%select(DJ)%>%unlist()%>%as.vector()
+AllDJs<-DJKey%>%select(DJ)%>%unlist()%>%as.vector()
+
+#plot stuff
 switch(mic,
-              on = makeWordCloud(djtdm_on),
-              off = makeWordCloud(djtdm_off),
-              both = makeWordCloud(djtdm_all)
+       on = plotStuff(djtdm_on,j[onDJs,onDJs],DJKey[DJKey$DJ%in%onDJs,]),
+       off = plotStuff(djtdm_off,j[offDJs,offDJs],DJKey[DJKey$DJ%in%offDJs,]),
+       all = plotStuff(djtdm_all,DJKey)
               )
 
-# get similarity index matrix using Jaccard
-j<-getSimilarity(djdtm,mic)
 
-onDJs<- DJKey%>%filter(onMic==TRUE)%>%select(DJ)%>%unlist()
-offDJs<-DJKey%>%filter(onMic==FALSE)%>%select(DJ)%>%unlist()
-AllDJs<-DJKey%>%select(DJ)%>%unlist()
