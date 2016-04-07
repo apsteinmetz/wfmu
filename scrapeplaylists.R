@@ -93,6 +93,13 @@ getShowNames<-function(DJURLs) {
   # wish I could figure out how to identify ON MIC by scraping
   DJKey$onMic <- FALSE
   DJKey$onMic[1:which(DJKey$DJ==LAST_DJ)]<-TRUE
+  #strip "WFMU" and "Playlists and Archives" and some punctuation
+  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylists (and|&) (A|a)rchives","")
+  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"-","")
+  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylist|(R|r)ecent","")
+  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"WFMU|wfmu","")
+  DJKey$ShowName<-str_trim(DJKey$ShowName)
+  
   save(DJKey,file="DJKey.RData")
 }
 

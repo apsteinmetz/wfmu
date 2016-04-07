@@ -11,10 +11,14 @@
 # # install_url("http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.1.tar.gz")
 # # install_url("http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.2.tar.gz")
 # 
+library(devtools)
+#install_github('sinhrks/ggfortify')
+library(ggplot2)
 library(stringr)
 library(tm)
 library(dplyr)
 library("ggplot2")
+#library(ggfortify)
 library("wordcloud")
 library("RColorBrewer")
 library("SnowballC")
@@ -184,7 +188,9 @@ assignClusters<-function(j,CLUSTERS=5) {
   
   # find similarity clusters
   #make a plot
-  clust<-kmeans(j,CLUSTERS)$cluster
+  set.seed(1)
+  kdj<-kmeans(j,CLUSTERS)
+  clust<-kdj$cluster
   #djCluster<-cbind(DJ=names(clust),data.frame(cluster=clust))
   
   #if ("cluster" %in% names(DJKey)){
@@ -196,10 +202,31 @@ assignClusters<-function(j,CLUSTERS=5) {
     
   
   clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
+  #autoplot(kdj,data=j)
   #list DJ clusters
   #return (clust)
 }
+#----------------------------------------------------------
+similarDJs<-function(whichDJ="TW",compareDJ="TM",j,DJkey,artistTokens){
+  #djs for example
+  #whichDJ <- "TW"
+  #compareDJ<-"TM"
+  likeDJs<-data.frame(similarity=as.matrix(j)[whichDJ,])
+  #likeDJs<-likeDJs%>%add_rownames(var="DJ")
+  likeDJs$DJ<-rownames(likeDJs)
+  likeDJs<-arrange(likeDJs,desc(similarity))[-1,] #sort descending and remove self DJ
+  rownames(likeDJs)<-NULL
+  #since we sorted in order of descending similarity the first row has the most similar DJ
+  compareDJ<-likeDJs[1,"DJ"]
+  whichShow<-DJKey%>%filter(DJ==whichDJ)%>%.$ShowName%>%as.character()
+  compareShow<-DJKey%>%filter(DJ==compareDJ)%>%.$ShowName%>%as.character()
+  paste(whichShow,"is most similar to",compareShow)
+  paste("Similarity Index:",format(likeDJs[1,"similarity"],digits=2),"/1.00")
+  commonArtists<-intersect(artistTokens[which(artistTokens$DJ==whichDJ),]$artistToken,artistTokens[which(artistTokens$DJ==compareDJ),]$artistToken)
+  print(as.data.frame(sample(commonArtists,20)))
+}
 #------------------------------------------------------------
+#not functional
 plotNetwork <- function(docMatrix) {
   library(proxy)
   library(igraph)
@@ -231,8 +258,10 @@ plotNetwork <- function(docMatrix) {
   whichDJ <- "TW"
   compareDJ<-"TM"
   likeDJs<-data.frame(similarity=as.matrix(j)[whichDJ,])
-  likeDJs<-likeDJs%>%add_rownames(var="DJ")
-  likeDJs<-arrange(likeDJs,similarity)
+  #likeDJs<-likeDJs%>%add_rownames(var="DJ")
+  likeDJs$DJ<-rownames(likeDJs)
+  likeDJs<-arrange(likeDJs,desc(similarity))[-1,] #sort descending and remove self DJ
+  rownames(likeDJs)<-NULL  
   
   commonArtists<-intersect(artistTokens[which(artistTokens$DJ==whichDJ),]$artistToken,artistTokens[which(artistTokens$DJ==compareDJ),]$artistToken)
   sample(commonArtists,20)
@@ -301,90 +330,84 @@ makeWordCloud<-function(djtdm=djtdm,maxWords=100) {
 #------------------------------------------------------------------
 #plot stuff depending on onmic or offmic status
 plotStuff<-function(djtdm=djdtm,j=j,DJKey=DJkey){
+  print(ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip())
   makeWordCloud(djtdm)
   assignClusters(j)
-  print(DJKey$ShowName)
+  #print(DJKey$ShowName)
 }  
 # --------------------------------------------------------------------------- MAIN --------------
 load("allDJArtists.RData")
 
-allDJArtists<-cleanUpArtists(allDJArtists)
+# allDJArtists<-cleanUpArtists(allDJArtists)
+# 
+# #combine first numWords words in artist name into a single token
+# artistTokens<-combineArtistWords(allDJArtists,numWords=2)
+# 
+# 
+# load("DJKey.RData")
+# 
+# DJKey<-addArtistCount(DJKey,artistTokens)
+# #save(DJKey,file="DJKey.RData")
+# 
+# #get rid of DJs with less than 100 artists, ever.  Probably not a music show
+# DJKey<-filter(DJKey,artistCount>100)
+# artistTokens<-semi_join(artistTokens,DJKey)
+# #regroup
+# artistTokens<-artistTokens%>%group_by(DJ)
+# 
+# save(artistTokens,file="artistTokens.RData")
+# load("artistTokens.RData")
+# 
+# 
+# #combine words into one document per DJ
+# # don't try to display djDocs. It's a monster and will hang machine!
+# djDocs<-combineAllArtists()
+# save(djDocs,file="djDocs.RData")
+# load("djDocs.RData")
+# 
 
-#combine first numWords words in artist name into a single token
-artistTokens<-combineArtistWords(allDJArtists,numWords=2)
-
-
-load("DJKey.RData")
-
-DJKey<-addArtistCount(DJKey,artistTokens)
-#save(DJKey,file="DJKey.RData")
-
-#get rid of Artists with less than 100 artists, ever.  Probably not a music show
-DJKey<-filter(DJKey,artistCount>100)
-artistTokens<-semi_join(artistTokens,DJKey)
-#regroup
-artistTokens<-artistTokens%>%group_by(DJ)
-
-save(artistTokens,file="artistTokens.RData")
-load("artistTokens.RData")
-
-
-#What DJs have played the most artists
-ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip()
-#what onMic DJs have the most artist diversity
-ggplot(DJKey%>%filter(onMic==FALSE)%>%.[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip()
-
-
-#combine words into one document per DJ
-# don't try to display djDocs. It's a monster and will hang machine!
-djDocs<-combineAllArtists()
-save(djDocs,file="djDocs.RData")
-load("djDocs.RData")
-
-
-
-print("Create document corpus and term document matrices")
-djCorpus <- Corpus(VectorSource(djDocs$artists))
-
-
-for (i in 1:length(djCorpus)) {
-  meta(djCorpus[[i]], tag="ID") <- djDocs$DJ[i]  
-  meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]  
-  meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
-  meta(djCorpus[[i]], tag="onMic") <- djDocs$onMic[i]
-}
-#djDocs<-inner_join(djDocs,DJKey[,c("DJ","cluster")])
-#make 3 tdms based on onmic status
-
-djtdm<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
-
-
-
-micStatus=c("on","off","both")
-mic<-micStatus[2]
-#idx <- switch(mic,
-#              on = (meta(djCorpus, "onMic") == TRUE),
-#              off = (meta(djCorpus, "onMic") == FALSE),
-#              both = rep(TRUE,length(djCorpus))
-#              )
-
-#djtdm<-TermDocumentMatrix(djCorpus[idx])%>%removeSparseTerms(SPARSE)
-
-#OR if you have the memory to pre-create
-
-djtdm_all<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
-djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == TRUE])%>%removeSparseTerms(SPARSE)
-djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == FALSE])%>%removeSparseTerms(SPARSE)
-
-djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
-
-# get similarity index matrix using Jaccard
-j<-getSimilarity(djdtm)
-
-onDJs<- DJKey%>%filter(onMic==TRUE)%>%select(DJ)%>%unlist()%>%as.vector()
-offDJs<-DJKey%>%filter(onMic==FALSE)%>%select(DJ)%>%unlist()%>%as.vector()
-AllDJs<-DJKey%>%select(DJ)%>%unlist()%>%as.vector()
-
+#--------------------------------------------------------------------------------
+# print("Create document corpus and term document matrices")
+# djCorpus <- Corpus(VectorSource(djDocs$artists))
+# 
+# 
+# for (i in 1:length(djCorpus)) {
+#   meta(djCorpus[[i]], tag="ID") <- djDocs$DJ[i]  
+#   meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]  
+#   meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
+#   meta(djCorpus[[i]], tag="onMic") <- djDocs$onMic[i]
+# }
+# 
+# 
+# 
+# micStatus=c("on","off","both")
+# mic<-micStatus[2]
+# #idx <- switch(mic,
+# #              on = (meta(djCorpus, "onMic") == TRUE),
+# #              off = (meta(djCorpus, "onMic") == FALSE),
+# #              both = rep(TRUE,length(djCorpus))
+# #              )
+# 
+# 
+# #djtdm<-TermDocumentMatrix(djCorpus[idx])%>%removeSparseTerms(SPARSE)
+# 
+# #OR if you have the memory to pre-create
+# #make 3 Term Document Matrices where artist is in the column based on onmic status
+# 
+# djtdm_all<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
+# djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == TRUE])%>%removeSparseTerms(SPARSE)
+# djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == FALSE])%>%removeSparseTerms(SPARSE)
+# 
+# # now create Document Term Matrix where DJs are the column
+# djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
+# 
+# # get similarity index matrix using Jaccard
+# j<-getSimilarity(djdtm)
+# 
+# onDJs<- DJKey%>%filter(onMic==TRUE)%>%select(DJ)%>%unlist()%>%as.vector()
+# offDJs<-DJKey%>%filter(onMic==FALSE)%>%select(DJ)%>%unlist()%>%as.vector()
+# AllDJs<-DJKey%>%select(DJ)%>%unlist()%>%as.vector()
+#-----------------------------------------------------------------
 #plot stuff
 switch(mic,
        on = plotStuff(djtdm_on,j[onDJs,onDJs],DJKey[DJKey$DJ%in%onDJs,]),
