@@ -4,6 +4,25 @@ library(tm)
 library(wordcloud)
 library(memoise)
 
+# initialize files and variables
+load("djDocs.RData")
+load("djKey.RData")
+micStatus=c("on","off","all")
+#shows with less than 100 artists are probably not a music show
+DJKey<-filter(DJKey,artistCount>100)
+#OR if you have the memory to pre-create
+#make 3 Term Document Matrices where artist is in the column based on onmic status
+
+djtdm_all<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
+djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == TRUE])%>%removeSparseTerms(SPARSE)
+djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == FALSE])%>%removeSparseTerms(SPARSE)
+
+# now create Document Term Matrix where DJs are the column
+djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
+
+# get similarity index matrix using Jaccard
+j<-getSimilarity(djdtm)
+
 #--------------------------------------------------------------
 makeWordCloud<-function(djtdm=djtdm,maxWords=100) {
   #for wordcloud of most widely played artists
@@ -31,29 +50,39 @@ makeWordCloud<-function(djtdm=djtdm,maxWords=100) {
             colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
   
 }
+#-----------------------------------------------------------------------
+plotStuff<-function(djtdm=djdtm,j=j,DJKey=DJkey,maxWords){
+#  print(ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip())
+  makeWordCloud(djtdm,maxWords)
+#  assignClusters(j)
+  #print(DJKey$ShowName)
+}  
 
 #---------------------------------------------------
 server <- function(input, output, session) {
-  # Define a reactive expression for the document term matrix
-  terms <- reactive({
-    # Change when the "update" button is pressed...
-    input$update
-    # ...but not for anything else
-    isolate({
-      withProgress({
-        setProgress(message = "Processing corpus...")
-        getTermMatrix(input$selection)
-      })
-    })
-  })
-  
+#   # Define a reactive expression for the document term matrix
+#   terms <- reactive({
+#     # Change when the "update" button is pressed...
+#     input$update
+#     # ...but not for anything else
+#     isolate({
+#       withProgress({
+#         setProgress(message = "Processing corpus...")
+#         getTermMatrix(input$selection)
+#       })
+#     })
+#   })
+#   
   # Make the wordcloud drawing predictable during a session
-  wordcloud_rep <- repeatable(wordcloud)
+#  wordcloud_rep <- repeatable(wordcloud)
   
   output$plot <- renderPlot({
-    v <- terms()
-    makewordcloud(names(v),maxWords=input$max)
-                  
+    switch(input$mic,
+           on = plotStuff(djtdm_on,j[onDJs,onDJs],DJKey[DJKey$DJ%in%onDJs,],input$max),
+           off = plotStuff(djtdm_off,j[offDJs,offDJs],DJKey[DJKey$DJ%in%offDJs,],input$max),
+           all = plotStuff(djtdm,DJKey,input$max)
+    )
+
   })
 }
 #-------------------------------------------------------

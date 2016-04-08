@@ -346,17 +346,17 @@ load("allDJArtists.RData")
 # 
 # load("DJKey.RData")
 # 
-# DJKey<-addArtistCount(DJKey,artistTokens)
+#DJKey<-addArtistCount(DJKey,artistTokens)
 # #save(DJKey,file="DJKey.RData")
 # 
 # #get rid of DJs with less than 100 artists, ever.  Probably not a music show
-# DJKey<-filter(DJKey,artistCount>100)
-# artistTokens<-semi_join(artistTokens,DJKey)
-# #regroup
-# artistTokens<-artistTokens%>%group_by(DJ)
+DJKey<-filter(DJKey,artistCount>100)
+artistTokens<-semi_join(artistTokens,DJKey)
+#regroup
+artistTokens<-artistTokens%>%group_by(DJ)
 # 
-# save(artistTokens,file="artistTokens.RData")
-# load("artistTokens.RData")
+save(artistTokens,file="artistTokens.RData")
+load("artistTokens.RData")
 # 
 # 
 # #combine words into one document per DJ
@@ -367,46 +367,46 @@ load("allDJArtists.RData")
 # 
 
 #--------------------------------------------------------------------------------
-# print("Create document corpus and term document matrices")
-# djCorpus <- Corpus(VectorSource(djDocs$artists))
-# 
-# 
-# for (i in 1:length(djCorpus)) {
-#   meta(djCorpus[[i]], tag="ID") <- djDocs$DJ[i]  
-#   meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]  
-#   meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
-#   meta(djCorpus[[i]], tag="onMic") <- djDocs$onMic[i]
-# }
-# 
-# 
-# 
-# micStatus=c("on","off","both")
-# mic<-micStatus[2]
-# #idx <- switch(mic,
-# #              on = (meta(djCorpus, "onMic") == TRUE),
-# #              off = (meta(djCorpus, "onMic") == FALSE),
-# #              both = rep(TRUE,length(djCorpus))
-# #              )
-# 
-# 
-# #djtdm<-TermDocumentMatrix(djCorpus[idx])%>%removeSparseTerms(SPARSE)
-# 
-# #OR if you have the memory to pre-create
-# #make 3 Term Document Matrices where artist is in the column based on onmic status
-# 
-# djtdm_all<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
-# djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == TRUE])%>%removeSparseTerms(SPARSE)
-# djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == FALSE])%>%removeSparseTerms(SPARSE)
-# 
-# # now create Document Term Matrix where DJs are the column
-# djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
-# 
-# # get similarity index matrix using Jaccard
-# j<-getSimilarity(djdtm)
-# 
-# onDJs<- DJKey%>%filter(onMic==TRUE)%>%select(DJ)%>%unlist()%>%as.vector()
-# offDJs<-DJKey%>%filter(onMic==FALSE)%>%select(DJ)%>%unlist()%>%as.vector()
-# AllDJs<-DJKey%>%select(DJ)%>%unlist()%>%as.vector()
+print("Create document corpus and term document matrices")
+djCorpus <- Corpus(VectorSource(djDocs$artists))
+
+
+for (i in 1:length(djCorpus)) {
+  meta(djCorpus[[i]], tag="ID") <- djDocs$DJ[i]  
+  meta(djCorpus[[i]], tag="id") <- djDocs$DJ[i]  
+  meta(djCorpus[[i]], tag="DJ") <- djDocs$DJ[i]
+  meta(djCorpus[[i]], tag="onMic") <- djDocs$onMic[i]
+}
+
+
+
+micStatus=c("on","off","all")
+mic<-micStatus[2]
+#idx <- switch(mic,
+#              on = (meta(djCorpus, "onMic") == TRUE),
+#              off = (meta(djCorpus, "onMic") == FALSE),
+#              both = rep(TRUE,length(djCorpus))
+#              )
+
+
+#djtdm<-TermDocumentMatrix(djCorpus[idx])%>%removeSparseTerms(SPARSE)
+
+#OR if you have the memory to pre-create
+#make 3 Term Document Matrices where artist is in the column based on onmic status
+
+djtdm_all<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
+djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == TRUE])%>%removeSparseTerms(SPARSE)
+djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == FALSE])%>%removeSparseTerms(SPARSE)
+
+# now create Document Term Matrix where DJs are the column
+djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
+
+# get similarity index matrix using Jaccard
+j<-getSimilarity(djdtm)
+
+onDJs<- DJKey%>%filter(onMic==TRUE)%>%select(DJ)%>%unlist()%>%as.vector()
+offDJs<-DJKey%>%filter(onMic==FALSE)%>%select(DJ)%>%unlist()%>%as.vector()
+AllDJs<-DJKey%>%select(DJ)%>%unlist()%>%as.vector()
 #-----------------------------------------------------------------
 #plot stuff
 switch(mic,
