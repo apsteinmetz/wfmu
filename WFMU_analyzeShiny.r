@@ -3,6 +3,7 @@ library(shiny)
 library(tm)
 library(wordcloud)
 library(memoise)
+library(Matrix)
 
 # initialize files and variables
 load("djDocs.RData")
@@ -13,12 +14,16 @@ DJKey<-filter(DJKey,artistCount>100)
 #OR if you have the memory to pre-create
 #make 3 Term Document Matrices where artist is in the column based on onmic status
 
-djtdm_all<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
-djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == TRUE])%>%removeSparseTerms(SPARSE)
-djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == FALSE])%>%removeSparseTerms(SPARSE)
+# djtdm_all<-TermDocumentMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
+# djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == TRUE])%>%removeSparseTerms(SPARSE)
+# djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onMic") == FALSE])%>%removeSparseTerms(SPARSE)
+load("djtdm_all.RData")
+load("djtdm_on.RData")
+load("djtdm_off.RData")
 
 # now create Document Term Matrix where DJs are the column
-djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
+#djdtm<-DocumentTermMatrix(djCorpus)%>%removeSparseTerms(SPARSE)
+load("djdtm.RData")
 
 # get similarity index matrix using Jaccard
 j<-getSimilarity(djdtm)
@@ -46,12 +51,13 @@ makeWordCloud<-function(djtdm=djtdm,maxWords=100) {
   #scalefactor magnifies differences for wordcloud
   scaleFactor=3
   #maxWords = 200
+  set.seed(1234)
   wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
             colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
   
 }
 #-----------------------------------------------------------------------
-plotStuff<-function(djtdm=djdtm,j=j,DJKey=DJkey,maxWords){
+plotStuff<-function(djtdm=djdtm,j=j,DJKey=DJkey,maxWords=100){
 #  print(ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip())
   makeWordCloud(djtdm,maxWords)
 #  assignClusters(j)
@@ -82,15 +88,24 @@ server <- function(input, output, session) {
            off = plotStuff(djtdm_off,j[offDJs,offDJs],DJKey[DJKey$DJ%in%offDJs,],input$max),
            all = plotStuff(djtdm,DJKey,input$max)
     )
-
+    
+  })
+  output$text <- renderPlot({
+    switch(input$mic,
+           on = plotStuff(djtdm_on,j[onDJs,onDJs],DJKey[DJKey$DJ%in%onDJs,],input$max),
+           off = plotStuff(djtdm_off,j[offDJs,offDJs],DJKey[DJKey$DJ%in%offDJs,],input$max),
+           all = plotStuff(djtdm,DJKey,input$max)
+    )
+    
   })
 }
 #-------------------------------------------------------
 ui <- fluidPage(
   # Application title
-  titlePanel("Word Cloud"),
+  titlePanel("WFMU Busy Box"),
   
   sidebarLayout(
+    #img(src="busybox.jpg"),
     # Sidebar with a slider and selection inputs
     sidebarPanel(
       selectInput("mic", "DJ OnAir Status:",
@@ -107,6 +122,7 @@ ui <- fluidPage(
     
     # Show Word Cloud
     mainPanel(
+      h1("Word Cloud"),
       plotOutput("plot")
     )
   )

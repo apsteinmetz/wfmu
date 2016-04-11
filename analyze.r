@@ -5,12 +5,12 @@
 #git fetch --all
 #git reset --hard origin/master
 
-# # install.packages("devtools")
-# # require(devtools)
-# # install_url("http://www.omegahat.org/Rstem/Rstem_0.4-1.tar.gz")
-# # install_url("http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.1.tar.gz")
-# # install_url("http://cran.r-project.org/src/contrib/Archive/sentiment/sentiment_0.2.tar.gz")
-# 
+#things to do. 
+# histogram of similarity indices to give context
+#list most similar DJs
+#save tdms
+
+
 library(devtools)
 #install_github('sinhrks/ggfortify')
 library(ggplot2)
@@ -207,7 +207,7 @@ assignClusters<-function(j,CLUSTERS=5) {
   #return (clust)
 }
 #----------------------------------------------------------
-similarDJs<-function(whichDJ="TW",compareDJ="TM",j,DJkey,artistTokens){
+similarDJs<-function(whichDJ="TW",compareDJ="TM",j,DJKey,artistTokens){
   #djs for example
   #whichDJ <- "TW"
   #compareDJ<-"TM"
@@ -220,10 +220,10 @@ similarDJs<-function(whichDJ="TW",compareDJ="TM",j,DJkey,artistTokens){
   compareDJ<-likeDJs[1,"DJ"]
   whichShow<-DJKey%>%filter(DJ==whichDJ)%>%.$ShowName%>%as.character()
   compareShow<-DJKey%>%filter(DJ==compareDJ)%>%.$ShowName%>%as.character()
-  paste(whichShow,"is most similar to",compareShow)
-  paste("Similarity Index:",format(likeDJs[1,"similarity"],digits=2),"/1.00")
+  print(paste(whichShow,"is most similar to",compareShow))
+  print(paste("Similarity Index:",format(likeDJs[1,"similarity"],digits=2),"/1.00"))
   commonArtists<-intersect(artistTokens[which(artistTokens$DJ==whichDJ),]$artistToken,artistTokens[which(artistTokens$DJ==compareDJ),]$artistToken)
-  print(as.data.frame(sample(commonArtists,20)))
+  print(data.frame(Common_Artists=sample(commonArtists,20)))
 }
 #------------------------------------------------------------
 #not functional
