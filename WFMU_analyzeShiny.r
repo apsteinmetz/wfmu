@@ -4,6 +4,11 @@ library(tm)
 library(wordcloud)
 library(memoise)
 library(Matrix)
+library(ggplot2)
+library(dplyr)
+#shiny version of analyze DJ data
+
+
 
 # initialize files and variables
 load("djDocs.RData")
@@ -58,7 +63,7 @@ makeWordCloud<-function(djtdm=djtdm,maxWords=100) {
 }
 #-----------------------------------------------------------------------
 plotStuff<-function(djtdm=djdtm,j=j,DJKey=DJkey,maxWords=100){
-#  print(ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip())
+  #print(ggplot(DJKey[1:20,],aes(ShowName,artistCount))+geom_bar(stat="identity")+coord_flip())
   makeWordCloud(djtdm,maxWords)
 #  assignClusters(j)
   #print(DJKey$ShowName)
