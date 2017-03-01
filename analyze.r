@@ -66,7 +66,7 @@ cleanUpArtists<- function(allDJArtists) {
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"various artists|various","")
   
   #get rid of the marathon finale
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"hoof mouth sinfonia|ho mouth sinfonia","")
+  allDJArtists<-allDJArtists%>%filter(!str_detect(artist,"hoof[a-zA-Z ]+sinfonia"))
   
   #make "new york" one word.  Lots of bands start with the term
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"new york","newyork")
@@ -312,6 +312,7 @@ makeWordCloud<-function(djtdm=djtdm,maxWords=100) {
   
   
   m <- as.matrix(djtdm)
+  
   v <- sort(rowSums(m),decreasing=TRUE)
   d <- data.frame(word = names(v),freq=v)
   t<-head(d, 200)
@@ -322,8 +323,9 @@ makeWordCloud<-function(djtdm=djtdm,maxWords=100) {
   print("Create Word Cloud")
   #scalefactor magnifies differences for wordcloud
   scaleFactor=3
-  #maxWords = 200
-  wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
+  maxWords = 200
+  allDJArtists%>%group_by(artist)%>%summarize(count=n())%>%arrange(desc(count)) ->artist_count
+  wordcloud(words = artist_count$artist, freq = artist_count$count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
             colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
   
 }
@@ -415,4 +417,14 @@ switch(mic,
        all = plotStuff(djtdm_all,DJKey)
               )
 
+
+#----------------------------------------------------------------------
+# New MAIN
+print("Create Word Cloud")
+#scalefactor magnifies differences for wordcloud
+scaleFactor=2
+maxWords = 200
+allDJArtists%>%group_by(artist)%>%summarize(count=n())%>%arrange(desc(count)) ->artist_count
+wordcloud(words = artist_count$artist, freq = artist_count$count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 

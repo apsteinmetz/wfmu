@@ -1,21 +1,11 @@
 ---
-title: "WFMU DJ Artists played"
+title: "WFMU DJ Artists most widely played"
 output: html_notebook
 ---
 Analyze all artists ever played by each WFMU DJ to find commonality.  wfmu.org provides a list of unique artists for every DJ. This is of limited utility because superstars like the Beatles have probably been played at least once by every DJ.  These are the most widely played artists.  Frequency of play would be more interesting and let us learn more about the similarity among DJs.  Scraping playlists is more involved however and is left for a future project.
 
 ```{r}
 #analyze list of artists to find DJ similarity
-
-
-#force git to overwrite local files on pull. run from git shell
-#git fetch --all
-#git reset --hard origin/master
-
-#things to do. 
-# histogram of similarity indices to give context
-#list most similar DJs
-#save tdms
 
 library(tidyverse)
 library(devtools)
@@ -34,6 +24,7 @@ library(cluster)
 library(reshape2)
 library(proxy)
 library(Matrix)
+library(hashmap)
 ```
 
 Set up functions to clean data scraped from wfmu.org.  Data scrape has been done and saved as "allDJArtists.RData"
@@ -43,6 +34,7 @@ Set up functions to clean data scraped from wfmu.org.  Data scrape has been done
 #get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
 SPARSE<- 0.95 #sparsity of term document matrices
 
+#-----------------------------------------------------------------------
 cleanUpArtists<- function(allDJArtists) {
   allDJArtists$artistRaw<-allDJArtists$artist
 # one artist is all punctuation so give !!! special treatment
@@ -78,7 +70,7 @@ cleanUpArtists<- function(allDJArtists) {
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"various artists|various","")
   
   #get rid of the marathon finale
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"hoof mouth sinfonia|ho mouth sinfonia","")
+  allDJArtists<-allDJArtists%>%filter(!str_detect(artist,"hoof[a-zA-Z ]+sinfonia"))
   
   #make "new york" one word.  Lots of bands start with the term
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"new york","newyork")
@@ -137,6 +129,9 @@ addArtistCount<- function(DJKey,artistTokens) {
 }
 #-------------------------------------------------------------  
 combineAllArtists <- function(){
+# this combines all the artist tokens into one space-delmited string
+#which can then be used as a document corpus for the text mining package
+  
   t<- data.frame()
   #make sure there aren't extra levels
   artistTokens$DJ<-factor(artistTokens$DJ,as.character(unique(artistTokens$DJ)))
@@ -312,33 +307,6 @@ plotNetwork <- function(docMatrix) {
   print(wfmugraf,file="wfmugraf.gexf")
   
 }
-#--------------------------------------------------------------------------------------------------
-makeWordCloud<-function(djtdm=djtdm,maxWords=150) {
-  #for wordcloud of most widely played artists
-  #removing sparse terms at 0.99 means that artists played by fewer than 50 DJs will be dropped
-  #and will return about 400 artists
-  
-  #just onMic?
-  #idx <- meta(djCorpus, "cluster") == 5
-  #djtdm<-TermDocumentMatrix(djCorpus[idx])%>%removeSparseTerms(0.80)
-  
-  
-  m <- as.matrix(djtdm)
-  v <- sort(rowSums(m),decreasing=TRUE)
-  d <- data.frame(word = names(v),freq=v)
-  t<-head(d, 200)
-  rownames(t)<-NULL
-  print(t)
-  #save(t,file='artistfreq.txt',ascii = TRUE)
-  
-  print("Create Word Cloud")
-  #scalefactor magnifies differences for wordcloud
-  scaleFactor=3
-  #maxWords = 200
-  wordcloud(words = t$word, freq = t$freq^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
-            colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
-  
-}
 #------------------------------------------------------------------
 #plot stuff depending on onmic or offmic status
 plotStuff<-function(djtdm=djdtm,j=j,DJKey=DJkey){
@@ -432,6 +400,67 @@ switch(mic,
               )
 
 
+
+```
+Load data
+```{r}
+load("allDJArtists.RData")
+load("DJKey.RData")
+# #save(DJKey,file="DJKey.RData")
+```
+Munge data
+```{r}
+# 
+allDJArtists<-as_tibble(allDJArtists)
+allDJArtists<-cleanUpArtists(allDJArtists)
+
+#get list of all artists and frequency
+#take a stab at fixing minor typos
+#warning this is SLOW. You will get sensible results even if you ignore this step
+allDJArtists$artist<-fix_spelling(allDJArtists$artist)
+ 
+# #combine first numWords words in artist name into a single token
+artistTokens<-combineArtistWords(allDJArtists,numWords=2)
+# #get rid of DJs with less than 100 artists, ever.  Probably not a music show
+DJKey<-filter(DJKey,artistCount>100)
+artistTokens<-semi_join(artistTokens,DJKey)
+#regroup
+artistTokens<-artistTokens%>%group_by(DJ)
+# 
+save(artistTokens,file="artistTokens.RData")
+load("artistTokens.RData")
+# 
+# 
+# #combine words into one document per DJ
+djDocs<-as_tibble(combineAllArtists())
+save(djDocs,file="djDocs.RData")
+load("djDocs.RData")
+# 
+
+```
+
+```{r}
+
+```
+
+
+Make a word cloud of the most widely played artists
+```{r}
+
+# New MAIN
+
+print("Create Word Cloud")
+allDJArtists%>%group_by(artist)%>%summarize(count=n())%>%arrange(desc(count)) ->artist_count
+#scalefactor magnifies differences for wordcloud
+scaleFactor=3
+maxWords = 200
+wordcloud(words = artist_count$artist, freq = artist_count$count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+
+```
+Run a spell check on artist names to find letter transpositions.
+It works by assuming the most frequently cited version is the correct one.
+```{r}
 
 ```
 
