@@ -104,9 +104,11 @@ combineArtistWords <- function(allDJArtists,numWords){
   
   allDJArtists$artistToken<-apply(t,MARGIN=1,FUN=paste,collapse="")
 
+    # There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
+  artistTokens%>%mutate(artistToken=replace(artistToken,str_detect(artistToken,'brucesp'),"brucespringsteen"))->artistTokens
+
   #now that tokens are created extract unique ones for each dj so mulitples don't occur
   # the zillion flavors of "Sun Ra..." will show up for each DJ only once
-  # not perfect.  There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
   print("Create list of unique artist names for each DJ")
   artistTokens<-allDJArtists%>%select(DJ,artistToken)%>%group_by(DJ)%>%distinct(artistToken)
 
@@ -409,16 +411,12 @@ load("DJKey.RData")
 # #save(DJKey,file="DJKey.RData")
 ```
 Munge data
-```{r}
+```{r, message=FALSE}
 # 
 allDJArtists<-as_tibble(allDJArtists)
 allDJArtists<-cleanUpArtists(allDJArtists)
 
-#get list of all artists and frequency
-#take a stab at fixing minor typos
-#warning this is SLOW. You will get sensible results even if you ignore this step
-allDJArtists$artist<-fix_spelling(allDJArtists$artist)
- 
+
 # #combine first numWords words in artist name into a single token
 artistTokens<-combineArtistWords(allDJArtists,numWords=2)
 # #get rid of DJs with less than 100 artists, ever.  Probably not a music show
@@ -439,28 +437,28 @@ load("djDocs.RData")
 
 ```
 
-```{r}
-
-```
-
 
 Make a word cloud of the most widely played artists
-```{r}
+```{r, warning=FALSE}
 
 # New MAIN
 
-print("Create Word Cloud")
-allDJArtists%>%group_by(artist)%>%summarize(count=n())%>%arrange(desc(count)) ->artist_count
+artistTokens%>%group_by(artistToken)%>%summarize(count=n())%>%arrange(desc(count)) ->artist_count
 #scalefactor magnifies differences for wordcloud
 scaleFactor=3
 maxWords = 200
-wordcloud(words = artist_count$artist, freq = artist_count$count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
+wordcloud(words = artist_count$artistToken, freq = artist_count$count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 
 ```
-Run a spell check on artist names to find letter transpositions.
-It works by assuming the most frequently cited version is the correct one.
 ```{r}
-
+artist_count$artistToken<-as.factor(artist_count$artistToken)
+#trying to get bars in height order
+#levels(artist_count$artistToken)<-artist_count$artistToken
+gg<-ggplot(artist_count[1:10,],aes(x=artistToken,y=count/nrow(DJKey)*100))+geom_col()
+gg<-gg+labs(title='Most Widely Played Artists on WFMU',
+            y='Pct of DJs Who Have Played',
+            x= 'Artist')
+print(gg)
 ```
 

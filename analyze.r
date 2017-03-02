@@ -100,18 +100,21 @@ combineArtistWords <- function(allDJArtists,numWords){
   
   allDJArtists$artistToken<-apply(t,MARGIN=1,FUN=paste,collapse="")
 
-  #now that tokens are created extract unique ones for each dj so mulitples don't occur
+  # There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
+  artistTokens%>%mutate(artistToken=replace(artistToken,str_detect(artistToken,'brucesp'),"brucespringsteen"))->artistTokens
+    #now that tokens are created extract unique ones for each dj so mulitples don't occur
   # the zillion flavors of "Sun Ra..." will show up for each DJ only once
   # not perfect.  There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
   print("Create list of unique artist names for each DJ")
   artistTokens<-allDJArtists%>%select(DJ,artistToken)%>%group_by(DJ)%>%distinct(artistToken)
+
 
   print("Combining iconic 2-name artists into one name to save space in wordcloud")
   artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"rollingstones","stones")
   artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"enniomorricone","morricone") #only on WFMU!
   artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"davidbowie","bowie")
   artistTokens$artistToken<-str_replace_all(artistTokens$artistToken,"bobdylan","dylan")
-  #rm(t)
+
   return(artistTokens)
 }
 #-------------------------------------------------------------------------------------
