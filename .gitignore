@@ -37,6 +37,6 @@ Temporary Items
 .apdisk
 .Rproj.user
 WFMU_analyzeShiny.r
-.RData
-.Rhistory
+/.RData
+/.Rhistory
 *.html
