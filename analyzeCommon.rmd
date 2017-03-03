@@ -17,7 +17,8 @@ library(dplyr)
 # #library(ggfortify)
 library(RColorBrewer)
 library(wordcloud)
-# library(SnowballC)
+library(SnowballC)
+library(tm)
 # library(igraph)
 # library(cluster)
 # library(reshape2)
@@ -190,6 +191,10 @@ print(gg)
 ```
 While we are going crazy with word clouds, what are the most widely played artists with the word "love" in the artist name?
 ```{r}
+temp<-allDJArtists$artist%>%str_split(' ')%>%unlist()%>%table()%>%as.data.frame()%>%arrange(desc(Freq))
+names(temp)<-c('band_word','count')
+
+
 lovebands <-artist_count%>%filter(str_detect(artistToken,'love'))
 wordcloud(words = lovebands$artistToken, freq =                                lovebands$count,max.words=maxWords,                                  random.order=FALSE,rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
