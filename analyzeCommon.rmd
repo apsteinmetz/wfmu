@@ -174,7 +174,7 @@ artist_count$artistToken<-as.factor(artist_count$artistToken)
 #scalefactor magnifies differences for wordcloud
 scaleFactor=3
 maxWords = 200
-wordcloud(words = artist_count$artistToken, freq = artist_count$count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
+wordcloud(words = artist_count$artistToken, freq =                             artist_count$count^scaleFactor,max.words=maxWords,                   random.order=FALSE,rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 
 ```
@@ -188,8 +188,11 @@ gg<-gg+labs(title='Most Widely Played Artists on WFMU',
 gg<-gg+coord_flip()
 print(gg)
 ```
-
+While we are going crazy with word clouds, what are the most widely played artists with the word "love" in the artist name?
 ```{r}
-artistToken%>%filter(str_detect(artistTokens,'love'))
+lovebands <-artist_count%>%filter(str_detect(artistToken,'love'))
+wordcloud(words = lovebands$artistToken, freq =                                lovebands$count,max.words=maxWords,                                  random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+
 ```
 
