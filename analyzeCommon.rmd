@@ -200,4 +200,14 @@ wordcloud(words = lovebands$artistToken, freq =                                l
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 
 ```
+So love is popular what are the other popular words in band names?
+```{r}
+allDJArtists$artist%>%
+  str_split(" ")%>%
+  unlist()%>%
+  as_tibble()%>%
+  group_by(value)%>%
+  summarise(count=n())%>%
+  arrange(desc(count))->wordCount
+```
 

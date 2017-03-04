@@ -40,3 +40,7 @@ WFMU_analyzeShiny.r
 /.RData
 /.Rhistory
 *.html
+wfmugraph.gexf
+wfmu.gephi_temp1458271468748
+.RDataTmp
+artistTokens.RData
