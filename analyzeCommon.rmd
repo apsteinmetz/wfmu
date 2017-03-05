@@ -200,7 +200,7 @@ wordcloud(words = lovebands$artistToken, freq =                                l
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 
 ```
-So love is popular what are the other popular words in band names?
+So love is popular what are the other popular words in band names?  Limit ourselves to words of more than three characters.
 ```{r}
 allDJArtists$artist%>%
   str_split(" ")%>%
@@ -208,6 +208,18 @@ allDJArtists$artist%>%
   as_tibble()%>%
   group_by(value)%>%
   summarise(count=n())%>%
-  arrange(desc(count))->wordCount
+  arrange(desc(count))%>%
+  filter(str_length(value)>3)->wordCount
+
+temp%>%filter(str_length(band_word)>3)->wordCount
+wordCount
+
+
+```
+Now do the word cloud.
+```{r}
+wordcloud(words = wordCount$band_word, freq =                                wordCount$count,max.words=maxWords,                                  random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+
 ```
 
