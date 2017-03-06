@@ -40,3 +40,5 @@ WFMU_analyzeShiny.r
 /.RData
 /.Rhistory
 *.html
+.RData
+.Rhistory
