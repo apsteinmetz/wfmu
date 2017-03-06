@@ -175,6 +175,9 @@ artistTokens%>%
   summarize(count=n())%>%
   arrange(desc(count)) ->artist_count
 artist_count$artistToken<-as.factor(artist_count$artistToken)
+print(paste('There have been',nrow(artist_count),'artists played on WFMU!'))
+```
+```{r, warning=FALSE}
 #scalefactor magnifies differences for wordcloud
 scaleFactor=3
 maxWords = 200
@@ -182,6 +185,7 @@ wordcloud(words = artist_count$artistToken, freq =                             a
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 
 ```
+Stones!  Let's more more quantitative about the data.  What percentage of WFMU DJs have played these bands at least once?
 ```{r}
 #make sure bars are in height order
 artist_count$artistToken<-reorder(artist_count$artistToken,artist_count$count)
@@ -192,26 +196,10 @@ gg<-gg+labs(title='Most Widely Played Artists on WFMU',
 gg<-gg+coord_flip()
 print(gg)
 ```
-While we are going crazy with word clouds, what are the most widely played artists with the word "love" in the artist name?
+What are the most popular words in band names?  Limit ourselves to words of more than three characters.
 ```{r}
-#temp<-allDJArtists$artist%>%str_split(' #')%>%unlist()%>%table()%>%as.data.frame()%>%arrange(desc(Freq))
-#names(temp)<-c('band_word','count')
-
-allDJArtists$artist%>%
-  str_split(' ')%>%
-  unlist()%>%
-  table()%>%
-  as.data.frame()%>%
-  arrange(desc(Freq)) ->wordCount
 
 
-lovebands <-artist_count%>%filter(str_detect(artistToken,'love'))
-wordcloud(words = lovebands$artistToken, freq =                                lovebands$count,max.words=maxWords,                                  random.order=FALSE,rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
-
-```
-So love is popular what are the other popular words in band names?  Limit ourselves to words of more than three characters.
-```{r}
 allDJArtists$artist%>%
   str_split(" ")%>%
   unlist()%>%
@@ -221,15 +209,28 @@ allDJArtists$artist%>%
   arrange(desc(count))%>%
   filter(str_length(value)>3)->wordCount
 
-temp%>%filter(str_length(band_word)>3)->wordCount
 wordCount
 
 
 ```
 Now do the word cloud.
 ```{r}
-wordcloud(words = wordCount$band_word, freq =                                wordCount$count,max.words=maxWords,                                  random.order=FALSE,rot.per=0.35, 
+wordcloud(words = wordCount$value, freq =                                wordCount$count,max.words=maxWords,                                  random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+
+```
+"John" is the most popular word after orchestra and band? Wow. What are the widely played band/artist names with John in them?
+```{r, warning=FALSE}
+johnbands <-artist_count%>%filter(str_detect(artistToken,'john'))
+wordcloud(words = johnbands$artistToken, freq =                                         johnbands$count,max.words=200,                                  random.order=FALSE,rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 
 ```
 
+While we are going crazy with word clouds, what are the most widely played artists with the word "love" in the artist name?
+```{r}
+lovebands <-artist_count%>%filter(str_detect(artistToken,'love'))
+wordcloud(words = lovebands$artistToken, freq =                                lovebands$count,max.words=maxWords,                                  random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+
+```
