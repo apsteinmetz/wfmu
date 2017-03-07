@@ -2,29 +2,23 @@
 title: "WFMU DJ Artists most widely played"
 output: html_notebook
 ---
-Analyze all artists ever played by each WFMU DJ to find commonality.  wfmu.org provides a list of unique artists for every DJ. This is of limited utility because superstars like the Beatles have probably been played at least once by every DJ.  These are the most widely played artists.  Frequency of play would be more interesting and let us learn more about the similarity among DJs.  Scraping playlists is more involved however and is left for a future project.
+Analyze all artists ever played by each WFMU DJ to find commonality.  wfmu.org provides a list of unique artists for every DJ. This is of limited utility because superstars like the Beatles have probably been played at least once by every DJ.  These are the most widely played artists.  Frequency of play would be more interesting and let us learn more about the similarity among DJs.  Scraping playlists is more involved, particularly since the playlist pages at wfmu.org are not in a consistant format across all DJs.  I leave this for a future project.
 
 ```{r}
 #analyze list of artists to find DJ similarity
 
+# things to do:
+# strip stop words from band word list and find intersting three-character words
+# use term-doc matrix to compute similarity index for all 23,871 DJ pairs.
+
 library(tidyverse)
-# library(devtools)
-# #install_github('sinhrks/ggfortify')
 library(ggplot2)
 library(stringr)
-#library(tm)
 library(dplyr)
-# #library(ggfortify)
 library(RColorBrewer)
 library(wordcloud)
 library(SnowballC)
 library(tm)
-# library(igraph)
-# library(cluster)
-# library(reshape2)
-# library(proxy)
-# library(Matrix)
-# library(hashmap)
 ```
 
 Set up functions to clean data scraped from wfmu.org.  Data scrape has been done and saved as "allDJArtists.RData"
@@ -69,9 +63,14 @@ cleanUpArtists<- function(allDJArtists) {
   #get rid of the marathon finale
   allDJArtists<-allDJArtists%>%filter(!str_detect(artist,"hoof[a-zA-Z ]+sinfonia"))
   
-  #make "new york" one word.  Lots of bands start with the term
-  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"new york","newyork")
+  #if a band name includes a common two word city make it one word
+  # before we limit the word count
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"[N|n]ew [Y|y]ork","newyork")
   
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"[L|l]os [A|a]ngeles","losangeles")
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"[B|b]uenos [A|a]ires","buenosaires")
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"[S|s]ao [P|p]aulo","saopaulo")
+
   #make "x ray" one word. hopefully we've stripped out the dash already.Lots of bands start with the term
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"x ray","xray")
   
@@ -165,7 +164,7 @@ load("artistTokens.RData")
 ```
 
 
-Make a word cloud of the most widely played artists
+How many unique artists have been played on WFMU?
 ```{r, warning=FALSE}
 
 # New MAIN
@@ -177,6 +176,11 @@ artistTokens%>%
 artist_count$artistToken<-as.factor(artist_count$artistToken)
 print(paste('There have been',nrow(artist_count),'artists played on WFMU!'))
 ```
+Wow.  That's a alot.  How many artists have been played by only one DJ?
+```{r}
+print(paste('There have been',nrow(filter(artist_count,count==1)),'artists played by only one DJ on WFMU!'))
+```
+Make a word cloud of the most widely played artists.
 ```{r, warning=FALSE}
 #scalefactor magnifies differences for wordcloud
 scaleFactor=3
@@ -232,5 +236,27 @@ While we are going crazy with word clouds, what are the most widely played artis
 lovebands <-artist_count%>%filter(str_detect(artistToken,'love'))
 wordcloud(words = lovebands$artistToken, freq =                                lovebands$count,max.words=maxWords,                                  random.order=FALSE,rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+
+```
+G Love Compartment?  Ohhhh. Glove Compartment. Ha!
+
+Finally, New York or LA?
+```{r}
+# not looking for "LA" or "NYC"
+cities=c('tokyo','dehli','shanghai','beijing','newyork','buenosares','saopaolo',"calcutta",'istanbul','rio','','manila','lagos','losangeles')
+
+citybands <-wordCount%>%filter(value %in% cities)
+citybands
+```
+Boo ya!
+```{r}
+nybands<-artist_count%>%filter(str_detect(artistToken,"newyork"))%>%
+  mutate(artistToken=str_replace(artistToken,"newyork","ny"))
+wordcloud(words = nybands$artistToken,
+          freq = nybands$count*10,
+          random.order=FALSE,
+          rot.per=0.35,
+          colors=brewer.pal(8, "Dark2"),
+          scale = c(3,.5))
 
 ```
