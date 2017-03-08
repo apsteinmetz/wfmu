@@ -255,19 +255,27 @@ London!
 londonbands<-artist_count%>%filter(str_detect(artistToken,"london"))
 londonbands
 ```
-Ah, then.  It looks like a lot people are simply named London.  That's not cricket.  Let's limit ourselves to bands that start with  "London."  Not perfect but covers the vast number of false positives.
+Hold on.  It looks like a lot of people are simply named London.  That's not cricket.  Let's limit ourselves to bands that start with  "London."  Not perfect but covers the vast number of false positives.
 
 ```{r}
 londonbands<-artist_count%>%filter(str_detect(artistToken,"^london"))
-londonbands
-
+print(paste('There are',nrow(londonbands),'bands with London starting the name.'))
 ```
 
-wordcloud(words = londonbands$artistToken,
-          freq = londonbands$count*10,
+```{r}
+#replace 'newyork' with 'ny' to make more room in word cloud.
+artist_count%>%filter(str_detect(artistToken,"newyork"))%>%
+              mutate(artistToken=str_replace(artistToken,"newyork","ny"))->nybands
+print(paste('There are',nrow(nybands),'bands with New York in the name.'))
+```
+So it's New York after all!
+```{r}
+wordcloud(words = nybands$artistToken,
+          freq = nybands$count*10,
           random.order=FALSE,
           rot.per=0.35,
           colors=brewer.pal(8, "Dark2"),
           scale = c(3,.5))
 
 ```
+New York Dolls, of  course!
