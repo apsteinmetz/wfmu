@@ -70,6 +70,7 @@ cleanUpArtists<- function(allDJArtists) {
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"[L|l]os [A|a]ngeles","losangeles")
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"[B|b]uenos [A|a]ires","buenosaires")
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"[S|s]ao [P|p]aulo","saopaulo")
+  allDJArtists$artist<-str_replace_all(allDJArtists$artist,"[H|h]ong [K|k]ong","hongkong")
 
   #make "x ray" one word. hopefully we've stripped out the dash already.Lots of bands start with the term
   allDJArtists$artist<-str_replace_all(allDJArtists$artist,"x ray","xray")
@@ -242,18 +243,28 @@ G Love Compartment?  Ohhhh. Glove Compartment. Ha!
 
 Finally, New York or LA?
 ```{r}
-# not looking for "LA" or "NYC"
-cities=c('tokyo','dehli','shanghai','beijing','newyork','buenosares','saopaolo',"calcutta",'istanbul','rio','','manila','lagos','losangeles')
+# some big cities.  Not looking for "LA" or "NYC."
+cities=c('tokyo','dehli','shanghai','beijing','newyork','buenosares','saopaolo',"calcutta",'istanbul','rio','','manila','lagos','losangeles','london','paris','hongkong')
 
 citybands <-wordCount%>%filter(value %in% cities)
 citybands
 ```
-Boo ya!
+London! 
 ```{r}
-nybands<-artist_count%>%filter(str_detect(artistToken,"newyork"))%>%
-  mutate(artistToken=str_replace(artistToken,"newyork","ny"))
-wordcloud(words = nybands$artistToken,
-          freq = nybands$count*10,
+
+londonbands<-artist_count%>%filter(str_detect(artistToken,"london"))
+londonbands
+```
+Ah, then.  It looks like a lot people are simply named London.  That's not cricket.  Let's limit ourselves to bands that start with  "London."  Not perfect but covers the vast number of false positives.
+
+```{r}
+londonbands<-artist_count%>%filter(str_detect(artistToken,"^london"))
+londonbands
+
+```
+
+wordcloud(words = londonbands$artistToken,
+          freq = londonbands$count*10,
           random.order=FALSE,
           rot.per=0.35,
           colors=brewer.pal(8, "Dark2"),
