@@ -1,9 +1,14 @@
 ---
 title: "WFMU DJ Artists most widely played"
 output: html_notebook
+toc: TRUE
 ---
-Analyze all artists ever played by each WFMU DJ to find commonality.  wfmu.org provides a list of unique artists for every DJ. This is of limited utility because superstars like the Beatles have probably been played at least once by every DJ.  These are the most widely played artists.  Frequency of play would be more interesting and let us learn more about the similarity among DJs.  Scraping playlists is more involved, particularly since the playlist pages at wfmu.org are not in a consistant format across all DJs.  I leave this for a future project.
+# What are the most widely played artists on WFMU?
+wfmu.org provides a list of unique artists for every DJ. 
 
+This is of limited utility because superstars like the Beatles have probably been played at least once by every DJ.  These are the most widely played artists.  Frequency of play would be more interesting and let us learn more about the similarity among DJs.  Scraping playlists is more involved, particularly since the playlist pages at wfmu.org are not in a consistant format across all DJs.  I leave this for a future project.
+
+# Load Libraries
 ```{r}
 #analyze list of artists to find DJ similarity
 
@@ -21,13 +26,13 @@ library(SnowballC)
 library(tm)
 ```
 
-Set up functions to clean data scraped from wfmu.org.  Data scrape has been done and saved as "allDJArtists.RData"
+#Set up some functions for cleaning the raw artist names.
 
+There are a lot of superfluous characters and inconsistent spellings. Let's make an attempt to gather the meaningful words in artist names that uniquely identify them.
 ```{r}
-
 #-----------------------------------------------------------------------
 cleanUpArtists<- function(allDJArtists) {
-  allDJArtists$artistRaw<-allDJArtists$artist
+  allDJArtists$artist<-allDJArtists$artistRaw
 # one artist is all punctuation so give !!! special treatment
   allDJArtists$artist<-str_replace(allDJArtists$artist,"!!!","chkchkchk")
   # now change some common punctuation to space
@@ -129,16 +134,15 @@ addArtistCount<- function(DJKey,artistTokens) {
 }
 ```
 
-Load data
-```{r}
-load("allDJArtists.RData")
-load("DJKey.RData")
-# #save(DJKey,file="DJKey.RData")
+# Load CSV files that have every DJ and every artist.
+The DJs are coded with two letter initials.  We also load a key file that includes the DJ's show name and whether they are currently on the air.
+```{r, message=FALSE}
+allDJArtists<-read_csv("djs_and_artists.csv")
+DJKey<-read_csv("dj_key.csv")
 ```
-Munge data
+# Clean the Data
 ```{r, message=FALSE}
 # 
-allDJArtists<-as_tibble(allDJArtists)
 allDJArtists<-cleanUpArtists(allDJArtists)
 
 
@@ -147,14 +151,16 @@ allDJArtists<-cleanUpArtists(allDJArtists)
 # of the first two words joined so "Joe Blow featuring Sally Swell"
 # and "Joe Blow and the Big Wind" will both become "joeblow"
 artistTokens<-combineArtistWords(allDJArtists,numWords=2)
+# now that we have cleaned up band names count the number of bands each DJ has played
+DJKey<-addArtistCount(DJKey,artistTokens)
 # #get rid of DJs with less than 100 artists, ever.  Probably not a music show
 DJKey<-filter(DJKey,artistCount>100)
 artistTokens<-semi_join(artistTokens,DJKey)
 #regroup
 artistTokens<-artistTokens%>%group_by(DJ)
 # 
-save(artistTokens,file="artistTokens.RData")
-load("artistTokens.RData")
+#save(artistTokens,file="artistTokens.RData")
+#load("artistTokens.RData")
 
 # #combine words into one document per DJ
 # djDocs<-as_tibble(combineAllArtists())
@@ -163,7 +169,7 @@ load("artistTokens.RData")
  
 
 ```
-
+# Now let's do some fun stuff with our data!
 
 How many unique artists have been played on WFMU?
 ```{r, warning=FALSE}
@@ -201,6 +207,21 @@ gg<-gg+labs(title='Most Widely Played Artists on WFMU',
 gg<-gg+coord_flip()
 print(gg)
 ```
+
+Which DJ has played the most artists?
+```{r}
+#make sure bars are in height order
+#DJKey$DJ<-reorder(DJKey$DJ,DJKey$count)
+gg<-ggplot(DJKey[1:20,],aes(x=DJ,y=artist_count))+geom_col()
+gg<-gg+labs(title='Most Prolific DJs',
+            y='Number of Unique Bands',
+            x= 'DJ')
+gg<-gg+coord_flip()
+print(gg)
+
+```
+
+
 What are the most popular words in band names?  Limit ourselves to words of more than three characters.
 ```{r}
 

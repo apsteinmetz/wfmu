@@ -139,7 +139,7 @@ getDJArtistNames<-function(DJURLs) {
     print(showName)
     artistListPage <- paste(ROOT_URL,URL_BRANCH,DJ, sep="")
     artistList<-html(artistListPage)%>%html_node(xpath="//body/div")%>%html_text()%>%str_split("\n")
-    DJArtists<-data.frame(DJ,artist=unlist(artistList))
+    DJArtists<-data.frame(DJ,artistRaw=unlist(artistList))
     if (nrow(DJArtists) >0) allDJArtists = rbind(allDJArtists,DJArtists)
     #remove factor level of DJs with no artists
     save(allDJArtists,file="allDJArtists.RData")
@@ -154,5 +154,5 @@ allDJArtists <- getDJArtistNames(DJURLs)
 
 allDJArtists <- filter(allDJArtists,artist!="")
 # artists are a factor by default. change it to character
-allDJArtists$artist<-as.character(allDJArtists$artist)
+allDJArtists$artistRaw<-as.character(allDJArtists$artistRaw)
 save(allDJArtists,file="allDJArtists.RData")
