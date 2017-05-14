@@ -1,10 +1,11 @@
 # scrape playlists
 
 library(rvest)
-library(stringr)
-library(XML)
+#library(stringr)
+#library(XML)
 library(xml2)
-library(dplyr)
+#library(dplyr)
+library(tidyverse)
 # library(data.table)
 
 
@@ -14,7 +15,7 @@ LAST_DJ<-"AH" #last currently on-mic DJ in DJ list  Need to smartly detect this
 
 #-------------------------------------------
 getDJURLs <- function(){
-  rawDJURLs<- html(paste(ROOT_URL,"/playlists",sep=""))
+  rawDJURLs<- read_html(paste(ROOT_URL,"/playlists",sep=""))
   # get the urls of the each DJs RSS playlist feed
   t<-html_nodes(rawDJURLs,"ul")[2] %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
   DJURLs<-paste("http://wfmu.org",t,sep="")[-1]
@@ -22,6 +23,12 @@ getDJURLs <- function(){
   # the URL to get the right link
   DJURLs<- gsub("playlistfeed","playlists",DJURLs)
   DJURLs<- gsub(".xml","",DJURLs)
+  
+  #test
+  #table 9 is off sched. 2-8 are monday through sunday
+  t<-rawDJURLs%>%html_nodes(xpath='//html//body//center[2]//table[1]//table')
+  t<-rawDJURLs%>%html_node(xpath='//html//body//center[2]//table[1]//table[9]')
+  t %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
   return(DJURLs)
 }
 #--------------------------------------------------------------------------
@@ -29,7 +36,7 @@ getDJURLs <- function(){
 getDJURLs2 <- function(){
   # current shows //li+//table
   # off mic shows //*+[(@id = "bench")]//table
-  rawDJURLs<- html(paste(ROOT_URL,"/playlists",sep=""))
+  rawDJURLs<- read_html(paste(ROOT_URL,"/playlists",sep=""))
   # get the urls of the each DJs RSS playlist feed
   t<-html_attr(rawDJURLs,xpath='//li+//table') %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
   DJURLs<-paste("http://wfmu.org",t,sep="")[-1]
@@ -50,7 +57,7 @@ getPlaylist <- function(plURL,dj) {
   for (i in 1:length(plURL)) {
     print(paste(dj,i))
     # first two columns contain artist and track name, leave the rest
-    temp <- html(plURL[i])%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE)
+    temp <- read_html(plURL[i])%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE)
     #temp<-html(plURL[i])%>%html_nodes("table")%>%.[2]%>%html_table(fill=TRUE)
     # try to correct tables without headers
     if (is.null(names(temp)) || names(temp)[1]=="X1") {
@@ -79,20 +86,20 @@ getPlaylist <- function(plURL,dj) {
 # get the shownames for a DJ
 getShowNames<-function(DJURLs) {
   DJKey = data.frame()
-  for (n in 1:length(DJURLs)) {
-    singleDJ<- html(DJURLs[n])
+  for (page in DJURLs) {
+    singleDJ<- read_html(page)
     showName <- html_node(singleDJ,"title")%>%html_text()
     showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     showName<-str_replace(showName,'WFMU:',"")
     showName<-str_replace_all(showName,':Playlists and Archives',"")
-    DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
+    DJ <- sub("http://wfmu.org/playlists/","",page)
     DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
     print(showName)
   }
   # now identifty those DJs which are currently ON MIC
   # wish I could figure out how to identify ON MIC by scraping
-  DJKey$onMic <- FALSE
-  DJKey$onMic[1:which(DJKey$DJ==LAST_DJ)]<-TRUE
+  DJKey$onSched <- FALSE
+  DJKey$onSched[1:which(DJKey$DJ==LAST_DJ)]<-TRUE
   #strip "WFMU" and "Playlists and Archives" and some punctuation
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylists (and|&) (A|a)rchives","")
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"-","")
@@ -109,7 +116,7 @@ getDJPlaylistURLs<-function(DJURLs) {
   allDJPlayLists = data.frame()
   #DJKey = data.frame()
   for (n in 1:length(DJURLs)) {
-    singleDJ<- html(DJURLs[n])
+    singleDJ<- read_html(DJURLs[n])
     pl<-html_nodes(singleDJ,xpath="//a")%>%html_attr("href")
     #format for newer shows
     pl1<-paste(ROOT_URL, na.omit(pl[str_detect(pl,"playlists/shows")]),sep="")
@@ -125,20 +132,22 @@ getDJPlaylistURLs<-function(DJURLs) {
   return(allDJPlayLists)
 }
 
-# Get all Artists
+#-------------------------------------------------
+# Get all Artists ever played by a DJ
+#WFMU maintains this as a separate page
 getDJArtistNames<-function(DJURLs) {
   # scrape artist names for all DJs from the link at the bottom of each DJ page
   allDJArtists<-data.frame()
   URL_BRANCH<- "/artistkeywords.php/"
   for (page in DJURLs) {
-    singleDJ<- html(page)
+    singleDJ<- read_html(page)
     showName <- html_node(singleDJ,"title")%>%html_text()
     showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     DJ <- sub("http://wfmu.org/playlists/","",page)
     DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
     print(showName)
     artistListPage <- paste(ROOT_URL,URL_BRANCH,DJ, sep="")
-    artistList<-html(artistListPage)%>%html_node(xpath="//body/div")%>%html_text()%>%str_split("\n")
+    artistList<-read_html(artistListPage)%>%html_node(xpath="//body/div")%>%html_text()%>%str_split("\n")
     DJArtists<-data.frame(DJ,artistRaw=unlist(artistList))
     if (nrow(DJArtists) >0) allDJArtists = rbind(allDJArtists,DJArtists)
     #remove factor level of DJs with no artists
