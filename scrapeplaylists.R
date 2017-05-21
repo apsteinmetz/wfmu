@@ -17,37 +17,26 @@ LAST_DJ<-"CI" #last currently on-mic DJ in DJ list  Need to smartly detect this
 getDJURLs <- function(){
   rawDJURLs<- read_html(paste(ROOT_URL,"/playlists",sep=""))
   # get the urls of the each DJs RSS playlist feed
-  t<-html_nodes(rawDJURLs,"ul")[2] %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
+  t<-rawDJURLs%>%html_nodes(xpath='//html//body//center[2]//table[1]//table//a[contains(.,"Playlists")]') %>% 
+    html_attr(name="href")
+
   DJURLs<-paste("http://wfmu.org",t,sep="")[-1]
   # above got the RSS feed links but we want the longer list of shows.  Below modifies
   # the URL to get the right link
   DJURLs<- gsub("playlistfeed","playlists",DJURLs)
   DJURLs<- gsub(".xml","",DJURLs)
   
-  #test
-  #table 9 is off sched. 2-8 are monday through sunday
-  t_all<-rawDJURLs%>%html_nodes(xpath='//html//body//center[2]//table[1]//table')
-  t_off<-rawDJURLs%>%html_node(xpath='//html//body//center[2]//table[1]//table[9]')
-  t_all[9] %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
   return(DJURLs)
 }
 #--------------------------------------------------------------------------
 #-------------------------------------------
-getDJURLs2 <- function(){
-  # current shows //li+//table
-  # off mic shows //*+[(@id = "bench")]//table
+getDJsOffSched <- function(){
+  #table 9 is off sched. 2-8 are monday through sunday
   rawDJURLs<- read_html(paste(ROOT_URL,"/playlists",sep=""))
-  # get the urls of the each DJs RSS playlist feed
-  t<-html_attr(rawDJURLs,xpath='//li+//table') %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
-  DJURLs<-paste("http://wfmu.org",t,sep="")[-1]
-  t2<-html_nodes(rawDJURLs,"ul")[2] %>%html_nodes("table")
-  t2<-t2[8]%>%html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href")
-  offMicURLs<-paste("http://wfmu.org",t2,sep="")[-1]
-  # above got the RSS feed links but we want the longer list of shows.  Below modifies
-  # the URL to get the right link
-  DJURLs<- gsub("playlistfeed","playlists",DJURLs)
-  DJURLs<- gsub(".xml","",DJURLs)
-  return(DJURLs)
+  t_off<-rawDJURLs%>%html_nodes(xpath='//html//body//center[2]//table[1]//table[9]//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
+  d_off <- str_replace(t_off,"/playlistfeed/","")
+  d_off <- str_replace(d_off,".xml","")
+  return(d_off)
 }
 #--------------------------------------------------------------------------
 #get all playlists for a DJ
@@ -57,7 +46,7 @@ getPlaylist <- function(plURL,dj) {
   for (i in 1:length(plURL)) {
     print(paste(dj,i))
     # first two columns contain artist and track name, leave the rest
-    temp <- read_html(plURL[i])%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE)
+    temp <- read_html(paste(ROOT_URL, plURL[i],sep=''))%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE)
     #temp<-html(plURL[i])%>%html_nodes("table")%>%.[2]%>%html_table(fill=TRUE)
     # try to correct tables without headers
     if (is.null(names(temp)) || names(temp)[1]=="X1") {
@@ -97,9 +86,8 @@ getShowNames<-function(DJURLs) {
     print(showName)
   }
   # now identifty those DJs which are currently ON MIC
-  # wish I could figure out how to identify ON MIC by scraping
-  DJKey$onSched <- FALSE
-  DJKey$onSched[1:which(DJKey$DJ==LAST_DJ)]<-TRUE
+  DJKey$onSched <- TRUE
+  DJKey$onSched[which(DJKey$DJ %in% getDJsOffSched())]<-FALSE
   #strip "WFMU" and "Playlists and Archives" and some punctuation
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylists (and|&) (A|a)rchives","")
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"-","")
@@ -172,7 +160,10 @@ getShowNames(DJURLs)
 playlistURLS<-getDJPlaylistURLs(DJURLs)
 playlistURLs %>% group_by(DJ) %>% summarise(showCount=n()) %>% arrange(desc(showCount))->showCounts
 DJKey<-left_join(DJKey,showCounts)
-
+numShows<-25
+for (dj in unique(allDJPlayLists$DJ)) {
+  allDJPlayLists %>% filter(DJ==dj) %>% select(playlistURL)%>%.[1:numShows,1] %>%getPlaylist(dj)
+}
 
 #allDJArtists <- getDJArtistNames(DJURLs) 
 #allDJArtists <- filter(allDJArtists,artist!="")
