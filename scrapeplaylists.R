@@ -11,7 +11,7 @@ library(tidyverse)
 
 # ----------------------------------------------
 ROOT_URL<-"http://wfmu.org"
-LAST_DJ<-"AH" #last currently on-mic DJ in DJ list  Need to smartly detect this
+LAST_DJ<-"CI" #last currently on-mic DJ in DJ list  Need to smartly detect this
 
 #-------------------------------------------
 getDJURLs <- function(){
