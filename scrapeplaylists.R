@@ -1,7 +1,7 @@
 # scrape playlists
 
 library(rvest)
-#library(stringr)
+library(stringr)
 #library(XML)
 library(xml2)
 #library(dplyr)
@@ -26,9 +26,9 @@ getDJURLs <- function(){
   
   #test
   #table 9 is off sched. 2-8 are monday through sunday
-  t<-rawDJURLs%>%html_nodes(xpath='//html//body//center[2]//table[1]//table')
-  t<-rawDJURLs%>%html_node(xpath='//html//body//center[2]//table[1]//table[9]')
-  t %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
+  t_all<-rawDJURLs%>%html_nodes(xpath='//html//body//center[2]//table[1]//table')
+  t_off<-rawDJURLs%>%html_node(xpath='//html//body//center[2]//table[1]//table[9]')
+  t_all[9] %>% html_nodes(xpath='//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
   return(DJURLs)
 }
 #--------------------------------------------------------------------------
@@ -113,22 +113,31 @@ getShowNames<-function(DJURLs) {
 # #---------------------------------------------------
 # get the URLs of the playlists for a DJ
 getDJPlaylistURLs<-function(DJURLs) {
-  allDJPlayLists = data.frame()
+  allDJPlayLists = data.frame(DJ=NULL,playlistURL=NULL)
+  dudList<-NULL
   #DJKey = data.frame()
   for (n in 1:length(DJURLs)) {
     singleDJ<- read_html(DJURLs[n])
     pl<-html_nodes(singleDJ,xpath="//a")%>%html_attr("href")
     #format for newer shows
-    pl1<-paste(ROOT_URL, na.omit(pl[str_detect(pl,"playlists/shows")]),sep="")
+    pl1<-as.character(na.omit(pl[str_detect(pl,"playlists/shows")]))
     # format for older shows
-    pl2<-paste(ROOT_URL, na.omit(pl[str_detect(pl,"Playlist")]),sep="")
+    pl2<-as.character(na.omit(pl[str_detect(pl,"Playlist")]))
     playlistURL<-c(pl1,pl2)
+    playlistURL<-str_replace_all(playlistURL,'http://wfmu.org','')
     #showName <- html_node(singleDJ,"title")%>%html_text()
     #showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
+    print(DJ)
     #DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
-    allDJPlayLists = rbind(allDJPlayLists, getPlaylist(plURL = playlistURL,dj = DJ))
+    #omit shows without valid playlists.  Talk shows?
+    if (length(playlistURL)>0) {
+      allDJPlayLists = rbind(allDJPlayLists, data.frame(DJ=DJ,playlistURL = playlistURL))
+    } else { 
+      print("DUD")
+      dudList<-c(dudList,DJ) }
   }  
+  
   return(allDJPlayLists)
 }
 
@@ -156,12 +165,17 @@ getDJArtistNames<-function(DJURLs) {
   return(allDJArtists)
 }  
 
+
 #-------------- MAIN -----------------
 DJURLs<-getDJURLs()
 getShowNames(DJURLs)
-allDJArtists <- getDJArtistNames(DJURLs) 
+playlistURLS<-getDJPlaylistURLs(DJURLs)
+playlistURLs %>% group_by(DJ) %>% summarise(showCount=n()) %>% arrange(desc(showCount))->showCounts
+DJKey<-left_join(DJKey,showCounts)
 
-allDJArtists <- filter(allDJArtists,artist!="")
+
+#allDJArtists <- getDJArtistNames(DJURLs) 
+#allDJArtists <- filter(allDJArtists,artist!="")
 # artists are a factor by default. change it to character
-allDJArtists$artistRaw<-as.character(allDJArtists$artistRaw)
-save(allDJArtists,file="allDJArtists.RData")
+#allDJArtists$artistRaw<-as.character(allDJArtists$artistRaw)
+#save(allDJArtists,file="allDJArtists.RData")
