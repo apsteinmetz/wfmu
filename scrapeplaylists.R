@@ -112,7 +112,7 @@ getDJPlaylistURLs<-function(DJURLs) {
     # format for older shows
     pl2<-as.character(na.omit(pl[str_detect(pl,"Playlist")]))
     playlistURL<-c(pl1,pl2)
-    playlistURL<-str_replace_all(playlistURL,'http://wfmu.org','')
+    playlistURL<-str_replace_all(playlistURL,'http://wfmu.org','')%>%as.character()
     #showName <- html_node(singleDJ,"title")%>%html_text()
     #showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
@@ -157,12 +157,15 @@ getDJArtistNames<-function(DJURLs) {
 #-------------- MAIN -----------------
 DJURLs<-getDJURLs()
 getShowNames(DJURLs)
+load(file='djkey.rdata')
 playlistURLS<-getDJPlaylistURLs(DJURLs)
-playlistURLs %>% group_by(DJ) %>% summarise(showCount=n()) %>% arrange(desc(showCount))->showCounts
+showCounts<-playlistURLs %>% group_by(DJ) %>% summarise(showCount=n()) %>% arrange(desc(showCount))
 DJKey<-left_join(DJKey,showCounts)
+#limit analysis to DJs with at least numShows shows
 numShows<-25
-for (dj in unique(allDJPlayLists$DJ)) {
-  allDJPlayLists %>% filter(DJ==dj) %>% select(playlistURL)%>%.[1:numShows,1] %>%getPlaylist(dj)
+djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ)
+for (dj in djList) {
+  playlistURLs %>% filter(DJ==dj) %>% select(playlistURL)%>%.[1:numShows,1] %>%getPlaylist(dj)
 }
 
 #allDJArtists <- getDJArtistNames(DJURLs) 
