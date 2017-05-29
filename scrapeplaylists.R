@@ -38,38 +38,6 @@ getDJsOffSched <- function(){
   d_off <- str_replace(d_off,".xml","")
   return(d_off)
 }
-#--------------------------------------------------------------------------
-#get all playlists for a DJ
-# TROUBLE all play list tables are not the same. Headers might not match
-getPlaylist <- function(plURL,dj) {
-  playlist = data.frame()
-  for (i in 1:length(plURL)) {
-    print(paste(dj,i))
-    # first two columns contain artist and track name, leave the rest
-    temp <- read_html(paste(ROOT_URL, plURL[i],sep=''))%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE)
-    #temp<-html(plURL[i])%>%html_nodes("table")%>%.[2]%>%html_table(fill=TRUE)
-    # try to correct tables without headers
-    if (is.null(names(temp)) || names(temp)[1]=="X1") {
-      names(temp)<- temp[1,]
-      temp <- temp[-1,]
-      
-    }
-    # order of artist, track(or title) varies.   Fix it
-    if (dim(temp)[2]>1) {  #ignore single column playlists  
-      if (names(temp)[1]=="Artist") {
-        playlist<-rbind(playlist,cbind(dj,temp["Artist"],Track=temp[,2]))
-     }
-      else {
-       playlist<-rbind(playlist,cbind(dj,temp["Artist"],Track=temp[,1]))
-      
-      }
-    }
-  }
-  return(playlist)
-}
-
-
-
 
 # #---------------------------------------------------
 # get the shownames for a DJ
@@ -95,7 +63,9 @@ getShowNames<-function(DJURLs) {
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"WFMU|wfmu","")
   DJKey$ShowName<-str_trim(DJKey$ShowName)
   
-  save(DJKey,file="DJKey.RData")
+
+  return (DJKey)  
+  #save(DJKey,file="DJKey.RData")
 }
 
 # #---------------------------------------------------
@@ -153,21 +123,85 @@ getDJArtistNames<-function(DJURLs) {
   return(allDJArtists)
 }  
 
+#--------------------------------------------------------------------------
+#get all playlists for a DJ
+# TROUBLE all play list tables are not the same. Headers might not match
+getPlaylist <- function(plURLs,dj) {
+  playlist = data.frame()
+  for (i in 1:length(plURLs)) {
+    print(paste(dj,i))
+    # first two columns contain artist and track name, leave the rest
+    temp <- read_html(paste(ROOT_URL, plURLs[i],sep=''))%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE)
+    #temp<-html(plURL[i])%>%html_nodes("table")%>%.[2]%>%html_table(fill=TRUE)
+    # try to correct tables without headers
+    if (is.null(names(temp)) || names(temp)[1]=="X1") {
+      names(temp)<- temp[1,]
+      temp <- temp[-1,]
+      
+    }
+    # order of artist, track(or title) varies.   Fix it
+    if (dim(temp)[2]>1) {  #ignore single column playlists  
+      if (names(temp)[1]=="Artist") {
+        playlist<-rbind(playlist,cbind(dj,temp["Artist"],Track=temp[,2]))
+      }
+      else {
+        playlist<-rbind(playlist,cbind(dj,temp["Artist"],Track=temp[,1]))
+        
+      }
+    }
+  }
+  return(playlist)
+}
+
+
+# just get first playlist to test parsing. TROUBLE all play list tables are not the same. Headers might not match
+testgetPlaylist <- function(plURLs,dj) {
+    playlist = data.frame()
+    i<-1
+    print(paste(dj,i))
+    # first two columns contain artist and track name, leave the rest
+    temp <- read_html(paste(ROOT_URL, plURLs[i],sep=''))%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE)
+    #temp<-html(plURL[i])%>%html_nodes("table")%>%.[2]%>%html_table(fill=TRUE)
+    # try to correct tables without headers
+    if (is.null(names(temp)) || names(temp)[1]=="X1") {
+      names(temp)<- temp[1,]
+      temp <- temp[-1,]
+      
+    }
+    # order of artist, track(or title) varies.   Fix it
+    if (dim(temp)[2]>1) {  #ignore single column playlists  
+      if (names(temp)[1]=="Artist") {
+        playlist<-rbind(playlist,cbind(dj,temp["Artist"],Track=temp[,2]))
+      }
+      else {
+        playlist<-rbind(playlist,cbind(dj,temp["Artist"],Track=temp[,1]))
+        
+      }
+    }
+  return(playlist[1:10,])
+}
+
+
 
 #-------------- MAIN -----------------
 DJURLs<-getDJURLs()
-getShowNames(DJURLs)
-load(file='djkey.rdata')
+DJKey<-getShowNames(DJURLs)
+#load(file='djkey.rdata')
 playlistURLS<-getDJPlaylistURLs(DJURLs)
 showCounts<-playlistURLs %>% group_by(DJ) %>% summarise(showCount=n()) %>% arrange(desc(showCount))
 DJKey<-left_join(DJKey,showCounts)
-#limit analysis to DJs with at least numShows shows
-numShows<-25
+#limit analysis to DJs with at least numShows shows and take the last numshows shows.
+numShows<-50
 djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ)
 for (dj in djList) {
-  playlistURLs %>% filter(DJ==dj) %>% select(playlistURL)%>%.[1:numShows,1] %>%getPlaylist(dj)
+  playlistURLs %>% filter(DJ==dj) %>% select(playlistURL)%>%.[1:numShows,1] %>%as.character() %>% getPlaylist(dj)
 }
 
+testPL = list()
+for (dj in djList) {
+  plURLs<-playlistURLs %>% filter(DJ==dj) %>% select(playlistURL)%>%.[1:numShows,1] %>%as.character()
+  testPL[[dj]]<-testgetPlaylist(plURLs,dj)
+}
 #allDJArtists <- getDJArtistNames(DJURLs) 
 #allDJArtists <- filter(allDJArtists,artist!="")
 # artists are a factor by default. change it to character
