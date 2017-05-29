@@ -3,6 +3,7 @@ testgetPlaylist <- function(plURLs,dj) {
   i<-1
   print(paste(dj,i))
   #assume playlist is a table.  scan all tables on page to find which is the correct one
+  #TABLE STYLE 1
   # select th is assumed to be unique to playlist tables.  not proven.
   alltables <- read_html(paste(ROOT_URL, plURLs[i],sep=''))%>%html_nodes("table")
   pl<-data.frame()
@@ -11,26 +12,33 @@ testgetPlaylist <- function(plURLs,dj) {
       pl<-alltables[[n]]%>%html_table(fill=TRUE)
       } #we found the table with playlists
   }
-  
-
+  #TABLE STYLE 2
+  if (length(pl)==0){
+    pl<-alltables[[3]]%>%html_table(fill=T)
+    if (is.null(names(pl)) || names(pl)[1]=="X1") {
+      names(pl)<- pl[1,]
+      pl <- pl[-1,]
+    }
+  }  
   #temp<-html(plURL[i])%>%html_nodes("table")%>%.[2]%>%html_table(fill=TRUE)
   # try to correct tables without headers
   #headers might be in second row
   if (is.null(names(pl)) || names(pl)[1]=="X1") {
-    names(pl)<- temp[1,]
+    names(pl)<- pl[1,]
     pl <- pl[-1,]
     
   }
   #exceptions we are aware of where table is nice but headers are not labeled "artist" ,"title"
   altTitleNames<-c('THE SONG','Track')
   altArtistNames<-c('THE STOOGE')
-  names(temp)[names(temp)%in%altTitleNames]<-"Title"
-  names(temp)[names(temp)%in%altArtistNames]<-"Artist"
+  names(pl)[names(pl)%in%altTitleNames]<-"Title"
+  names(pl)[names(pl)%in%altArtistNames]<-"Artist"
   # order of artist, track(or title) varies.   Fix it
-  if (dim(temp)[2]>1) {  #ignore single column playlists  
-      playlist<-rbind(playlist,cbind(dj,Artist=temp["Artist"],Title=temp['Title']))
+  if (dim(pl)[2]>1) {  #ignore single column playlists  
+      playlist<-rbind(playlist,cbind(dj,Artist=pl["Artist"],Title=pl['Title']))
       
-    }
+  }
+  playlist<-filter(playlist,Artist!='')
   return(playlist[1:10,])
 }
 
