@@ -3,11 +3,17 @@ testgetPlaylist <- function(plURLs,dj) {
   i<-1
   print(paste(dj,i))
   #assume playlist is a table.  scan all tables on page to find which is the correct one
-  #TABLE STYLE 1
-  # select th is assumed to be unique to playlist tables.  not proven.
-  alltables <- read_html(paste(ROOT_URL, plURLs[i],sep=''))%>%html_nodes("table")
+  
+  wholepage <- read_html(paste(ROOT_URL, plURLs[i],sep=''))
+  plraw<-wholepage%>% html_nodes(xpath='//*[contains(concat( " ", @class, " " ), concat( " ", "song", " " ))]')%>%
+    html_text()%>%
+    as.matrix()
+  dim(plraw)<-c(5,length(plraw)/5)  
+  plraw<-plraw%>%t()%>%as.data.frame()
+  names(plraw)<-plraw[1,]
+  
   pl<-data.frame()
-  for (n in 1:length(alltables)) {
+  for (n in 1:length(alltablerows)) {
     if (length(html_nodes(alltables[n],'th')) > 0) {
       pl<-alltables[[n]]%>%html_table(fill=TRUE)
       } #we found the table with playlists
