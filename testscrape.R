@@ -6,29 +6,49 @@ fixHeaders<-function(pl){
   names(pl)[names(pl)%in%altArtistNames]<-"Artist"
   return(pl)
 }
-
+#--------------------------------------------------------------------
 testgetPlaylist <- function(plURLs,dj) {
-  playlist = data.frame()
   i<-1
-  print(paste(dj,i))
+  print(paste(dj,i,plURLs[i]))
 
   wholepage <- read_html(paste(ROOT_URL, plURLs[i],sep=''))
   # are there rows with td of class=song?  get the table
-  plraw<-wholepage%>% 
-    html_node(xpath="//td[@class='song']/ancestor::table")%>%
-    html_table(fill=TRUE)%>%
-    select(-`NA`) %>% #sometimes an NA column
-    as_data_frame()
+  if((wholepage%>%html_node(xpath="//td[@class='song']")%>%length())>0) {
+    plraw<-wholepage%>% 
+      html_node(xpath="//td[@class='song']/ancestor::table")%>%
+      html_table(fill=TRUE) 
     
-  #if not, does a table have a border element.  assume first such table is playlist
-  if (length(plraw)==0){
-    print('fail') #placeholder
-  } else{
+    if(TRUE%in%is.na(names(plraw))) plraw<-plraw[,-which(is.na(names(plraw)))] #sometimes an NA column
+
     playlist<-plraw%>%
+      as_data_frame()%>%
       fixHeaders() %>%
       mutate(DJ=dj)%>%
       select(DJ,Artist,Title)%>%
       filter(Artist!='')
+  } else  {
+    #if not, does it have a table row with "artist | title | song | album".  assume first such table is playlist
+    if(wholepage%>%html_node(xpath="//tr[td='Artist'] or //tr[td='Album']")) {
+      plraw<-wholepage%>% 
+        html_node(xpath="//tr[td='Artist']/ancestor::table") %>%
+        html_table(fill=TRUE)
+
+      if (names(plraw)[1]=="X1"){
+        names(plraw)<-plraw[1,]
+        plraw<-plraw[-1,]
+      }
+      
+      if(TRUE%in%is.na(names(plraw))) plraw<-plraw[,-which(is.na(names(plraw)))] #sometimes an NA column
+      
+      playlist<-plraw%>%
+        as_data_frame()%>%
+        fixHeaders() %>%
+        mutate(DJ=dj)%>%
+        select(DJ,Artist,Title)%>%
+        filter(Artist!='')
+    } else {
+      print('fail') #placeholder
+    }
   }
   #if not?
   #is there a th row?  use it as header
@@ -51,7 +71,8 @@ testgetPlaylist <- function(plURLs,dj) {
   #     
   # }
   # playlist<-filter(playlist,Artist!='')
-  return(playlist[1:10,])
+  print(playlist[1:5,])
+  return(playlist)
 }
 
 
