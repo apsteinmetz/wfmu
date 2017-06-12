@@ -11,11 +11,18 @@ handleBadTable<-function(wholepage){
   headers<-wholepage%>% 
     html_node(xpath="//th[@class='song']/parent::tr")%>%
     html_text()%>%
-    str_split('\n')
+    str_split('\n') %>% 
+    unlist()
   plraw<-wholepage%>% 
     html_nodes(xpath="//td[@class='song']/parent::tr")%>%
     html_text()%>%
-    str_split('\n')
+    str_split('\n') %>% 
+    as.data.frame() %>% 
+    t() %>% 
+    as_data_frame()
+  plraw<-plraw[,!sapply(plraw,function(x) (all(x==""))),drop=F]
+ # still has columns with only on-printable characters
+
   #NOT WORKING
 
 }
