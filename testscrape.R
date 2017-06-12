@@ -6,6 +6,20 @@ fixHeaders<-function(pl){
   names(pl)[names(pl)%in%altArtistNames]<-"Artist"
   return(pl)
 }
+
+handleBadTable<-function(wholepage){
+  headers<-wholepage%>% 
+    html_node(xpath="//th[@class='song']/parent::tr")%>%
+    html_text()%>%
+    str_split('\n')
+  plraw<-wholepage%>% 
+    html_nodes(xpath="//td[@class='song']/parent::tr")%>%
+    html_text()%>%
+    str_split('\n')
+  #NOT WORKING
+
+}
+  
 #--------------------------------------------------------------------
 testgetPlaylist <- function(plURLs,dj) {
   i<-1
@@ -22,13 +36,13 @@ testgetPlaylist <- function(plURLs,dj) {
     plraw<-wholepage%>% 
       html_node(xpath="//td[@class='song']/ancestor::table")%>%
       html_table(fill=TRUE) 
+    if (ncol(plraw)>10) plraw<-handleBadTable(wholepage)
   } else  {
     #if not, does it have a table row with "artist | title | song | album".  assume first such table is playlist
     if(wholepage%>%html_node(xpath="//tr[td='Artist'] or //tr[td='Album']")) {
       plraw<-wholepage%>% 
         html_node(xpath="//tr[td='Artist']/ancestor::table") %>%
         html_table(fill=TRUE)
-
     } else {
       print('fail') #placeholder
     }
