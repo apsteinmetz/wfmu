@@ -85,12 +85,13 @@ getDJPlaylistURLs<-function(DJURLs) {
     playlistURL<-c(pl1,pl2)
     playlistURL<-str_replace_all(playlistURL,'http://wfmu.org','')%>%as.character()
 
-    showdates<-singleDJ%>%
-      html_node(xpath="//div[@class='showlist']")%>%
-      # html_nodes(xpath="//span") %>% 
-      html_text()%>%
-      str_extract_all('[A-Za-z]+ [0-9]{1,2}, [0-9]{4}') #%>%
-      strptime("%B %d, %Y")
+    # #showdates doesn't work if there dates not associated with a playlist
+    # showdates<-singleDJ%>%
+    #   html_node(xpath="//div[@class='showlist']")%>%
+    #   html_text()%>%
+    #   str_extract_all('[A-Za-z]+ [0-9]{1,2}, [0-9]{4}') %>%
+    #   lapply(strptime,"%B %d, %Y")
+    
     #showName <- html_node(singleDJ,"title")%>%html_text()
     #showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
