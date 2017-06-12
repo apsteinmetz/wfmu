@@ -2,11 +2,9 @@
 
 library(rvest)
 library(stringr)
-#library(XML)
 library(xml2)
-#library(dplyr)
 library(tidyverse)
-# library(data.table)
+
 
 
 # ----------------------------------------------
@@ -76,13 +74,23 @@ getDJPlaylistURLs<-function(DJURLs) {
   #DJKey = data.frame()
   for (n in 1:length(DJURLs)) {
     singleDJ<- read_html(DJURLs[n])
-    pl<-html_nodes(singleDJ,xpath="//a")%>%html_attr("href")
+    pl<-singleDJ%>%
+      html_node(xpath="//div[@class='showlist']")%>%
+      html_nodes(xpath="//a")%>%
+      html_attr("href")
     #format for newer shows
     pl1<-as.character(na.omit(pl[str_detect(pl,"playlists/shows")]))
     # format for older shows
     pl2<-as.character(na.omit(pl[str_detect(pl,"Playlist")]))
     playlistURL<-c(pl1,pl2)
     playlistURL<-str_replace_all(playlistURL,'http://wfmu.org','')%>%as.character()
+
+    showdates<-singleDJ%>%
+      html_node(xpath="//div[@class='showlist']")%>%
+      # html_nodes(xpath="//span") %>% 
+      html_text()%>%
+      str_extract_all('[A-Za-z]+ [0-9]{1,2}, [0-9]{4}') #%>%
+      strptime("%B %d, %Y")
     #showName <- html_node(singleDJ,"title")%>%html_text()
     #showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
