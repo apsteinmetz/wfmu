@@ -12,20 +12,16 @@ testgetPlaylist <- function(plURLs,dj) {
   print(paste(dj,i,plURLs[i]))
 
   wholepage <- read_html(paste(ROOT_URL, plURLs[i],sep=''))
+  #try to pull out the show date.  assume first date in text on page is the show date
+  airDate<-wholepage%>%
+    html_text()%>%
+    str_extract('[A-Za-z]+ [0-9]{1,2}, [0-9]{4}') %>% 
+    as.Date("%B %d, %Y")
   # are there rows with td of class=song?  get the table
   if((wholepage%>%html_node(xpath="//td[@class='song']")%>%length())>0) {
     plraw<-wholepage%>% 
       html_node(xpath="//td[@class='song']/ancestor::table")%>%
       html_table(fill=TRUE) 
-    
-    if(TRUE%in%is.na(names(plraw))) plraw<-plraw[,-which(is.na(names(plraw)))] #sometimes an NA column
-
-    playlist<-plraw%>%
-      as_data_frame()%>%
-      fixHeaders() %>%
-      mutate(DJ=dj)%>%
-      select(DJ,Artist,Title)%>%
-      filter(Artist!='')
   } else  {
     #if not, does it have a table row with "artist | title | song | album".  assume first such table is playlist
     if(wholepage%>%html_node(xpath="//tr[td='Artist'] or //tr[td='Album']")) {
@@ -33,23 +29,22 @@ testgetPlaylist <- function(plURLs,dj) {
         html_node(xpath="//tr[td='Artist']/ancestor::table") %>%
         html_table(fill=TRUE)
 
-      if (names(plraw)[1]=="X1"){
-        names(plraw)<-plraw[1,]
-        plraw<-plraw[-1,]
-      }
-      
-      if(TRUE%in%is.na(names(plraw))) plraw<-plraw[,-which(is.na(names(plraw)))] #sometimes an NA column
-      
-      playlist<-plraw%>%
-        as_data_frame()%>%
-        fixHeaders() %>%
-        mutate(DJ=dj)%>%
-        select(DJ,Artist,Title)%>%
-        filter(Artist!='')
     } else {
       print('fail') #placeholder
     }
   }
+  if (names(plraw)[1]=="X1"){
+    names(plraw)<-plraw[1,]
+    plraw<-plraw[-1,]
+  }
+  if(TRUE%in%is.na(names(plraw))) plraw<-plraw[,-which(is.na(names(plraw)))] #sometimes an NA column
+  
+  playlist<-plraw%>%
+    as_data_frame()%>%
+    fixHeaders() %>%
+    mutate(DJ=dj,AirDate=airDate)%>%
+    select(DJ,AirDate,Artist,Title)%>%
+    filter(Artist!='')
   #if not?
   #is there a th row?  use it as header
   # plraw<-wholepage%>% html_nodes(xpath="//td[class=song")%>%
@@ -81,7 +76,7 @@ testgetPlaylist <- function(plURLs,dj) {
 #limit analysis to DJs with at least numShows shows and take the last numshows shows.
 numShows<-50
 # non-music shows
-excludeDJs<-c('SD','HA','BC','AF','CP','HP','JP')
+excludeDJs<-c('SD','HA','BC','AF','CP','HP','JP','GM')
 djList<-filter(DJKey,showCount>numShows-1,!(DJ%in%excludeDJs)) %>%select(DJ) %>% .[,1]
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
 
