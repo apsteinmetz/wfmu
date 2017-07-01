@@ -75,7 +75,7 @@ getDJPlaylistURLs<-function(DJURLs) {
   for (n in 1:length(DJURLs)) {
     singleDJ<- read_html(DJURLs[n])
     pl<-singleDJ%>%
-      html_node(xpath="//div[@class='showlist']")%>%
+      html_node(xpath="//div[@class='showlist']") #%>%
       html_nodes(xpath="//a")%>%
       html_attr("href")
     #format for newer shows
@@ -165,11 +165,14 @@ getPlaylist <- function(plURLs,dj) {
 
 # just get first playlist to test parsing. TROUBLE all play list tables are not the same. Headers might not match
 testgetPlaylist <- function(plURLs,dj) {
-    playlist = data.frame()
     i<-1
     print(paste(dj,i))
+    playlist = data_frame()
     # first two columns contain artist and track name, leave the rest
-    temp <- read_html(paste(ROOT_URL, plURLs[i],sep=''))%>%html_node(xpath="//table[2]")%>%html_table(fill=TRUE)
+    temp <- read_html(paste(ROOT_URL, plURLs[i],sep='')) %>% 
+      html_node(xpath="//table[2]") %>% 
+      html_table(fill=TRUE) %>% 
+      as_data_frame()
     #temp<-html(plURL[i])%>%html_nodes("table")%>%.[2]%>%html_table(fill=TRUE)
     # try to correct tables without headers
     if (is.null(names(temp)) || names(temp)[1]=="X1") {
@@ -193,22 +196,34 @@ testgetPlaylist <- function(plURLs,dj) {
 
 
 #-------------- MAIN -----------------
-DJURLs<-getDJURLs()
-DJKey<-getShowNames(DJURLs)
+#DJURLs<-getDJURLs()
+#DJKey<-getShowNames(DJURLs)
 #load(file='djkey.rdata')
-playlistURLS<-getDJPlaylistURLs(DJURLs)
-showCounts<-playlistURLs %>% group_by(DJ) %>% summarise(showCount=n()) %>% arrange(desc(showCount))
+playlistURLs<-getDJPlaylistURLs(DJURLs)
+showCounts<-playlistURLs %>% 
+  group_by(DJ) %>% 
+  summarise(showCount=n()) %>% 
+  arrange(desc(showCount))
 DJKey<-left_join(DJKey,showCounts)
 #limit analysis to DJs with at least numShows shows and take the last numshows shows.
 numShows<-50
-djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ)
-for (dj in djList) {
-  playlistURLs %>% filter(DJ==dj) %>% select(playlistURL)%>%.[1:numShows,1] %>%as.character() %>% getPlaylist(dj)
-}
+djList<-filter(DJKey,showCount>numShows-1) %>% 
+  select(DJ) %>% .[,1] %>% 
+  as.factor()
+# for (dj in djList) {
+#   playlistURLs %>% 
+#     filter(DJ==dj) %>% 
+#     select(playlistURL)%>%.[1:numShows,1] %>%
+#     as.character() %>% 
+#     getPlaylist(dj)
+# }
 
 testPL = list()
 for (dj in djList) {
-  plURLs<-playlistURLs %>% filter(DJ==dj) %>% select(playlistURL)%>%.[1:numShows,1] %>%as.character()
+  plURLs<-playlistURLs %>% 
+    filter(DJ==dj) %>% 
+    select(playlistURL)%>%.[1:numShows,1] %>%
+    as.character()
   testPL[[dj]]<-testgetPlaylist(plURLs,dj)
 }
 #allDJArtists <- getDJArtistNames(DJURLs) 

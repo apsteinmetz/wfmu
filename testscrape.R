@@ -39,10 +39,23 @@ testgetPlaylist <- function(plURLs,dj) {
     str_extract('[A-Za-z]+ [0-9]{1,2}, [0-9]{4}') %>% 
     as.Date("%B %d, %Y")
   # are there rows with td of class=song?  get the table
-  if((wholepage%>%html_node(xpath="//td[@class='song']")%>%length())>0) {
-    plraw<-wholepage%>% 
-      html_node(xpath="//td[@class='song']/ancestor::table")%>%
-      html_table(fill=TRUE) 
+  if((wholepage%>%html_nodes(xpath="//td[@class='song']")%>%length())>0) {
+    plraw_head<-wholepage%>% 
+      html_nodes(xpath="//th[@class='song']") %>% 
+      html_text() %>%   
+      str_replace('\n','') %>% 
+      str_trim()
+      
+    plraw_row<-wholepage%>% 
+      html_nodes(xpath="//td[@class='song']")
+    plraw<-plraw_row %>% 
+      html_text() %>% 
+      str_replace('\n','') %>% 
+      str_trim() %>% 
+      matrix(ncol=length(plraw_head),byrow=T) %>% 
+      as_data_frame()
+    names(plraw)<-plraw_head
+    
     if (ncol(plraw)>10) plraw<-handleBadTable(wholepage)
   } else  {
     #if not, does it have a table row with "artist | title | song | album".  assume first such table is playlist
@@ -97,12 +110,16 @@ testgetPlaylist <- function(plURLs,dj) {
 #limit analysis to DJs with at least numShows shows and take the last numshows shows.
 numShows<-50
 # non-music shows
-excludeDJs<-c('SD','HA','BC','AF','CP','HP','JP','GM')
-djList<-filter(DJKey,showCount>numShows-1,!(DJ%in%excludeDJs)) %>%select(DJ) %>% .[,1]
+excludeDJs<-c('SD','HA','BC','AF','CP','HP','JP','GM','DC')
+djList<-filter(DJKey,showCount>numShows-1,!(DJ%in%excludeDJs)) %>% 
+  select(DJ) %>% .[,1]
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
 
-testPL = list()
+testPL = data_frame()
 for (dj in djList) {
-  plURLs<-playlistURLs %>% filter(DJ==dj) %>% select(playlistURL)%>%.[1:numShows,1] %>%as.character()
-  testPL[[dj]]<-testgetPlaylist(plURLs,dj)
+  plURLs<-playlistURLs %>% 
+    filter(DJ==dj) %>% 
+    select(playlistURL) %>% .[1:numShows,1] %>%
+    as.character()
+  testPL<-bind_rows(testPL,testgetPlaylist(plURLs,dj))
 }
