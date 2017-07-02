@@ -69,21 +69,26 @@ getShowNames<-function(DJURLs) {
 # #---------------------------------------------------
 # get the URLs of the playlists for a DJ
 getDJPlaylistURLs<-function(DJURLs) {
-  allDJPlayLists = data.frame(DJ=NULL,playlistURL=NULL)
+  allDJPlayLists = data_frame(DJ=NULL,playlistURL=NULL)
   dudList<-NULL
   #DJKey = data.frame()
   for (n in 1:length(DJURLs)) {
     singleDJ<- read_html(DJURLs[n])
     pl<-singleDJ%>%
-      html_node(xpath="//div[@class='showlist']") #%>%
+      html_node(xpath="//div[@class='showlist']") %>%
       html_nodes(xpath="//a")%>%
       html_attr("href")
+    if (length(pl)==0){ #try something else
+      pl<-singleDJ%>%
+        html_nodes(xpath="//span[@class='KDBFavIcon KDBepisode']") %>%
+        html_nodes(xpath="//a")%>%
+        html_attr("href")
+    }
     #format for newer shows
-    pl1<-as.character(na.omit(pl[str_detect(pl,"playlists/shows")]))
+    pl<-as.character(na.omit(pl[str_detect(pl,"playlists/shows")]))
     # format for older shows
-    pl2<-as.character(na.omit(pl[str_detect(pl,"Playlist")]))
-    playlistURL<-c(pl1,pl2)
-    playlistURL<-str_replace_all(playlistURL,'http://wfmu.org','')%>%as.character()
+    if (length(pl)<1) pl<-as.character(na.omit(pl[str_detect(pl,"Playlist")]))
+    playlistURL<-str_replace_all(pl,'http://wfmu.org','')%>%as.character()
 
     # #showdates doesn't work if there dates not associated with a playlist
     # showdates<-singleDJ%>%
@@ -99,7 +104,7 @@ getDJPlaylistURLs<-function(DJURLs) {
     #DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
     #omit shows without valid playlists.  Talk shows?
     if (length(playlistURL)>0) {
-      allDJPlayLists = rbind(allDJPlayLists, data.frame(DJ=DJ,playlistURL = playlistURL))
+      allDJPlayLists = bind_rows(allDJPlayLists, data_frame(DJ=DJ,playlistURL = playlistURL))
     } else { 
       print("DUD")
       dudList<-c(dudList,DJ) }
