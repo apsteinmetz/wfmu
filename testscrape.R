@@ -50,8 +50,6 @@ testgetPlaylist <- function(plURLs, dj) {
   i <- 1
   print(paste(dj, i, plURLs[i, 1]))
   
-  
-  
   wholepage <- read_html(paste(ROOT_URL, plURLs[i, 1], sep = ''))
   #try to pull out the show date.  assume first date in text on page is the show date
   airDate <- wholepage %>%
@@ -90,13 +88,12 @@ testgetPlaylist <- function(plURLs, dj) {
           print("DUD. Can't find header")
           plraw <- NULL
         }
-        
       }
     }
   }
   
   if (is.null(plraw)) {
-    # no song class now what? is it a table? try to  find header
+    # no song class, now what? is it a table? try to  find header
     #seems like cellspacing means its a row column thing
     pl_table<-wholepage %>% html_node(xpath = "//table[@cellspacing and @cellpadding]")
     if (!is.na(pl_table)) {
@@ -105,79 +102,54 @@ testgetPlaylist <- function(plURLs, dj) {
         pl_raw<-pl_table
       } else{
         # try one more ``
-          #scan until we find the playlist header
-          for (n in 1:nrow(pl_table)) {
-            if (TRUE %in% (pl_table[n,] %in% altHeaderNames)) {
-              names(pl_table) <- pl_table[n, ]
-              plraw <- pl_table[n + 1:nrow(pl_table), ]
-              break
-            }
-          }
-          if (n == nrow(pl_table)) {
-            print("DUD. Can't find header")
-            plraw <- NULL #final dead end
-          }
-      }
-      
-    }
-    
-    
-    plraw_head <- wholepage %>%
-      html_nodes(xpath = "//td[(@class='song') and not(@colspan | @align)]") %>%
-      html_text() %>%
-      str_replace('\n', '') %>%
-      str_trim()
-    
-    plraw_row <- wholepage %>%
-      html_nodes(xpath = "//td[(@class='song') and not(@colspan | @align)]") %>%
-      html_text() %>%
-      str_replace('\n', '') %>%
-      str_trim() %>%
-      matrix(ncol = length(plraw_head), byrow = T) %>%
-      as_data_frame()
-    
-    names(plraw) <- plraw_head
-    plraw <- NULL #we got nothin'
-    if (is.null(plraw)) {
-      print("DUD. Can't find a playlist.")
-    } else{
-      # try one more thing
-      if (names(plraw)[1] == "X1") {
         #scan until we find the playlist header
-        for (n in 1:nrow(plraw)) {
-          if (plraw$X1[n] %in% altHeaderNames) {
-            names(plraw) <- plraw[n, ]
-            plraw <- plraw[n + 1:nrow(plraw), ]
+        for (n in 1:nrow(pl_table)) {
+          if (TRUE %in% (pl_table[n,] %in% altHeaderNames)) {
+            names(pl_table) <- pl_table[n, ]
+            plraw <- pl_table[n + 1:nrow(pl_table), ]
             break
           }
         }
-        if (n == nrow(plraw)) {
+        if (n == nrow(pl_table)) {
           print("DUD. Can't find header")
           plraw <- NULL #final dead end
         }
       }
     }
+    
+    # plraw_head <- wholepage %>%
+    #   html_nodes(xpath = "//td[(@class='song') and not(@colspan | @align)]") %>%
+    #   html_text() %>%
+    #   str_replace('\n', '') %>%
+    #   str_trim()
+    # 
+    # plraw_row <- wholepage %>%
+    #   html_nodes(xpath = "//td[(@class='song') and not(@colspan | @align)]") %>%
+    #   html_text() %>%
+    #   str_replace('\n', '') %>%
+    #   str_trim() %>%
+    #   matrix(ncol = length(plraw_head), byrow = T) %>%
+    #   as_data_frame()
+    # 
   }
-}
-
-# final clean up if we have something
-if (is.null(plraw)) {
-  playlist <- NULL
-} else {
-  if (TRUE %in% is.na(names(plraw)))
-    plraw <- plraw[, -which(is.na(names(plraw)))] #sometimes an NA column
+  # final clean up if we have something
+  if (is.null(plraw)) {
+    playlist <- NULL
+  } else {
+    if (TRUE %in% is.na(names(plraw)))
+      plraw <- plraw[, -which(is.na(names(plraw)))] #sometimes an NA column
+    
+    playlist <- plraw %>%
+      as_data_frame() %>%
+      fixHeaders() %>%
+      mutate(DJ = dj, AirDate = airDate) %>%
+      select(DJ, AirDate, Artist, Title) %>%
+      filter(Artist != '')
+    print(playlist[1:5, ])
+    
+  }
   
-  playlist <- plraw %>%
-    as_data_frame() %>%
-    fixHeaders() %>%
-    mutate(DJ = dj, AirDate = airDate) %>%
-    select(DJ, AirDate, Artist, Title) %>%
-    filter(Artist != '')
-  print(playlist[1:5, ])
-  
-}
-
-return(playlist)
+  return(playlist)
 }
 
 
