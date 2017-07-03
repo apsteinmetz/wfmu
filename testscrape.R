@@ -69,11 +69,17 @@ testgetPlaylist <- function(plURLs, dj) {
   #simplest case. A table with obvious header names
   if (!is.na(wholepage %>% html_node(xpath = "//th[@class='song']"))) {
     plraw <- wholepage %>%
-      html_node(xpath = "//td[@class='song']/ancestor::table") %>%
+      html_node(xpath = "//th[@class='song']/ancestor::table") %>%
       html_table(fill = TRUE)
+    #some ideas to deal with FP
+    plraw_header <- wholepage %>%
+      html_nodes(xpath = "//tr[th[@class='song']]")
+    plraw_row <- wholepage %>%
+      html_nodes(xpath = "//tr[td[@class='song']]")
+    
   } else {
     # no 'th' but are there rows in a table with td of class=song?  get the table
-    if (!is.na(wholepage %>% html_node(xpath = "//tr[@class='song']"))) {
+    if (!is.na(wholepage %>% html_node(xpath = "//td[@class='song']"))) {
       plraw <- wholepage %>%
         html_node(xpath = "//td[@class='song']/ancestor::table") %>%
         html_table(fill = T)
