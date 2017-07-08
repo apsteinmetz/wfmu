@@ -75,27 +75,17 @@ testgetPlaylist <- function(plURLs, dj) {
   plraw <- NULL
   #simplest case. A table with obvious header names
   if (!is.na(wholepage %>% html_node(xpath = "//th[@class='song']"))) {
-    wholepage %>% html_nodes(xpath="//tr[td[@class !='song']]") %>% xml_remove()
-    plraw <- wholepage %>%
-      html_nodes(xpath = "//td[@class='song']/ancestor::table") %>%
-      html_table(fill = TRUE)
-    #some ideas to deal with FP
-    #get headers
-    plraw_header<-wholepage %>% 
-      html_nodes(xpath="//th[@class='song']/parent::tr") %>% 
-      html_text() %>% 
-      word(start=1:10,sep="\n") %>% 
-      na.omit() %>% 
-      as.vector()
-
-    #plraw_header <- wholepage %>% 
-    #  html_nodes(xpath = "//tr[th[@class='song']]")
-    plraw_row <- wholepage %>%
-      html_nodes(xpath = "//tr[td[@class='song']]") %>% 
-      html_text() %>% 
-      lapply(word,start=1:10,sep="[\n]+") #%>% 
-      na.omit() %>% 
-      as.vector()
+    #plraw <- wholepage %>%
+    #  html_node(xpath = "//td[@class='song']/ancestor::table")
+    #if (length(plraw)>2){ #can't make clean table.  "FP" for example extract individual rows
+      table_shell<-xml_new_root("table")
+      plraw<-wholepage %>% 
+        html_nodes(xpath="//tr[td[@class ='song']] | //tr[th[@class ='song']]")
+      for (node in plraw) xml_add_child(table_shell,node)
+      plraw<-table_shell %>% 
+        html_node(xpath="//table")
+    #}
+    plraw<-html_table(plraw,fill=TRUE)
     
   } else {
     # no 'th' but are there rows in a table with td of class=song?  get the table
