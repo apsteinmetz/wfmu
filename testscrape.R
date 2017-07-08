@@ -1,3 +1,10 @@
+library(rvest)
+library(stringr)
+library(xml2)
+library(tidyverse)
+
+
+
 altArtistNames <- c('THE STOOGE', 'Band', 'Singer', 'Artist')
 altTitleNames <- c('THE SONG', 'Track', 'Song')
 altHeaderNames <- c(altArtistNames, altTitleNames)
@@ -68,11 +75,14 @@ testgetPlaylist <- function(plURLs, dj) {
   plraw <- NULL
   #simplest case. A table with obvious header names
   if (!is.na(wholepage %>% html_node(xpath = "//th[@class='song']"))) {
+    #strip table rows that aren't class song
+    # wholepage %>% html_nodes(xpath="//tr[td[not(@class)]]") %>% xml_remove()
+    wholepage %>% html_nodes(xpath="//tr[td[@class !='song']]") %>% xml_remove()
     plraw <- wholepage %>%
-      html_node(xpath = "//th[@class='song']/ancestor::table") %>%
+      html_nodes(xpath = "//td[@class='song']/ancestor::table") #%>%
       html_table(fill = TRUE)
     #some ideas to deal with FP
-    plraw_header <- wholepage %>%
+    plraw_header <- wholepage %>% 
       html_nodes(xpath = "//tr[th[@class='song']]")
     plraw_row <- wholepage %>%
       html_nodes(xpath = "//tr[td[@class='song']]")
