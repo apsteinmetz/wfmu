@@ -69,11 +69,12 @@ getShowNames<-function(DJURLs) {
 # #---------------------------------------------------
 # get the URLs of the playlists for a DJ
 getDJPlaylistURLs<-function(DJURLs) {
-  allDJPlayLists = data_frame(DJ=NULL,playlistURL=NULL)
+  allDJPlayLists = NULL
   dudList<-NULL
   #DJKey = data.frame()
   for (n in 1:length(DJURLs)) {
     singleDJ<- read_html(DJURLs[n])
+    #singleDJ<-read_html("http://wfmu.org/playlists/SN")  #TEST
     pl<-singleDJ%>%
       html_node(xpath="//div[@class='showlist']") %>%
       html_nodes(xpath="//a")%>%
@@ -88,7 +89,11 @@ getDJPlaylistURLs<-function(DJURLs) {
     pl<-as.character(na.omit(pl[str_detect(pl,"playlists/shows")]))
     # format for older shows
     if (length(pl)<1) pl<-as.character(na.omit(pl[str_detect(pl,"Playlist")]))
-    playlistURL<-str_replace_all(pl,'http://wfmu.org','')%>%as.character()
+    
+    #assume a full URL is a fill-in DJ.  We omit these from the analysis
+    pl<-pl[!str_detect(pl,"http")]
+    
+    playlistURL<-pl %>% as.character()
 
     # #showdates doesn't work if there dates not associated with a playlist
     # showdates<-singleDJ%>%
