@@ -37,7 +37,7 @@ getDJsOffSched <- function(){
   return(d_off)
 }
 
-# #---------------------------------------------------
+#---------------------------------------------------
 # get the shownames for a DJ
 getShowNames<-function(DJURLs) {
   DJKey = data.frame()
@@ -68,12 +68,13 @@ getShowNames<-function(DJURLs) {
 
 # #---------------------------------------------------
 # get the URLs of the playlists for a DJ
-getDJPlaylistURLs<-function(DJURLs) {
+getDJPlaylistURLs<-function(music_djs) {
   allDJPlayLists = NULL
   dudList<-NULL
   #DJKey = data.frame()
-  for (n in 1:length(DJURLs)) {
-    singleDJ<- read_html(DJURLs[n])
+  for (dj in music_djs) {
+    singleDJ<- read_html(paste("http://wfmu.org/playlists/",dj,sep=''))
+    #singleDJ<- read_html("http://wfmu.org/playlists/HN")
     pl<-singleDJ%>%
         html_nodes(xpath="//a[contains(@href,'playlists/shows')]") %>%
         html_attr("href")
@@ -86,14 +87,13 @@ getDJPlaylistURLs<-function(DJURLs) {
     pl<-pl[!str_detect(pl,"http")]
     
     playlistURL<-pl %>% as.character()
-    DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
-    print(DJ)
+    print(dj)
     #omit shows without valid playlists.  Talk shows?
     if (length(playlistURL)>0) {
-      allDJPlayLists = bind_rows(allDJPlayLists, data_frame(DJ=DJ,playlistURL = playlistURL))
+      allDJPlayLists = bind_rows(allDJPlayLists, data_frame(DJ=dj,playlistURL = playlistURL))
     } else { 
       print("DUD")
-      dudList<-c(dudList,DJ) }
+      dudList<-c(dudList,dj) }
   }  
   
   return(allDJPlayLists)
@@ -190,7 +190,11 @@ testgetPlaylist <- function(plURLs,dj) {
 #DJURLs<-getDJURLs()
 #DJKey<-getShowNames(DJURLs)
 #load(file='djkey.rdata')
-playlistURLs<-getDJPlaylistURLs(DJURLs)
+music_djs<-DJKey %>% 
+  select(DJ) %>% 
+  anti_join(data_frame(DJ=excludeDJs)) %>% 
+  as_vector()
+playlistURLs<-getDJPlaylistURLs(music_djs)
 showCounts<-playlistURLs %>% 
   group_by(DJ) %>% 
   summarise(showCount=n()) %>% 
