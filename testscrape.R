@@ -6,8 +6,9 @@ library(tidyverse)
 
 
 altArtistNames <- c('THE STOOGE', 'Band', 'Singer', 'Artist')
-altTitleNames <- c('THE SONG', 'Track', 'Song')
+altTitleNames <- c('THE SONG', 'Track', 'Song','Title')
 altHeaderNames <- c(altArtistNames, altTitleNames)
+MAXLEN = 60 #how long should we let artist and title names be. Truncate longer
 header_th_xpath <- paste(
   "//th='Track'",
   "or //th='Title'",
@@ -25,17 +26,29 @@ header_td_xpath <- paste(
 )
 
 
+#------------------------------------------------------------------
 try_BK<-function(wp){
-  table_shell<-xml_new_root("table")
-  pl<-wp %>% 
-    html_nodes(xpath='//span[@class="KDBFavIcon KDBsong"]')
-  for (node in plraw) xml_add_child(table_shell,node)
-  plraw<-table_shell %>% 
-    html_node(xpath="//table")
-  #}
-  plraw<-html_table(plraw,fill=TRUE)
+  #assume first field is title and second is artist
+  #doing it it two steps assure same number of artists and titles
+  title_artist<-wp %>% 
+    html_nodes(xpath="//table[2]") %>% 
+    html_text() %>% 
+    str_extract_all("\n[\\S ]+\n-\n[\\S ]+\n") %>% 
+    .[[1]] 
+  
+  
+  Title<-title_artist %>% 
+    str_extract_all("\n[\\S ]+\n-") %>% 
+    str_replace_all("\n(-)?","")
+  
+  Artist<-title_artist %>% 
+    str_extract_all("\n-\n[\\S ]+\n") %>% 
+    str_replace_all("\n(-)?","")
+  plraw<-tibble(Artist,Title)
   
 }
+#------------------------------------------------------------------
+
 fixHeaders <- function(pl) {
   #takes a data frame
   n<-names(pl) %in% altArtistNames
@@ -137,8 +150,8 @@ testgetPlaylist <- function(plURLs, dj) {
     pl_table<-wholepage %>% html_node(xpath = "//table[@cellspacing and @cellpadding]")
     if (!is.na(pl_table)) {
       pl_table<-html_table(pl_table,fill = TRUE)
-      if (TRUE %in% (names(pl_table) %in% altHeaderNames)) {
-        pl_raw<-pl_table
+      if (any(names(pl_table) %in% altHeaderNames)) {
+        plraw<-pl_table
       } else{
         # try one more ``
         #scan until we find the playlist header
@@ -150,10 +163,11 @@ testgetPlaylist <- function(plURLs, dj) {
           }
         }
         if (n == nrow(pl_table)) {
+          plraw<-NULL
           #try idiosyncratic djs
-          plraw<-try_BK(wholepage)
-          print("DUD. Can't find header")
-          plraw <- NULL #final dead end
+          if (dj=="TW") plraw<-try_BK(wholepage)
+          if (is.null(plraw)) print("DUD. Can't find header")
+          #final dead end
         }
       }
     }
@@ -181,9 +195,13 @@ testgetPlaylist <- function(plURLs, dj) {
       plraw <- plraw[, -which(is.na(names(plraw)))] #sometimes an NA column
     
     playlist <- plraw %>%
+      select(Artist,Title) %>% 
+      na.omit() %>% 
       fixHeaders() %>%
-      mutate(DJ = dj, AirDate = airDate) %>%
-      select(DJ, AirDate, Artist, Title) %>%
+      transmute(DJ = dj, 
+                AirDate = airDate,
+                Artist= Artist %>% str_trunc(MAXLEN,"right") %>% str_to_title(),
+                Title =  Title %>% str_trunc(MAXLEN,"right") %>% str_to_title()) %>%
       filter(Artist != '')
     print(playlist[1:5, ])
     
@@ -209,7 +227,8 @@ excludeDJs <-
     'DC',
     'CC',
     'DU',
-    'ES')
+    'ES',
+    'LW')
 djList <- filter(DJKey, showCount > numShows - 1, !(DJ %in% excludeDJs)) %>%
   select(DJ) %>% .[, 1]
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
