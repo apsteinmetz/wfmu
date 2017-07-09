@@ -74,17 +74,9 @@ getDJPlaylistURLs<-function(DJURLs) {
   #DJKey = data.frame()
   for (n in 1:length(DJURLs)) {
     singleDJ<- read_html(DJURLs[n])
-    #singleDJ<-read_html("http://wfmu.org/playlists/SN")  #TEST
     pl<-singleDJ%>%
-      html_node(xpath="//div[@class='showlist']") %>%
-      html_nodes(xpath="//a")%>%
-      html_attr("href")
-    if (length(pl)==0){ #try something else
-      pl<-singleDJ%>%
-        html_nodes(xpath="//span[@class='KDBFavIcon KDBepisode']") %>%
-        html_nodes(xpath="//a")%>%
+        html_nodes(xpath="//a[contains(@href,'playlists/shows')]") %>%
         html_attr("href")
-    }
     #format for newer shows
     pl<-as.character(na.omit(pl[str_detect(pl,"playlists/shows")]))
     # format for older shows
@@ -94,19 +86,8 @@ getDJPlaylistURLs<-function(DJURLs) {
     pl<-pl[!str_detect(pl,"http")]
     
     playlistURL<-pl %>% as.character()
-
-    # #showdates doesn't work if there dates not associated with a playlist
-    # showdates<-singleDJ%>%
-    #   html_node(xpath="//div[@class='showlist']")%>%
-    #   html_text()%>%
-    #   str_extract_all('[A-Za-z]+ [0-9]{1,2}, [0-9]{4}') %>%
-    #   lapply(strptime,"%B %d, %Y")
-    
-    #showName <- html_node(singleDJ,"title")%>%html_text()
-    #showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     DJ <- sub("http://wfmu.org/playlists/","",DJURLs[n])
     print(DJ)
-    #DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
     #omit shows without valid playlists.  Talk shows?
     if (length(playlistURL)>0) {
       allDJPlayLists = bind_rows(allDJPlayLists, data_frame(DJ=DJ,playlistURL = playlistURL))
