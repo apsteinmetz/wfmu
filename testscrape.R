@@ -28,7 +28,7 @@ header_td_xpath <- paste(
 
 #------------------------------------------------------------------
 try_BK<-function(wp){
-  #assume first field is title and second is artist
+  #assume first field is title and second is artist separated by dash
   #doing it it two steps assure same number of artists and titles
   title_artist<-wp %>% 
     html_nodes(xpath="//table[2]") %>% 
@@ -48,6 +48,26 @@ try_BK<-function(wp){
   
 }
 #------------------------------------------------------------------
+try_HN<-function(wp){
+  #assume first field is title and second is artist separated by colon
+  #doing it it two steps assure same number of artists and titles
+  title_artist<-wp %>% 
+    html_nodes(xpath="//table[2]") %>% 
+    html_text() %>% 
+    str_extract_all("\n[\\S ]+: [\\S ]+\n") %>% 
+    .[[1]] 
+  
+  
+  Artist<-title_artist %>% 
+    str_extract_all("\n[\\S ]+: ") %>% 
+    str_replace_all("(\n)|(: )","")
+  
+  Title<-title_artist %>% 
+    str_extract_all(": [\\S ]+\n") %>% 
+    str_replace_all("(\n)|(: )","")
+  plraw<-tibble(Artist,Title)
+  
+}#------------------------------------------------------------------
 
 fixHeaders <- function(pl) {
   #takes a data frame
@@ -65,27 +85,6 @@ if (any(which(t))){
 }
   
   return(pl)
-}
-
-handleBadTable <- function(wholepage) {
-  headers <- wholepage %>%
-    html_node(xpath = "//th[@class='song']/parent::tr") %>%
-    html_text() %>%
-    str_split('\n') %>%
-    unlist()
-  plraw <- wholepage %>%
-    html_nodes(xpath = "//td[@class='song']/parent::tr") %>%
-    html_text() %>%
-    str_split('\n') %>%
-    as.data.frame() %>%
-    t() %>%
-    as_data_frame()
-  plraw <- plraw[, !sapply(plraw, function(x)
-    (all(x == ""))), drop = F]
-  # still has columns with only on-printable characters
-  
-  #NOT WORKING
-  
 }
 
 #--------------------------------------------------------------------
@@ -111,9 +110,6 @@ testgetPlaylist <- function(plURLs, dj) {
   plraw <- NULL
   #simplest case. A table with obvious header names
   if (!is.na(wholepage %>% html_node(xpath = "//th[@class='song']"))) {
-    #plraw <- wholepage %>%
-    #  html_node(xpath = "//td[@class='song']/ancestor::table")
-    #if (length(plraw)>2){ #can't make clean table.  "FP" for example extract individual rows
       table_shell<-xml_new_root("table")
       plraw<-wholepage %>% 
         html_nodes(xpath="//tr[td[@class ='song']] | //tr[th[@class ='song']]")
@@ -166,26 +162,12 @@ testgetPlaylist <- function(plURLs, dj) {
           plraw<-NULL
           #try idiosyncratic djs
           if (dj=="TW") plraw<-try_BK(wholepage)
+          if (dj=="HN") plraw<-try_HN(wholepage)
           if (is.null(plraw)) print("DUD. Can't find header")
           #final dead end
         }
       }
     }
-    
-    # plraw_head <- wholepage %>%
-    #   html_nodes(xpath = "//td[(@class='song') and not(@colspan | @align)]") %>%
-    #   html_text() %>%
-    #   str_replace('\n', '') %>%
-    #   str_trim()
-    # 
-    # plraw_row <- wholepage %>%
-    #   html_nodes(xpath = "//td[(@class='song') and not(@colspan | @align)]") %>%
-    #   html_text() %>%
-    #   str_replace('\n', '') %>%
-    #   str_trim() %>%
-    #   matrix(ncol = length(plraw_head), byrow = T) %>%
-    #   as_data_frame()
-    # 
   }
   # final clean up if we have something
   if (is.null(plraw)) {
@@ -195,9 +177,9 @@ testgetPlaylist <- function(plURLs, dj) {
       plraw <- plraw[, -which(is.na(names(plraw)))] #sometimes an NA column
     
     playlist <- plraw %>%
+      fixHeaders() %>%
       select(Artist,Title) %>% 
       na.omit() %>% 
-      fixHeaders() %>%
       transmute(DJ = dj, 
                 AirDate = airDate,
                 Artist= Artist %>% str_trunc(MAXLEN,"right") %>% str_to_title(),
@@ -228,7 +210,8 @@ excludeDJs <-
     'CC',
     'DU',
     'ES',
-    'LW')
+    'LW',
+    'IM')
 djList <- filter(DJKey, showCount > numShows - 1, !(DJ %in% excludeDJs)) %>%
   select(DJ) %>% .[, 1]
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
