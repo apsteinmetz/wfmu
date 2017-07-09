@@ -24,10 +24,33 @@ header_td_xpath <- paste(
   "or //td='THE STOOGE'"
 )
 
+
+try_BK<-function(wp){
+  table_shell<-xml_new_root("table")
+  pl<-wp %>% 
+    html_nodes(xpath='//span[@class="KDBFavIcon KDBsong"]')
+  for (node in plraw) xml_add_child(table_shell,node)
+  plraw<-table_shell %>% 
+    html_node(xpath="//table")
+  #}
+  plraw<-html_table(plraw,fill=TRUE)
+  
+}
 fixHeaders <- function(pl) {
   #takes a data frame
-  names(pl)[names(pl) %in% altTitleNames] <- "Title"
-  names(pl)[names(pl) %in% altArtistNames] <- "Artist"
+  n<-names(pl) %in% altArtistNames
+  t<-names(pl) %in% altTitleNames
+  if (any(which(n))){
+    names(pl)[n] <- "Artist"
+  } else{
+    pl$Artist=NA
+  } 
+if (any(which(t))){
+  names(pl)[t] <- "Title"
+} else{
+  pl$Title=NA
+}
+  
   return(pl)
 }
 
@@ -127,6 +150,8 @@ testgetPlaylist <- function(plURLs, dj) {
           }
         }
         if (n == nrow(pl_table)) {
+          #try idiosyncratic djs
+          plraw<-try_BK(wholepage)
           print("DUD. Can't find header")
           plraw <- NULL #final dead end
         }
@@ -156,7 +181,6 @@ testgetPlaylist <- function(plURLs, dj) {
       plraw <- plraw[, -which(is.na(names(plraw)))] #sometimes an NA column
     
     playlist <- plraw %>%
-      as_data_frame() %>%
       fixHeaders() %>%
       mutate(DJ = dj, AirDate = airDate) %>%
       select(DJ, AirDate, Artist, Title) %>%
@@ -197,4 +221,5 @@ for (dj in djList) {
     .[1:numShows, ] %>%
     select(playlistURL)
   testPL <- bind_rows(testPL, testgetPlaylist(plURLs, dj))
+  bad_Tables<-anti_join(tibble(DJ=djList),testPL)
 }
