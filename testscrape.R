@@ -115,9 +115,8 @@ testgetPlaylist <- function(plURLs, dj) {
         html_nodes(xpath="//tr[td[@class ='song']] | //tr[th[@class ='song']]")
       for (node in plraw) xml_add_child(table_shell,node)
       plraw<-table_shell %>% 
-        html_node(xpath="//table")
-    #}
-    plraw<-html_table(plraw,fill=TRUE)
+        html_node(xpath="//table") %>% 
+        html_table(fill=TRUE) %>% na.omit()
     
   } else {
     # no 'th' but are there rows in a table with td of class=song?  get the table
