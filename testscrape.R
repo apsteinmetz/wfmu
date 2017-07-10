@@ -111,9 +111,11 @@ testgetPlaylist <- function(plURLs, dj) {
   #simplest case. A table with obvious header names
   if (!is.na(wholepage %>% html_node(xpath = "//th[@class='song']"))) {
       table_shell<-xml_new_root("table")
+      #remove single column rows, I hope nothing else.
+      wholepage %>% html_nodes(xpath="//td[@colspan='8']") %>% xml_remove(free=T)
       plraw<-wholepage %>% 
         html_nodes(xpath="//tr[td[@class ='song']] | //tr[th[@class ='song']]")
-      for (node in plraw) xml_add_child(table_shell,node)
+      for (node in plraw)  xml_add_child(table_shell,node)
       plraw<-table_shell %>% 
         html_node(xpath="//table") %>% 
         html_table(fill=TRUE) %>% na.omit()
