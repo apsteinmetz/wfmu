@@ -195,7 +195,8 @@ testgetPlaylist <- function(plURL, dj) {
                   str_extract("[^\\(]+") %>%
                   str_trim()
       ) %>% 
-    filter(Artist != '')
+    filter(Artist != '') %>% 
+    filter(!is.na(Artist))
     print(playlist[1:5, ])
     
   }
