@@ -88,11 +88,9 @@ if (any(which(t))){
 }
 
 #--------------------------------------------------------------------
-testgetPlaylist <- function(plURLs, dj) {
-  i <- 1
-  print(paste(dj, i, plURLs[i, 1]))
-  
-  wholepage <- read_html(paste(ROOT_URL, plURLs[i, 1], sep = ''))
+testgetPlaylist <- function(plURL, dj) {
+
+    wholepage <- read_html(paste(ROOT_URL, plURL, sep = ''))
   #try to pull out the show date.  assume first date in text on page is the show date
   airDate <- wholepage %>%
     html_text() %>%
@@ -108,17 +106,18 @@ testgetPlaylist <- function(plURLs, dj) {
   }
   
   plraw <- NULL
+  #hand-rolled
   #simplest case. A table with obvious header names
   if (!is.na(wholepage %>% html_node(xpath = "//th[@class='song']"))) {
       table_shell<-xml_new_root("table")
       #remove single column rows, I hope nothing else.
       wholepage %>% html_nodes(xpath="//td[@colspan='8']") %>% xml_remove(free=T)
-      plraw<-wholepage %>% 
-        html_nodes(xpath="//tr[td[@class ='song']] | //tr[th[@class ='song']]")
+      plraw<-wholepage%>% 
+        html_nodes(xpa="//tr[td[@class ='song']] | //tr[th[@class ='song']]")
       for (node in plraw)  xml_add_child(table_shell,node)
       plraw<-table_shell %>% 
         html_node(xpath="//table") %>% 
-        html_table(fill=TRUE) %>% na.omit()
+        html_table(fill=TRUE)
     
   } else {
     # no 'th' but are there rows in a table with td of class=song?  get the table
@@ -183,9 +182,20 @@ testgetPlaylist <- function(plURLs, dj) {
       na.omit() %>% 
       transmute(DJ = dj, 
                 AirDate = airDate,
-                Artist= Artist %>% str_trunc(MAXLEN,"right") %>% str_to_title(),
-                Title =  Title %>% str_trunc(MAXLEN,"right") %>% str_to_title()) %>%
-      filter(Artist != '')
+                Artist= Artist %>% 
+                  str_trunc(MAXLEN,"right") %>% 
+                  str_to_title() %>% 
+                  str_extract("[\\S ]+") %>%         #get rid of extra lines in mutiple line cells
+                  str_extract("[^\\(]+") %>%         #dump parentheticals
+                  str_trim(),
+                Title =  Title %>% 
+                  str_trunc(MAXLEN,"right") %>% 
+                  str_to_title() %>%
+                  str_extract("[\\S ]+[^()]") %>% 
+                  str_extract("[^\\(]+") %>%
+                  str_trim()
+      ) %>% 
+    filter(Artist != '')
     print(playlist[1:5, ])
     
   }
@@ -212,7 +222,16 @@ excludeDJs <-
     'DU',
     'ES',
     'LW',
-    'IM')
+    'IM',
+    'LL',
+    'NW',
+    'NP',
+    'ZZ',
+    'FC',
+    'SY',
+    'TI',
+    'LK',
+    'TP')
 djList <- filter(DJKey, showCount > numShows - 1, !(DJ %in% excludeDJs)) %>%
   select(DJ) %>% .[, 1]
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
@@ -223,6 +242,11 @@ for (dj in djList) {
     filter(DJ == dj) %>%
     .[1:numShows, ] %>%
     select(playlistURL)
-  testPL <- bind_rows(testPL, testgetPlaylist(plURLs, dj))
+#  for (n in 1:numShows){
+  for (n in 1:5){
+    plURL<-plURLs[n,1]
+    print(paste(dj, n, plURL))
+    testPL <- bind_rows(testPL, testgetPlaylist(plURL, dj))
+  }
   bad_Tables<-anti_join(tibble(DJ=djList),testPL)
 }
