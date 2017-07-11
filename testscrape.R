@@ -243,11 +243,11 @@ for (dj in djList) {
     filter(DJ == dj) %>%
     .[1:numShows, ] %>%
     select(playlistURL)
-#  for (n in 1:numShows){
-  for (n in 1:5){
+  for (n in 1:numShows){
     plURL<-plURLs[n,1]
     print(paste(dj, n, plURL))
     testPL <- bind_rows(testPL, testgetPlaylist(plURL, dj))
   }
-  bad_Tables<-anti_join(tibble(DJ=djList),testPL)
+  save(testPL,file="testPL.Rdata")
 }
+bad_Tables<-anti_join(tibble(DJ=djList),testPL)
