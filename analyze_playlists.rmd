@@ -35,55 +35,55 @@ Clean up inconsistant artist names
 
 allDJArtists<-playlists
 
-allDJArtists$ArtistRaw<-allDJArtists$Artist
+allDJArtists$ArtistToken<-allDJArtists$Artist
 # one artist is all punctuation so give !!! special treatment
-allDJArtists$Artist<-str_replace(allDJArtists$Artist,"!!!","chkchkchk")
+allDJArtists$ArtistToken<-str_replace(allDJArtists$ArtistToken,"!!!","chkchkchk")
 # now change some common punctuation to space
 print("Stripping Punctuation")
 
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"\\&"," ")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"\\&"," ")
 
-allDJArtists$Artist<-str_to_lower(allDJArtists$Artist)
+allDJArtists$ArtistToken<-str_to_lower(allDJArtists$ArtistToken)
 # I choose to strip out the stuff below though dealing with it might get better analysis
 #remove any text in parentheses
 print("Stripping filler words")
 # get rid of anything between parenthesis
 #tricky regex to handle cases of multiple parentheticals in one artist
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"(\\([^(]+\\))","")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"(\\([^(]+\\))","")
 # remove 'featuring' or 'with' artists
 # I chose not to remove "Versus" because that is a band name
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"(feat |featuring |and the |with |vs |vs\\.).+","")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"(feat |featuring |and the |with |vs |vs\\.).+","")
 # get rid of 'live' identifier
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"(live @ |live on|@).+","")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"(live @ |live on|@).+","")
 
 #now get rid of remaining non-word characters except space
 
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"[^a-z^ ^0-9]","")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"[^a-z^ ^0-9]","")
 
 
 # get rid of 'interview'
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"(interview w|interview)","")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"(interview w|interview)","")
 
 # get rid of unspecified artists
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"unknown artist(s| )|unknown","")
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"various artists|various","")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"unknown artist(s| )|unknown","")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"various artists|various","")
 
 #get rid of the marathon finale
 allDJArtists<-allDJArtists%>%filter(!str_detect(Artist,"hoof[a-zA-Z ]+sinfonia"))
 
 #make "new york" one word.  Lots of bands start with the term
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"new york","newyork")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"new york","newyork")
 
 #make "x ray" one word. hopefully we've stripped out the dash already.Lots of bands start with the term
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"x ray","xray")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"x ray","xray")
 
 #now some connecting words that might be spelled/used variantly
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"and | of | the "," ")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"and | of | the "," ")
 
 #and leading "the"
-allDJArtists$Artist<-str_replace_all(allDJArtists$Artist,"^the "," ")
+allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"^the "," ")
 # strip leading/trailing whitespace
-allDJArtists$Artist<-str_trim(allDJArtists$Artist)
+allDJArtists$ArtistToken<-str_trim(allDJArtists$ArtistToken)
 
 #did we create any null entries
 allDJArtists<-filter(allDJArtists,Artist!="")
@@ -92,11 +92,7 @@ allDJArtists<-filter(allDJArtists,Artist!="Artist")
 allDJArtists<- filter(allDJArtists,!str_detect(Artist, "Music Behind Dj:"))
 allDJArtists<- filter(allDJArtists,!str_detect(Artist, "Wake N Bake"))
 
-```
 
-```{r}
-#-----------------------------------------------------------------------------
-#combine Artist Words into single token
 numWords=2 #is two enought for uniqueness?
 
   # we replaced all punctuation with spaces
@@ -104,7 +100,7 @@ numWords=2 #is two enought for uniqueness?
   #combine first two words
   print("Trying to make sense of artist names")
   #does this break if numWords> number of words?
-  t<-str_split_fixed(allDJArtists$Artist,pattern="[ ]+",n=numWords+1)[,1:numWords]
+  t<-str_split_fixed(allDJArtists$ArtistToken,pattern="[ ]+",n=numWords+1)[,1:numWords]
   
   allDJArtists$ArtistToken<-apply(t,MARGIN=1,FUN=paste,collapse="")
 
@@ -112,7 +108,7 @@ numWords=2 #is two enought for uniqueness?
   allDJArtists<- allDJArtists %>%   
     mutate(ArtistToken=replace(ArtistToken,
                                str_detect(ArtistToken,'brucesp'),
-                               "brucespringsteen"))
+                               "springsteen"))
   
   #Code below used for unique list of artists. Not used here.
   #now that tokens are created extract unique ones for each dj so mulitples don't occur
@@ -130,9 +126,7 @@ numWords=2 #is two enought for uniqueness?
   allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"yola","yolatengo")
   
   allDJArtists<-allDJArtists %>% 
-    select(DJ,AirDate,Artist=ArtistRaw,Title,ArtistToken) %>% 
     mutate(DJ=as.factor(DJ)) %>% 
-    filter(Artist != "Music Behind Dj:")
     group_by(DJ) 
 ```
 Data is reasonably clean.  Do some analysis
