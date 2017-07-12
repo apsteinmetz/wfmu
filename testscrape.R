@@ -71,15 +71,16 @@ try_HN<-function(wp){
 
 fixHeaders <- function(pl) {
   #takes a data frame
-  n<-names(pl) %in% altArtistNames
-  t<-names(pl) %in% altTitleNames
-  if (any(which(n))){
-    names(pl)[n] <- "Artist"
+  nm<-which(names(pl) %in% altArtistNames)
+  tt<-which(names(pl) %in% altTitleNames)
+  if (length(nm)>0){
+    names(pl)[nm] <- "Artist"
   } else{
-    pl$Artist=NA
+    pl=NULL
+    return(pl)
   } 
-if (any(which(t))){
-  names(pl)[t] <- "Title"
+if (length(tt)>0){
+  names(pl)[tt] <- "Title"
 } else{
   pl$Title=NA
 }
@@ -90,7 +91,7 @@ if (any(which(t))){
 #--------------------------------------------------------------------
 testgetPlaylist <- function(plURL, dj) {
 
-    wholepage <- read_html(paste(ROOT_URL, plURL, sep = ''))
+  wholepage <- read_html(paste(ROOT_URL, plURL, sep = ''))
   #try to pull out the show date.  assume first date in text on page is the show date
   airDate <- wholepage %>%
     html_text() %>%
@@ -169,6 +170,7 @@ testgetPlaylist <- function(plURL, dj) {
       }
     }
   }
+  plraw<-fixHeaders(plraw)
   # final clean up if we have something
   if (is.null(plraw)) {
     playlist <- NULL
@@ -177,7 +179,6 @@ testgetPlaylist <- function(plURL, dj) {
       plraw <- plraw[, -which(is.na(names(plraw)))] #sometimes an NA column
     
     playlist <- plraw %>%
-      fixHeaders() %>%
       select(Artist,Title) %>% 
       na.omit() %>% 
       transmute(DJ = dj, 
@@ -237,8 +238,8 @@ djList <- filter(DJKey, showCount > numShows - 1, !(DJ %in% excludeDJs)) %>%
   select(DJ) %>% .[, 1]
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
 
-testPL = data_frame()
-for (dj in djList) {
+#playlists = data_frame()
+for (dj in djList[67:153]) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
     .[1:numShows, ] %>%
@@ -246,8 +247,8 @@ for (dj in djList) {
   for (n in 1:numShows){
     plURL<-plURLs[n,1]
     print(paste(dj, n, plURL))
-    testPL <- bind_rows(testPL, testgetPlaylist(plURL, dj))
+    playlists <- bind_rows(playlists, testgetPlaylist(plURL, dj))
   }
-  save(testPL,file="testPL.Rdata")
+  save(playlists,file="playlists.Rdata")
 }
 bad_Tables<-anti_join(tibble(DJ=djList),testPL)
