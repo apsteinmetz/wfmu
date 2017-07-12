@@ -371,7 +371,7 @@ djList <- filter(DJKey, showCount > numShows - 1, !(DJ %in% excludeDJs)) %>%
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
 
 #playlists = data_frame()
-for (dj in djList[67:153]) {
+for (dj in djList) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
     .[1:numShows, ] %>%
