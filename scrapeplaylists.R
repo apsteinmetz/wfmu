@@ -9,7 +9,6 @@ library(tidyverse)
 
 # ----------------------------------------------
 ROOT_URL<-"http://wfmu.org"
-LAST_DJ<-"CI" #last currently on-mic DJ in DJ list  Need to smartly detect this
 
 #-------------------------------------------
 getDJURLs <- function(){
@@ -26,7 +25,6 @@ getDJURLs <- function(){
   
   return(DJURLs)
 }
-#--------------------------------------------------------------------------
 #-------------------------------------------
 getDJsOffSched <- function(){
   #table 9 is off sched. 2-8 are monday through sunday

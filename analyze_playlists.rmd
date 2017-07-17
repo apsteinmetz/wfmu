@@ -14,6 +14,8 @@ library(ggplot2)
 library(stringr)
 library(tm)
 library(dplyr)
+library(tidyverse)
+library(lubridate)
 library("ggplot2")
 #library(ggfortify)
 library("wordcloud")
@@ -21,13 +23,14 @@ library("RColorBrewer")
 library("SnowballC")
 library(igraph)
 library(cluster)
-library(reshape2)
-library(proxy)
+# library(reshape2)
+#library(proxy)
 library(Matrix)
 
 load("playlists.Rdata")
 load("djkey.Rdata")
 
+DJKey<-as_tibble(DJKey) %>% mutate(DJ=as.factor(DJ))
 ```
 
 Clean up inconsistant artist names
@@ -126,32 +129,66 @@ numWords=2 #is two enought for uniqueness?
   allDJArtists$ArtistToken<-str_replace_all(allDJArtists$ArtistToken,"yola","yolatengo")
   
   allDJArtists<-allDJArtists %>% 
-    mutate(DJ=as.factor(DJ)) %>% 
+    mutate(DJ=as.factor(DJ)) %>%
+    filter(ArtistToken !="") %>% 
+    filter(ArtistToken !="yourdj") %>% 
+    filter(ArtistToken !="hoofmouth") %>% 
+    filter(ArtistToken !="tomwilson") %>%  #not songs
+    distinct() %>% #why would there be dupes?  Don't know, but there are
+    filter(Artist !=Title) %>% #there are legit Songs==Title but not many.  Mostly filter interstitial rows.
     group_by(DJ) 
 ```
 Data is reasonably clean.  Do some analysis
 ```{r}
 
+#playlists by year
+allDJArtists %>% 
+  ungroup() %>% 
+  mutate(Year=trunc(decimal_date(AirDate)))  %>% 
+  group_by(Year) %>% 
+  summarise(Playlists=n()) %>% 
+  arrange(Year) %>% 
+  filter(YrQtr> as.yearqtr("2000-01-01")) %>% 
+  ggplot(aes(x=Year,y=Playlists))+geom_col()
+
+
+
+```
+
+```{r}
+
 #-------------------------------------------------------------------------------------
-  #allDJArtists %>% summarise(song_count=n()) %>% arrange(desc(song_count))
+# We love wordclouds!
 #scalefactor magnifies differences for wordcloud
+#use filters to select on or off schedule and constrain show airdate range
 scaleFactor=2
 maxWords = 200
   #most popular artists
-  top_artists<-allDJArtists%>%group_by(ArtistToken)%>%
-    summarize(play_count=n())%>%
-    arrange(desc(play_count))
-wordcloud(words = top_artists$ArtistToken, freq = top_artists$play_count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
-  #most popular artists in last year
-  top_artists<-allDJArtists%>% filter(AirDate>Sys.Date()-365) %>% 
+  top_artists<-DJKey %>% 
+    #filter(onSched==TRUE) %>% #on Sched or off?
+    left_join(allDJArtists)%>%
     group_by(ArtistToken)%>%
+    filter(AirDate<as.Date("2017-03-18")) %>%  #date range?
     summarize(play_count=n())%>%
     arrange(desc(play_count))
-  
 wordcloud(words = top_artists$ArtistToken, freq = top_artists$play_count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
-  
+
+```
+#Dead Artist Effect. When did interest in an artist increase?
+```{r}
+dead_artists=c('bowie','prince','amywinehouse','sharonjones','chuckberry')
+
+allDJArtists %>% 
+  ungroup() %>% 
+  filter(ArtistToken %in% dead_artists) %>% 
+  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,YrQtr) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(YrQtr) %>% 
+  filter(YrQtr> as.yearqtr("2000-01-01")) %>% 
+  ggplot(aes(x=YrQtr,y=Spins))+geom_col()+facet_wrap(~ArtistToken)
+
 ```
 
 combine artist list into a single string per DJ
