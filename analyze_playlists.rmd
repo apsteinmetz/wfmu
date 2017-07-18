@@ -36,7 +36,7 @@ DJKey<-as_tibble(DJKey) %>% mutate(DJ=as.factor(DJ))
 Clean up inconsistant artist names
 ```{r}
 
-allDJArtists<-playlists
+allDJArtists<-playlists %>% distinct() %>% filter(Artist != Title)
 
 allDJArtists$ArtistToken<-allDJArtists$Artist
 # one artist is all punctuation so give !!! special treatment
@@ -135,7 +135,6 @@ numWords=2 #is two enought for uniqueness?
     filter(ArtistToken !="hoofmouth") %>% 
     filter(ArtistToken !="tomwilson") %>%  #not songs
     distinct() %>% #why would there be dupes?  Don't know, but there are
-    filter(Artist !=Title) %>% #there are legit Songs==Title but not many.  Mostly filter interstitial rows.
     group_by(DJ) 
 ```
 Data is reasonably clean.  Do some analysis

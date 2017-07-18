@@ -4,6 +4,8 @@ library(rvest)
 library(stringr)
 library(xml2)
 library(tidyverse)
+library(tibble)
+
 
 
 
@@ -369,12 +371,13 @@ djList <- filter(DJKey, showCount > numShows - 1, !(DJ %in% excludeDJs)) %>%
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
 
 #playlists = data_frame()
-for (dj in djList) {
+for (dj in djList2) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
-    .[1:numShows, ] %>%
+    rowid_to_column() %>% 
+    filter(rowid>51) %>% 
     select(playlistURL)
-  for (n in 1:numShows){
+  for (n in 1:nrow(plURLs)){
     plURL<-plURLs[n,1]
     print(paste(dj, n, plURL))
     playlists <- bind_rows(playlists, testgetPlaylist(plURL, dj))
