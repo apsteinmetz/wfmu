@@ -24,7 +24,7 @@ library("SnowballC")
 library(igraph)
 library(cluster)
 # library(reshape2)
-#library(proxy)
+library(vegan)
 library(Matrix)
 
 load("playlists.Rdata")
@@ -224,12 +224,15 @@ combine artist list into a single string per DJ
                           filter(DJ==dj)%>%
                           pull(ArtistToken)%>% 
                           paste(collapse=" ")%>%
-                          str_replace_all("[^a-z ]","")%>%as.character(),
-                        onSched=DJKey%>%filter(DJ==dj)%>%pull(onSched)))
+                          str_replace_all("[^a-z ]","")%>%as.character() ,
+                          onSched=DJKey%>%filter(DJ==dj)%>%pull(onSched)
+                        ))
   }
   #artists should not have factor levels
   #concat_artists$Artists<-as.character(concat_artists$Artists)
   concat_artists<-filter(concat_artists,Artists!="")
+
+
 ```
 Create term document matrices
 ```{r}
@@ -248,8 +251,8 @@ for (i in 1:length(djCorpus)) {
 
 
 
-sched_status=c("on","off","all")
-status<-sched_status[1]
+#sched_status=c("on","off","all")
+#status<-sched_status[1]
 #idx <- switch(mic,
 #              on = (meta(djCorpus, "onMic") == TRUE),
 #              off = (meta(djCorpus, "onMic") == FALSE),
@@ -264,12 +267,12 @@ status<-sched_status[1]
 #get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
 SPARSE<- 0.95 #sparsity of term document matrices
 
-djtdm_all<-TermDocumentMatrix(djCorpus) #%>%removeSparseTerms(SPARSE)
-djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onSched") == TRUE])%>%removeSparseTerms(SPARSE)
-djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onSched") == FALSE])%>%removeSparseTerms(SPARSE)
+# djtdm_all<-TermDocumentMatrix(djCorpus) #%>%removeSparseTerms(SPARSE)
+# djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onSched") == TRUE])%>%removeSparseTerms(SPARSE)
+# djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onSched") == FALSE])%>%removeSparseTerms(SPARSE)
 
 # now create Document Term Matrix where DJs are the column
-djdtm<-DocumentTermMatrix(djCorpus) #%>%removeSparseTerms(SPARSE)
+djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(SPARSE)
 ```
 
 #Analyze similarity
@@ -296,11 +299,10 @@ jaccard <- function(m) {
 #-----------------------------------------------------------
 getSimilarity<-function(djdtm=djdtm){
   m2<-as.matrix(djdtm)
-  rownames(m2)<-djDocs$DJ
-
   # get similarity
-  #j<-simil(m2,method="Jaccard")
-  j<-jaccard(m2)
+  j<-vegdist(m2,method="jaccard") %>% as.matrix()
+  #j<-jaccard(m2)
+  
   save(j,file="djSimilarity.RData")
   return(j)
 }
@@ -352,6 +354,35 @@ likeDJs<-data_frame(DJ=row.names(j),similarity=as.matrix(j)[,whichDJ]) %>%
 similarDJs()
 ```
 
+```{r}
+likeDJs<-djdtm %>%
+  as.matrix() %>% 
+  vegdist(method="bray") %>% 
+  as.matrix() %>% 
+  as.data.frame() %>% 
+  mutate(DJ1=row.names(.)) %>% 
+  as_tibble() %>% 
+  gather(DJ2,Similarity,-DJ1) %>% 
+  mutate(Similarity=1-Similarity) %>% 
+  filter(DJ1 != DJ2) %>%  #remove diagonals
+  group_by(DJ1) %>% 
+  arrange(desc(Similarity))
+
+dj1 <- "TW"
+dj2 <- "TM"
+
+likeDJs %>% 
+  ungroup() %>% 
+  filter(DJ1==dj1) %>% 
+  .[1:3,] %>% 
+  rename(DJ=DJ2) %>% 
+  left_join(DJKey) %>% 
+  select(ShowName,Similarity)
+
+
+songs1 <-allDJArtists %>% filter(DJ==dj1)
+songs2 <-allDJArtists %>% filter(DJ==dj2)
+inner_join(songs2,songs1,by='Artist')
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
