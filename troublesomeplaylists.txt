@@ -1,1 +1,3 @@
-MI
+MI exactly 50 shows breaks it
+
+oops, after scraping urls from >51 to end, go back and get just 51. 

@@ -36,7 +36,9 @@ DJKey<-as_tibble(DJKey) %>% mutate(DJ=as.factor(DJ))
 Clean up inconsistant artist names
 ```{r}
 
-allDJArtists<-playlists %>% distinct() %>% filter(Artist != Title)
+allDJArtists<-playlists %>% 
+  distinct() %>% 
+  filter(Artist != Title)
 
 allDJArtists$ArtistToken<-allDJArtists$Artist
 # one artist is all punctuation so give !!! special treatment
@@ -145,10 +147,27 @@ allDJArtists %>%
   ungroup() %>% 
   mutate(Year=trunc(decimal_date(AirDate)))  %>% 
   group_by(Year) %>% 
-  summarise(Playlists=n()) %>% 
+  summarise(SongCount=n()) %>% 
   arrange(Year) %>% 
-  filter(YrQtr> as.yearqtr("2000-01-01")) %>% 
-  ggplot(aes(x=Year,y=Playlists))+geom_col()
+  filter(Year > 1979) %>% 
+  ggplot(aes(x=Year,y=SongCount))+geom_col()+labs(title="Songs Streamed or Aired at WFMU.ORG",x="Airdate")
+
+
+
+```
+```{r}
+
+#playlists by year
+allDJArtists %>% 
+  ungroup() %>% 
+  mutate(Year=trunc(decimal_date(AirDate)))  %>% 
+  select(DJ,AirDate,Year) %>% 
+  distinct() %>% 
+  group_by(Year) %>% 
+  summarise(ShowCount=n()) %>% 
+  arrange(Year) %>% 
+  filter(Year > 1979) %>% 
+  ggplot(aes(x=Year,y=ShowCount))+geom_col()+labs(title="Shows Archived at WFMU.ORG by Airdate",x="Airdate")
 
 
 
@@ -167,7 +186,7 @@ maxWords = 200
     #filter(onSched==TRUE) %>% #on Sched or off?
     left_join(allDJArtists)%>%
     group_by(ArtistToken)%>%
-    filter(AirDate<as.Date("2017-03-18")) %>%  #date range?
+    #filter(AirDate<as.Date("2017-03-18")) %>%  #date range?
     summarize(play_count=n())%>%
     arrange(desc(play_count))
 wordcloud(words = top_artists$ArtistToken, freq = top_artists$play_count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
@@ -185,8 +204,8 @@ allDJArtists %>%
   group_by(ArtistToken,YrQtr) %>% 
   summarise(Spins=n()) %>% 
   arrange(YrQtr) %>% 
-  filter(YrQtr> as.yearqtr("2000-01-01")) %>% 
-  ggplot(aes(x=YrQtr,y=Spins))+geom_col()+facet_wrap(~ArtistToken)
+  filter(YrQtr> as.yearqtr("2010-01-01")) %>% 
+  ggplot(aes(x=YrQtr,y=Spins))+geom_col()+facet_wrap(~ArtistToken)+scale_x_continuous()
 
 ```
 
@@ -307,7 +326,7 @@ CLUSTERS=5
     
   
   clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
-}
+
 ```
 
 ```{r}

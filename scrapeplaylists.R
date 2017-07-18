@@ -4,7 +4,7 @@ library(rvest)
 library(stringr)
 library(xml2)
 library(tidyverse)
-library(tibble)
+
 
 
 
@@ -366,8 +366,9 @@ excludeDJs <-
     'TI',
     'LK',
     'TP')
-djList <- filter(DJKey, showCount > numShows - 1, !(DJ %in% excludeDJs)) %>%
-  select(DJ) %>% .[, 1]
+djList <- DJKey %>% 
+  filter(showCount > numShows - 1, !(DJ %in% excludeDJs)) %>%
+  pull(DJ)
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
 
 #playlists = data_frame()
