@@ -264,7 +264,7 @@ testgetPlaylist <- function(plURL, dj) {
     # no song class, now what? is it a table? try to  find header
     #seems like cellspacing means its a row column thing
     pl_table<-wholepage %>% html_node(xpath = "//table[@cellspacing and @cellpadding]")
-    if (!is.na(pl_table)) {
+    if (length(pl_table)>2) {
       pl_table<-html_table(pl_table,fill = TRUE)
       if (any(names(pl_table) %in% altHeaderNames)) {
         plraw<-pl_table
@@ -380,10 +380,13 @@ for (dj in djList2) {
     select(playlistURL)
   for (n in 1:nrow(plURLs)){
     plURL<-plURLs[n,1]
-    print(paste(dj, n, plURL))
-    playlists <- bind_rows(playlists, testgetPlaylist(plURL, dj))
+    print(paste(dj, n, plURL,Sys.time()))
+    if (!is.null(plURLs)){
+      playlists <- bind_rows(playlists, testgetPlaylist(plURL, dj))
+    }
   }
   #save to disk after each dj
   save(playlists,file="playlists.Rdata")
 }
+
 bad_Tables<-anti_join(tibble(DJ=djList),testPL)

@@ -16,6 +16,7 @@ library(tm)
 library(dplyr)
 library(tidyverse)
 library(lubridate)
+library(xts)
 library("ggplot2")
 #library(ggfortify)
 library("wordcloud")
@@ -360,7 +361,7 @@ likeDJs<-djdtm %>%
   vegdist(method="bray") %>% 
   as.matrix() %>% 
   as.data.frame() %>% 
-  mutate(DJ1=row.names(.)) %>% 
+  mutate(DJ1=rownames(.)) %>% 
   as_tibble() %>% 
   gather(DJ2,Similarity,-DJ1) %>% 
   mutate(Similarity=1-Similarity) %>% 
@@ -380,9 +381,20 @@ likeDJs %>%
   select(ShowName,Similarity)
 
 
-songs1 <-allDJArtists %>% filter(DJ==dj1)
-songs2 <-allDJArtists %>% filter(DJ==dj2)
-inner_join(songs2,songs1,by='Artist')
+songs1 <-allDJArtists %>% 
+  filter(DJ==dj1) %>% 
+  group_by(ArtistToken) %>% 
+  summarise(plays=n()) %>% 
+  arrange(desc(plays))
+songs2 <-allDJArtists %>% 
+  filter(DJ==dj2) %>% 
+  group_by(ArtistToken) %>% 
+  summarise(plays=n())%>% 
+  arrange(desc(plays))
+
+inner_join(songs2,songs1,by='ArtistToken') %>% 
+  mutate(FaveIndex=plays.x+plays.y-abs(plays.x-plays.y)) %>% 
+  arrange(desc(FaveIndex))
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
