@@ -139,7 +139,27 @@ numWords=2 #is two enought for uniqueness?
     filter(ArtistToken !="tomwilson") %>%  #not songs
     filter(ArtistToken !="hanklevine") %>%  #not songs
     distinct() %>% #why would there be dupes?  Don't know, but there are
-    group_by(DJ) 
+    group_by(DJ,ArtistToken) 
+  
+  #do we want to strip the signature song the some DJs use to open every show?  Reduce it's weighting?
+  #not sure. Sample code to examine it.
+  # IC clearly has a signature song
+  allDJArtists %>% 
+    filter(DJ=="IC") %>% 
+    summarize(FirstArtist=first(Artist)) %>% 
+    group_by(FirstArtist) %>% 
+    summarise(FirstPlayCount=n()) %>% 
+    arrange(desc(FirstPlayCount))
+  
+#possible way to dampen influence.  If most popular artist of a DJ
+#is more than double the average of the next 10, reduce it to the number two artist count plus 1
+  
+  allDJArtists %>% 
+    filter(DJ=="IC") %>%
+    summarise(PlayCount=n()) %>% 
+    arrange(desc(PlayCount)) %>% 
+    group_by(DJ) %>% summarise(top=max(PlayCount))
+  
 ```
 Data is reasonably clean.  Do some analysis
 ```{r}
@@ -185,7 +205,7 @@ scaleFactor=2
 maxWords = 200
   #most popular artists
   top_artists<-DJKey %>% 
-    #filter(onSched==TRUE) %>% #on Sched or off?
+    filter(onSched==TRUE) %>% #on Sched or off?
     left_join(allDJArtists)%>%
     group_by(ArtistToken)%>%
     #filter(AirDate<as.Date("2017-03-18")) %>%  #date range?
