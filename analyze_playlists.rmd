@@ -249,7 +249,7 @@ combine artist list into a single string per DJ
   allDJArtists$DJ<-factor(allDJArtists$DJ,as.character(unique(allDJArtists$DJ)))
   for (dj in levels(allDJArtists$DJ)){
     #put all words in string for each DJ
-    #print(paste("Creating artist documents",dj))
+    print(paste("Creating artist documents",dj))
     concat_artists<-bind_rows(concat_artists,data_frame(DJ=dj,
                         Artists= allDJArtists%>%
                           filter(DJ==dj)%>%
@@ -329,9 +329,10 @@ jaccard <- function(m) {
 }  
 #-----------------------------------------------------------
 getSimilarity<-function(djdtm=djdtm){
-  m2<-as.matrix(djdtm)
+  m2<-as.matrix(sign(djdtm))
   # get similarity
-  j<-vegdist(m2,method="jaccard") %>% as.matrix()
+  j<-vegdist(m2,method="bray") %>% as.matrix()
+  j<-1-j
   #j<-jaccard(m2)
   
   save(j,file="djSimilarity.RData")
