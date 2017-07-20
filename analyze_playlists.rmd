@@ -139,14 +139,16 @@ numWords=2 #is two enought for uniqueness?
     filter(ArtistToken !="tomwilson") %>%  #not songs
     filter(ArtistToken !="hanklevine") %>%  #not songs
     distinct() %>% #why would there be dupes?  Don't know, but there are
-    group_by(DJ,ArtistToken) 
-  
+    group_by(DJ) 
+```
+
+```{r}
   #do we want to strip the signature song the some DJs use to open every show?  Reduce it's weighting?
   #not sure. Sample code to examine it.
-  # IC clearly has a signature song
   allDJArtists %>% 
-    filter(DJ=="IC") %>% 
-    summarize(FirstArtist=first(Artist)) %>% 
+    filter(DJ=="TT") %>% 
+    group_by(AirDate) %>% 
+    summarize(FirstArtist=first(ArtistToken)) %>% 
     group_by(FirstArtist) %>% 
     summarise(FirstPlayCount=n()) %>% 
     arrange(desc(FirstPlayCount))
@@ -154,12 +156,13 @@ numWords=2 #is two enought for uniqueness?
 #possible way to dampen influence.  If most popular artist of a DJ
 #is more than double the average of the next 10, reduce it to the number two artist count plus 1
   
-  allDJArtists %>% 
-    filter(DJ=="IC") %>%
-    summarise(PlayCount=n()) %>% 
-    arrange(desc(PlayCount)) %>% 
-    group_by(DJ) %>% summarise(top=max(PlayCount))
-  
+  top_artists<-allDJArtists %>% 
+    filter(DJ=="TT") %>%
+    group_by((ArtistToken)) %>% 
+    summarise(play_count=n()) %>% 
+    arrange(desc(play_count))
+
+    top_artists$play_count[1]/mean(top_artists$play_count[2:11])
 ```
 Data is reasonably clean.  Do some analysis
 ```{r}
