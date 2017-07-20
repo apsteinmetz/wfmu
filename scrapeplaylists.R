@@ -332,7 +332,7 @@ testgetPlaylist <- function(plURL, dj) {
 music_djs<-DJKey %>% 
   select(DJ) %>% 
   anti_join(data_frame(DJ=excludeDJs)) %>% 
-  as_vector()
+  as.list()
 playlistURLs<-getDJPlaylistURLs(music_djs)
 showCounts<-playlistURLs %>% 
   group_by(DJ) %>% 
@@ -365,14 +365,16 @@ excludeDJs <-
     'SY',
     'TI',
     'LK',
-    'TP')
+    'TP',
+    'RC',
+    'VC')
 djList <- DJKey %>% 
-  filter(showCount > numShows - 1, !(DJ %in% excludeDJs)) %>%
+  filter(showCount > numShows, !(DJ %in% excludeDJs)) %>%
   pull(DJ)
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
 
 #playlists = data_frame()
-for (dj in djList2) {
+for (dj in djList) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
     rowid_to_column() %>% 
@@ -381,7 +383,7 @@ for (dj in djList2) {
   for (n in 1:nrow(plURLs)){
     plURL<-plURLs[n,1]
     print(paste(dj, n, plURL,Sys.time()))
-    if (!is.null(plURLs)){
+    if (!is.na(pull(plURLs[1,1]))){
       playlists <- bind_rows(playlists, testgetPlaylist(plURL, dj))
     }
   }

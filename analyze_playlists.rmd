@@ -137,6 +137,7 @@ numWords=2 #is two enought for uniqueness?
     filter(ArtistToken !="yourdj") %>% 
     filter(ArtistToken !="hoofmouth") %>% 
     filter(ArtistToken !="tomwilson") %>%  #not songs
+    filter(ArtistToken !="hanklevine") %>%  #not songs
     distinct() %>% #why would there be dupes?  Don't know, but there are
     group_by(DJ) 
 ```
@@ -210,6 +211,35 @@ allDJArtists %>%
 
 ```
 
+#Durability of popular artists
+```{r}
+big_artists=c('nrbq','beachboys','stones','beatles','kinks','dylan')
+
+allDJArtists %>% 
+  ungroup() %>% 
+  filter(ArtistToken %in% big_artists) %>% 
+  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,YrQtr) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(YrQtr) %>% 
+  filter(YrQtr> as.yearqtr("2010-01-01")) %>% 
+  ggplot(aes(x=YrQtr,y=Spins))+geom_col()+facet_wrap(~ArtistToken)+scale_x_continuous()
+
+```
+So, like, what was with the Beach Boys in 2015.  They went on tour but who started playing them?
+```{r}
+allDJArtists %>% 
+  ungroup() %>% 
+  filter(ArtistToken=='beachboys') %>% 
+  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
+  group_by(DJ,YrQtr) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(YrQtr) %>% 
+  filter(YrQtr> as.yearqtr("2015-01-01")) %>% 
+  arrange(desc(Spins))
+```
+
+
 combine artist list into a single string per DJ
 ```{r}
 #-------------------------------------------------------------  
@@ -219,8 +249,8 @@ combine artist list into a single string per DJ
   allDJArtists$DJ<-factor(allDJArtists$DJ,as.character(unique(allDJArtists$DJ)))
   for (dj in levels(allDJArtists$DJ)){
     #put all words in string for each DJ
-    print(paste("Creating artist documents",dj))
-  concat_artists<-bind_rows(concat_artists,data_frame(DJ=dj,
+    #print(paste("Creating artist documents",dj))
+    concat_artists<-bind_rows(concat_artists,data_frame(DJ=dj,
                         Artists= allDJArtists%>%
                           filter(DJ==dj)%>%
                           pull(ArtistToken)%>% 
