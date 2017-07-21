@@ -5,7 +5,7 @@ author: Arthur Steinmetz
 ---
  
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 
 
 library(devtools)
@@ -143,26 +143,21 @@ numWords=2 #is two enought for uniqueness?
 ```
 
 ```{r}
-  #do we want to strip the signature song the some DJs use to open every show?  Reduce it's weighting?
-  #not sure. Sample code to examine it.
-  allDJArtists %>% 
-    filter(DJ=="TT") %>% 
-    group_by(AirDate) %>% 
-    summarize(FirstArtist=first(ArtistToken)) %>% 
-    group_by(FirstArtist) %>% 
+  #do we want to strip the signature song the some DJs use to open every show?
+  #Their high play count distorts the popularity of some artists.
+  #Remove songs that have more than 20 instances of being the first song played.
+  #NOTE: This will remove all instances of that song title played by any DJ.
+  songs_to_strip<-allDJArtists %>% 
+    group_by(DJ,AirDate) %>% 
+    summarize(FirstSong=first(Title)) %>% 
+    group_by(FirstSong) %>% 
     summarise(FirstPlayCount=n()) %>% 
-    arrange(desc(FirstPlayCount))
-  
-#possible way to dampen influence.  If most popular artist of a DJ
-#is more than double the average of the next 10, reduce it to the number two artist count plus 1
-  
-  top_artists<-allDJArtists %>% 
-    filter(DJ=="TT") %>%
-    group_by((ArtistToken)) %>% 
-    summarise(play_count=n()) %>% 
-    arrange(desc(play_count))
+    arrange(desc(FirstPlayCount)) %>%
+    filter(FirstPlayCount>20,FirstSong != "Track 1",FirstSong != "Untitled")
 
-    top_artists$play_count[1]/mean(top_artists$play_count[2:11])
+allDJArtists<- allDJArtists %>% filter(!(Title %in% songs_to_strip$FirstSong))
+
+songs_to_strip
 ```
 Data is reasonably clean.  Do some analysis
 ```{r}
@@ -198,7 +193,7 @@ allDJArtists %>%
 
 ```
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 
 #-------------------------------------------------------------------------------------
 # We love wordclouds!
@@ -220,7 +215,7 @@ wordcloud(words = top_artists$ArtistToken, freq = top_artists$play_count^scaleFa
 ```
 #Dead Artist Effect. When did interest in an artist increase?
 ```{r}
-dead_artists=c('bowie','prince','amywinehouse','sharonjones','chuckberry')
+dead_artists=c('bowie','prince','amywinehouse','sharonjones','chuckberry','allmanbrothers')
 
 allDJArtists %>% 
   ungroup() %>% 
@@ -230,13 +225,14 @@ allDJArtists %>%
   summarise(Spins=n()) %>% 
   arrange(YrQtr) %>% 
   filter(YrQtr> as.yearqtr("2010-01-01")) %>% 
-  ggplot(aes(x=YrQtr,y=Spins))+geom_col()+facet_wrap(~ArtistToken)+scale_x_continuous()
+  ggplot(aes(x=YrQtr,y=Spins))+geom_col()+facet_wrap(~ArtistToken)+scale_x_continuous()+ggtitle("Dead Artist Effect")
 
 ```
 
 #Durability of popular artists
 ```{r}
-big_artists=c('nrbq','beachboys','stones','beatles','kinks','dylan')
+
+big_artists=top_artists$ArtistToken[1:6]
 
 allDJArtists %>% 
   ungroup() %>% 
@@ -246,7 +242,7 @@ allDJArtists %>%
   summarise(Spins=n()) %>% 
   arrange(YrQtr) %>% 
   filter(YrQtr> as.yearqtr("2010-01-01")) %>% 
-  ggplot(aes(x=YrQtr,y=Spins))+geom_col()+facet_wrap(~ArtistToken)+scale_x_continuous()
+  ggplot(aes(x=YrQtr,y=Spins))+geom_col()+facet_wrap(~ArtistToken)+scale_x_continuous()+ggtitle("Durability of popular artists")+ylim(0,100)
 
 ```
 So, like, what was with the Beach Boys in 2015.  They went on tour but who started playing them?
