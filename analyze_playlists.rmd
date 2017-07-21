@@ -317,7 +317,7 @@ dead_artist_plays<-playlists %>%
   mutate(YrQtr=as.yearqtr(AirDate))  %>% 
   group_by(ArtistToken,YrQtr) %>% 
   summarise(Spins=n()) %>% 
-  arrange(YrQtr) %>% 
+  arrange(YrQtr)
 gg<-dead_artist_plays %>% ggplot(aes(x=YrQtr,y=Spins))
 gg<-gg+geom_col()+facet_wrap(~ArtistToken)
 gg<-gg+scale_x_continuous()+ggtitle("Dead Artist Effect")
