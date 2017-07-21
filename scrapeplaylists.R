@@ -373,7 +373,7 @@ djList <- DJKey %>%
   pull(DJ)
 #djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
 
-#playlists = data_frame()
+#playlists_raw = data_frame()
 for (dj in djList) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
@@ -384,11 +384,11 @@ for (dj in djList) {
     plURL<-plURLs[n,1]
     print(paste(dj, n, plURL,Sys.time()))
     if (!is.na(pull(plURLs[1,1]))){
-      playlists <- bind_rows(playlists, testgetPlaylist(plURL, dj))
+      playlists_raw <- bind_rows(playlists_raw, testgetPlaylist(plURL, dj))
     }
   }
   #save to disk after each dj
-  save(playlists,file="playlists.Rdata")
+  save(playlists_raw,file="playlists_raw.Rdata")
 }
 
 bad_Tables<-anti_join(tibble(DJ=djList),testPL)
