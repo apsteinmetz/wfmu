@@ -471,7 +471,6 @@ combine artist list into a single string per DJ
   playlists$DJ<-factor(playlists$DJ,as.character(unique(playlists$DJ)))
   for (dj in levels(playlists$DJ)){
     #put all words in string for each DJ
-    print(paste("Creating artist documents",dj))
     concat_artists<-bind_rows(concat_artists,data_frame(DJ=dj,
                         Artists= playlists%>%
                           filter(DJ==dj)%>%
@@ -483,7 +482,7 @@ combine artist list into a single string per DJ
   }
   #artists should not have factor levels
   #concat_artists$Artists<-as.character(concat_artists$Artists)
-  concat_artists<-filter(concat_artists,Artists!="")
+  concat_artists<-filter(concat_artists,Artists!="") %>% distinct()
 
 
 ```
@@ -622,16 +621,17 @@ likeDJs<-djdtm %>%
   group_by(DJ1) %>% 
   arrange(desc(Similarity))
 
-dj1 <- "TW"
+dj1 <- "DK"
 dj2 <- "TM"
 
 likeDJs %>% 
   ungroup() %>% 
   filter(DJ1==dj1) %>% 
-  .[1:3,] %>% 
+  .[1:10,] %>% 
   rename(DJ=DJ2) %>% 
   left_join(DJKey) %>% 
   select(ShowName,Similarity)
+
 
 
 songs1 <-playlists %>% 
