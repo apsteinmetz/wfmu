@@ -16,6 +16,7 @@ library(tm)
 library(dplyr)
 library(tidyverse)
 library(lubridate)
+library(broom)
 library(xts)
 library("ggplot2")
 #library(ggfortify)
@@ -139,8 +140,10 @@ numWords=2 #is two enought for uniqueness?
     filter(ArtistToken !="hoofmouth") %>% 
     filter(ArtistToken !="tomwilson") %>%  #not songs
     filter(ArtistToken !="hanklevine") %>%  #not songs
+    filter(ArtistToken !="commerical") %>%  #not songs
     distinct() %>% #why would there be dupes?  Don't know, but there are
     group_by(DJ) 
+  #write_csv(playlists,path="playlists.csv")
 ```
 
 ```{r}
@@ -192,7 +195,7 @@ playlists %>%
   summarise(SongCount=n()) %>% 
   arrange(Year) %>% 
   filter(Year > 1979) %>% 
-  ggplot(aes(x=Year,y=SongCount))+geom_col()+labs(title="Songs Streamed or Aired at WFMU.ORG",x="Airdate")
+  ggplot(aes(x=Year,y=SongCount))+geom_col()+labs(title="Songs Streamed or Aired on WFMU in a Year",x="Airdate")
 
 
 
@@ -346,7 +349,7 @@ gg<-gg+geom_col()+facet_wrap(~ArtistToken)
 gg<-gg+scale_x_continuous()+ggtitle("Dead Artist Effect")
 gg
 ```
-Prince is the prince but Bowie is the king.  The deaths of Prince and Davie Bowie led to some continuing interest in the artist, while plays for Chuck Berry, Sharon Jones and the Allman brothers dropped back to their pre-death background levels.  Amy Winehouse barely registers, before or after. To make this more visible, clip the y-axis at 100.
+Prince is the prince but Bowie is the king.  The deaths of Prince and Davie Bowie led to some continuing interest in the artist, while plays for Chuck Berry, Sharon Jones and the Allman brothers dropped back to their pre-death background levels.  Amy Winehouse barely registers, before or after. To make this more visible, I'll clip the y-axis at 100. Now how does it look?
 ```{r}
 #clip outliers
 dead_artist_plays[dead_artist_plays$Spins>100,]$Spins=100
@@ -384,6 +387,44 @@ gg<-gg+facet_wrap(~ArtistToken)
 gg<-gg+scale_x_continuous()+ylim(0,100)
 gg<-gg+labs(title="Durability of popular artists\nQuarterly Plays",caption="Outliers clipped to 100")
 gg
+
+```
+
+Who are the top trending artists at WFMU over the last three years?
+
+```{r}
+cutoff_date<-Sys.Date()-(365*3)
+cutoff_artists<-150
+
+top_artists<-playlists %>% 
+  ungroup() %>% 
+  group_by(ArtistToken)%>%
+    filter(AirDate>cutoff_date) %>%  #date range?
+    summarize(play_count=n())%>%
+    arrange(desc(play_count)) %>%
+  .[1:cutoff_artists,] %>% 
+  pull(ArtistToken)
+
+#getting into the tidyverse over my head here.
+#building linear trend models on entire data frame
+#copying from https://blog.rstudio.com/2016/02/02/tidyr-0-4-0/ without
+#fully understanding
+artist_trends<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  filter(ArtistToken %in% top_artists) %>% 
+  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,YrQtr) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(YrQtr) %>% 
+  group_by(ArtistToken) %>% 
+  nest() %>% 
+  #heavy stuff here
+  mutate(model = purrr::map(data, ~ lm(Spins ~ YrQtr, data = .))) %>% 
+  unnest(model %>% purrr::map(broom::tidy)) %>% 
+  filter(term=="YrQtr") %>% 
+  filter(statistic>2.0) %>% #only statistically significant trends
+  arrange(desc(estimate))
 
 ```
 
