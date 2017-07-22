@@ -326,22 +326,10 @@ testgetPlaylist <- function(plURL, dj) {
 
 
 #-------------- MAIN -----------------
-#DJURLs<-getDJURLs()
-#DJKey<-getShowNames(DJURLs)
+DJURLs<-getDJURLs()
+DJKey<-getShowNames(DJURLs)
 #load(file='djkey.rdata')
-music_djs<-DJKey %>% 
-  select(DJ) %>% 
-  anti_join(data_frame(DJ=excludeDJs)) %>% 
-  as.list()
-playlistURLs<-getDJPlaylistURLs(music_djs)
-showCounts<-playlistURLs %>% 
-  group_by(DJ) %>% 
-  summarise(showCount=n()) %>% 
-  arrange(desc(showCount))
-DJKey<-left_join(DJKey,showCounts)
-#limit analysis to DJs with at least numShows shows and take the last numshows shows.
-numShows <- 50
-# non-music shows
+
 excludeDJs <-
   c('SD',
     'HA',
@@ -368,6 +356,19 @@ excludeDJs <-
     'TP',
     'RC',
     'VC')
+music_djs<-DJKey %>% 
+  select(DJ) %>% 
+  anti_join(data_frame(DJ=excludeDJs)) %>% 
+  pull(DJ)
+playlistURLs<-getDJPlaylistURLs(music_djs)
+showCounts<-playlistURLs %>% 
+  group_by(DJ) %>% 
+  summarise(showCount=n()) %>% 
+  arrange(desc(showCount))
+DJKey<-left_join(DJKey,showCounts)
+#limit analysis to DJs with at least numShows shows and take the last numshows shows.
+numShows <- 50
+# non-music shows
 djList <- DJKey %>% 
   filter(showCount > numShows, !(DJ %in% excludeDJs)) %>%
   pull(DJ)
