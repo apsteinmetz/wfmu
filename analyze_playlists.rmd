@@ -21,12 +21,13 @@ library("ggplot2")
 #library(ggfortify)
 library("wordcloud")
 library("RColorBrewer")
-library("SnowballC")
+#library("SnowballC")
 library(igraph)
 library(cluster)
 # library(reshape2)
 library(vegan)
 library(Matrix)
+library(knitr)
 
 load("playlists_raw.Rdata")
 load("djkey.Rdata")
@@ -162,11 +163,23 @@ playlists<- playlists %>% filter(!(Title %in% songs_to_strip$FirstSong))
 Data is reasonably clean.  Do some analysis. What do we have
 
 ```{r}
+year_count<-playlists %>% 
+  ungroup() %>% 
+  transmute(Year_count=year(AirDate)) %>% 
+  distinct() %>% nrow()
 dj_count<-playlists %>% summarise(DJs=n()) %>% nrow #DJs
 show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise(Shows=n()) %>% nrow()
 artist_count<-playlists %>% group_by(ArtistToken) %>% summarise(Artists=n()) %>% nrow() #Artists
 song_count<-playlists %>% ungroup %>% transmute(paste(ArtistToken,Title)) %>% distinct() %>% nrow() #songs
 spins_count<-nrow(playlists) # spins
+
+the_numbers<-data_frame(
+           Count=c(year_count,dj_count,show_count,artist_count,song_count,spins_count),Stat=c("Years","DJs","Shows","Artists","Songs","Spins"))
+
+the_numbers %>% 
+  kable(caption="WFMU Archives by the Numbers",
+        col.names=c('WFMU',' Archives by the Numbers'),
+        format.args = list(big.mark=","))
 ```
 
 ```{r}
