@@ -144,6 +144,8 @@ numWords=2 #is two enought for uniqueness?
     distinct() %>% #why would there be dupes?  Don't know, but there are
     group_by(DJ) 
   #write_csv(playlists,path="playlists.csv")
+  save(playlists,file="playlists.Rdata")
+  
 ```
 
 ```{r}
@@ -394,12 +396,12 @@ Who are the top trending artists at WFMU over the last three years?
 
 ```{r}
 cutoff_date<-Sys.Date()-(365*3)
-cutoff_artists<-150
+cutoff_artists<-500
 
 top_artists<-playlists %>% 
   ungroup() %>% 
+  filter(AirDate>cutoff_date) %>%  #date range?
   group_by(ArtistToken)%>%
-    filter(AirDate>cutoff_date) %>%  #date range?
     summarize(play_count=n())%>%
     arrange(desc(play_count)) %>%
   .[1:cutoff_artists,] %>% 
@@ -425,6 +427,13 @@ artist_trends<-playlists %>%
   filter(term=="YrQtr") %>% 
   filter(statistic>2.0) %>% #only statistically significant trends
   arrange(desc(estimate))
+
+trending_artists<-artist_trends[1:10,] %>% na.omit() %>% pull(ArtistToken) 
+
+#now we have the 150 most-played artists over the last three year where there
+# is a statistically significant trend in plays, ranked by trend strength.
+
+
 
 ```
 
