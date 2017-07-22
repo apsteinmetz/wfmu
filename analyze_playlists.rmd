@@ -157,9 +157,18 @@ numWords=2 #is two enought for uniqueness?
 
 playlists<- playlists %>% filter(!(Title %in% songs_to_strip$FirstSong))
 
-songs_to_strip
+#songs_to_strip
 ```
-Data is reasonably clean.  Do some analysis
+Data is reasonably clean.  Do some analysis. What do we have
+
+```{r}
+dj_count<-playlists %>% summarise(DJs=n()) %>% nrow #DJs
+show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise(Shows=n()) %>% nrow()
+artist_count<-playlists %>% group_by(ArtistToken) %>% summarise(Artists=n()) %>% nrow() #Artists
+song_count<-playlists %>% ungroup %>% transmute(paste(ArtistToken,Title)) %>% distinct() %>% nrow() #songs
+spins_count<-nrow(playlists) # spins
+```
+
 ```{r}
 
 #playlists_raw by year
