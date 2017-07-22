@@ -201,7 +201,8 @@ playlists %>%
 
 
 ```
-
+#Popular WFMU artists
+Who are the most popular artists amoung DJs that are on the current schedule?
 ```{r, message=FALSE, warning=FALSE}
 
 #-------------------------------------------------------------------------------------
