@@ -43,6 +43,13 @@ playlists<-playlists_raw %>%
   distinct() %>% 
   filter(Artist != Title)
 
+#filter out squirrelly dates
+#only Diane "Kamikaze" has archived playlists stretching back to the '80s.  Yay, Diane!
+# Charlie Lewis has playlists going back to 1997 but for some reason the dates I scraped
+# go way too far back for about 10 shows.  I chose to lose them since Charlie has mucho
+# episodes
+playlists <- playlists %>% filter(AirDate>as.Date("1982-01-01"))
+
 playlists$ArtistToken<-playlists$Artist
 # one artist is all punctuation so give !!! special treatment
 playlists$ArtistToken<-str_replace(playlists$ArtistToken,"!!!","chkchkchk")
@@ -250,14 +257,14 @@ dj_count<-playlists %>%
   ungroup() %>% 
   filter(ArtistToken==artist_token) %>% 
   filter(AirDate > cutoff_date) %>% 
-  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
-  group_by(DJ,YrQtr) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(DJ,AirDate) %>% 
   summarise(Spins=n()) %>% 
-  arrange(YrQtr) %>% 
-  group_by(YrQtr) %>% 
+  arrange(AirDate) %>% 
+  group_by(AirDate) %>% 
   summarise(DJCount=n())
 
-gg<-dj_count %>% ggplot(aes(x=YrQtr,y=DJCount))+geom_col()
+gg<-dj_count %>% ggplot(aes(x=AirDate,y=DJCount))+geom_col()
 gg<-gg+labs(title=paste("How many DJs Spin",artist_token,"every Quarter?"))
 gg<-gg+scale_x_continuous()
 gg
@@ -269,10 +276,10 @@ play_count_by_DJ<-playlists %>%
   filter(AirDate > cutoff_date) %>% 
   mutate(DJ=as.character(DJ)) %>% 
   filter(ArtistToken==artist_token) %>% 
-  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
-  group_by(DJ,YrQtr) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(DJ,AirDate) %>% 
   summarise(Spins=n()) %>% 
-  arrange(YrQtr)
+  arrange(AirDate)
 
 threshold <-5
 pc1<- play_count_by_DJ %>% 
@@ -281,16 +288,16 @@ pc1<- play_count_by_DJ %>%
 #lump together all DJ's who played the artist less than 'threshold' times
 pc2<- play_count_by_DJ %>% 
   filter(Spins<threshold) %>% 
-  group_by(YrQtr) %>% 
+  group_by(AirDate) %>% 
   summarise(Spins=n()) %>% 
   mutate(ShowName='AllOther')
 
 play_count_by_DJ<-pc1 %>% 
   left_join(DJKey) %>% 
   bind_rows(pc2) %>% 
-  select(YrQtr,ShowName,Spins)
+  select(AirDate,ShowName,Spins)
 
-gg<-play_count_by_DJ %>% ggplot(aes(x=YrQtr,y=Spins,fill=ShowName))+geom_col()
+gg<-play_count_by_DJ %>% ggplot(aes(x=AirDate,y=Spins,fill=ShowName))+geom_col()
 gg<-gg+labs(title=paste("Who accounts for the most",artist_token,"plays every quarter?"))
 gg<-gg+scale_x_continuous()
 gg
@@ -304,10 +311,10 @@ play_count_by_DJ<-playlists %>%
   filter(AirDate > cutoff_date) %>% 
   mutate(DJ=as.character(DJ)) %>% 
   filter(ArtistToken==artist_token) %>% 
-  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
-  group_by(DJ,YrQtr) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(DJ,AirDate) %>% 
   summarise(Spins=n()) %>% 
-  arrange(YrQtr)
+  arrange(AirDate)
 
 threshold <-5
 pc1<- play_count_by_DJ %>% 
@@ -316,16 +323,16 @@ pc1<- play_count_by_DJ %>%
 #lump together all DJ's who played the artist less than 'threshold' times
 pc2<- play_count_by_DJ %>% 
   filter(Spins<threshold) %>% 
-  group_by(YrQtr) %>% 
+  group_by(AirDate) %>% 
   summarise(Spins=n()) %>% 
   mutate(ShowName='AllOther')
 
 play_count_by_DJ<-pc1 %>% 
   left_join(DJKey) %>% 
   bind_rows(pc2) %>% 
-  select(YrQtr,ShowName,Spins)
+  select(AirDate,ShowName,Spins)
 
-gg<-play_count_by_DJ %>% ggplot(aes(x=YrQtr,y=Spins,fill=ShowName))+geom_col()
+gg<-play_count_by_DJ %>% ggplot(aes(x=AirDate,y=Spins,fill=ShowName))+geom_col()
 gg<-gg+labs(title=paste("Who accounts for the most",artist_token,"plays every quarter?"))
 gg<-gg+scale_x_continuous()
 gg
@@ -342,11 +349,11 @@ dead_artist_plays<-playlists %>%
   ungroup() %>% 
   filter(AirDate > cutoff_date) %>% 
   filter(ArtistToken %in% dead_artists) %>% 
-  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
-  group_by(ArtistToken,YrQtr) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
   summarise(Spins=n()) %>% 
-  arrange(YrQtr)
-gg<-dead_artist_plays %>% ggplot(aes(x=YrQtr,y=Spins))
+  arrange(AirDate)
+gg<-dead_artist_plays %>% ggplot(aes(x=AirDate,y=Spins))
 gg<-gg+geom_col()+facet_wrap(~ArtistToken)
 gg<-gg+scale_x_continuous()+ggtitle("Dead Artist Effect")
 gg
@@ -356,7 +363,7 @@ Prince is the prince but Bowie is the king.  The deaths of Prince and Davie Bowi
 #clip outliers
 dead_artist_plays[dead_artist_plays$Spins>100,]$Spins=100
 
-gg<-dead_artist_plays %>% ggplot(aes(x=YrQtr,y=Spins))
+gg<-dead_artist_plays %>% ggplot(aes(x=AirDate,y=Spins))
 gg<-gg+geom_col()+facet_wrap(~ArtistToken)
 gg<-gg+scale_x_continuous()+ggtitle("Dead Artist Effect")
 gg
@@ -376,15 +383,15 @@ artist_trends<-playlists %>%
   ungroup() %>% 
   filter(AirDate > cutoff_date) %>% 
   filter(ArtistToken %in% big_artists) %>% 
-  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
-  group_by(ArtistToken,YrQtr) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
   summarise(Spins=n()) %>% 
-  arrange(YrQtr)
+  arrange(AirDate)
 
 #clip outliers
 artist_trends[artist_trends$Spins>100,]$Spins=100
 
-gg<-artist_trends %>% ggplot(aes(x=YrQtr,y=Spins))+geom_col()
+gg<-artist_trends %>% ggplot(aes(x=AirDate,y=Spins))+geom_col()
 gg<-gg+facet_wrap(~ArtistToken)
 gg<-gg+scale_x_continuous()+ylim(0,100)
 gg<-gg+labs(title="Durability of popular artists\nQuarterly Plays",caption="Outliers clipped to 100")
@@ -392,7 +399,7 @@ gg
 
 ```
 
-Who are the top trending artists at WFMU over the last three years?
+Who are the top trending (increasing rate of play) artists at WFMU over the last three years?
 
 ```{r}
 cutoff_date<-Sys.Date()-(365*3)
@@ -411,31 +418,49 @@ top_artists<-playlists %>%
 #building linear trend models on entire data frame
 #copying from https://blog.rstudio.com/2016/02/02/tidyr-0-4-0/ without
 #fully understanding
-artist_trends<-playlists %>% 
+trending_artists<-playlists %>% 
   ungroup() %>% 
   filter(AirDate > cutoff_date) %>% 
   filter(ArtistToken %in% top_artists) %>% 
-  mutate(YrQtr=as.yearqtr(AirDate))  %>% 
-  group_by(ArtistToken,YrQtr) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
   summarise(Spins=n()) %>% 
-  arrange(YrQtr) %>% 
+  arrange(AirDate) %>% 
   group_by(ArtistToken) %>% 
   nest() %>% 
   #heavy stuff here
-  mutate(model = purrr::map(data, ~ lm(Spins ~ YrQtr, data = .))) %>% 
+  mutate(model = purrr::map(data, ~ lm(Spins ~ AirDate, data = .))) %>% 
   unnest(model %>% purrr::map(broom::tidy)) %>% 
-  filter(term=="YrQtr") %>% 
+  filter(term=="AirDate") %>% 
   filter(statistic>2.0) %>% #only statistically significant trends
-  arrange(desc(estimate))
+  arrange(desc(estimate)) %>% 
+  .[1:12,] %>% #get top 12 strongest trends
+  na.omit() %>% 
+  pull(ArtistToken) #after all that, just a list of artists
 
-trending_artists<-artist_trends[1:10,] %>% na.omit() %>% pull(ArtistToken) 
-
-#now we have the 150 most-played artists over the last three year where there
+# now we have the artists where there
 # is a statistically significant trend in plays, ranked by trend strength.
 
+artist_trends<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  filter(ArtistToken %in% trending_artists) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate)
 
+
+gg<-artist_trends %>% ggplot(aes(x=AirDate,y=Spins))+geom_col()
+gg<-gg+facet_wrap(~ArtistToken)
+gg<-gg+scale_x_continuous()+ylim(0,100)
+gg<-gg+labs(title="Trending Artists\nQuarterly Plays")
+gg
 
 ```
+No newer artists?  Lots of know stuff gets played on WFMU but nothing percolates into the conciousness of many DJs at once, it seems.  So "trending" seems to be irrelevant.  Despite that, let's see if we can identify similar DJs.
+
+#Analyze similarity
 
 combine artist list into a single string per DJ
 ```{r}
