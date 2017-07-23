@@ -84,14 +84,14 @@ numWords=2 #is two enought for uniqueness?
 #combine first two words
 print("Trying to make sense of artist names")
 #does this break if numWords> number of words?
+playlists$ArtistToken<-playlists$ArtistToken %>% str_to_title()
 t<-str_split_fixed(playlists$ArtistToken,pattern="[ ]+",n=numWords+1)[,1:numWords]
-
 playlists$ArtistToken<-apply(t,MARGIN=1,FUN=paste,collapse="")
 
 # There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
 playlists<- playlists %>%   
   mutate(ArtistToken=replace(ArtistToken,
-                             str_detect(ArtistToken,'brucesp'),
+                             str_detect(ArtistToken,'BruceSp'),
                              "springsteen"))
 
 #Code below used for unique list of artists. Not used here.
@@ -103,20 +103,20 @@ playlists<- playlists %>%
 
 
 print("Combining iconic 2-name artists into one name to save space in wordcloud")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"rollingstones","stones")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"enniomorricone","morricone") #only on WFMU!
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"davidbowie","bowie")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"bobdylan","dylan")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"yola","yolatengo")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"RollingStones","Stones")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"EnnioMorricone","Morricone") #only on WFMU!
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"DavidBowie","Bowie")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"BobDylan","Dylan")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Yola","YoLaTengo")
 
 playlists<-playlists %>% 
   mutate(DJ=as.factor(DJ)) %>%
   filter(ArtistToken !="") %>% 
-  filter(ArtistToken !="yourdj") %>% 
-  filter(ArtistToken !="hoofmouth") %>% 
-  filter(ArtistToken !="tomwilson") %>%  #not songs
-  filter(ArtistToken !="hanklevine") %>%  #not songs
-  filter(ArtistToken !="commerical") %>%  #not songs
+  filter(ArtistToken !="YourDj") %>% 
+  filter(ArtistToken !="HoofMouth") %>% 
+  filter(ArtistToken !="TomWilson") %>%  #not songs
+  filter(ArtistToken !="HankLevine") %>%  #not songs
+  filter(ArtistToken !="Commerical") %>%  #not songs
   distinct() %>% #why would there be dupes?  Don't know, but there are
   group_by(DJ) 
 
