@@ -31,7 +31,7 @@ library(Matrix)
 library(knitr)
 
 
-
+load("playlists.rdata")
 ```
 Do some analysis. What do we have?
 
@@ -42,8 +42,8 @@ year_count<-playlists %>%
   distinct() %>% nrow()
 dj_count<-playlists %>% summarise(DJs=n()) %>% nrow #DJs
 show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise(Shows=n()) %>% nrow()
-artist_count<-playlists %>% group_by(ArtistToken) %>% summarise(Artists=n()) %>% nrow() #Artists
-song_count<-playlists %>% ungroup() %>% transmute(paste(ArtistToken,Title)) %>% distinct() %>% nrow() #songs
+artist_count<-playlists %>% ungroup() %>% group_by(ArtistToken) %>% summarise(Artists=n()) %>% nrow() #Artists
+song_count<-playlists %>% ungroup() %>% transmute(songs=paste(ArtistToken,Title)) %>% distinct() %>% nrow() #songs
 spins_count<-nrow(playlists) # spins
 
 the_numbers<-data_frame(
@@ -88,7 +88,7 @@ playlists %>%
 
 ```
 #Popular WFMU artists
-Who are the most popular artists amoung DJs that are on the current schedule?
+Who are the most popular artists amoung DJs that are on the current schedule over the past five years?
 ```{r, message=FALSE, warning=FALSE}
 
 #-------------------------------------------------------------------------------------
@@ -102,16 +102,37 @@ maxWords = 200
     filter(onSched==TRUE) %>% #on Sched or off?
     left_join(playlists)%>%
     group_by(ArtistToken)%>%
-    #filter(AirDate<as.Date("2017-03-18")) %>%  #date range?
+    filter(AirDate<Sys.Date()-(365*5)) %>%  #date range?
     summarize(play_count=n())%>%
     arrange(desc(play_count))
 wordcloud(words = top_artists$ArtistToken, freq = top_artists$play_count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 
 ```
-NRBQ?  How many DJ's play them in any given quarter?  Not many, it seems.
+How about all playlists, on an off-schedule DJs.
+```{r, message=FALSE, warning=FALSE}
+
+#-------------------------------------------------------------------------------------
+# We love wordclouds!
+#scalefactor magnifies differences for wordcloud
+#use filters to select on or off schedule and constrain show airdate range
+scaleFactor=2
+maxWords = 200
+  #most popular artists
+  top_artists<-DJKey %>% 
+    #filter(onSched==TRUE) %>% #on Sched or off?
+    left_join(playlists)%>%
+    group_by(ArtistToken)%>%
+    #filter(AirDate<Sys.Date()-(365*5)) %>%  #date range?
+    summarize(play_count=n())%>%
+    arrange(desc(play_count))
+wordcloud(words = top_artists$ArtistToken, freq = top_artists$play_count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+
+```
+What's with NRBQ?  How many DJ's play them in any given quarter?  Not many, it seems.
 ```{r}
-artist_token='nrbq'
+artist_token='Nrbq'
 cutoff_date=as.Date("2007-01-01")
 
 dj_count<-playlists %>% 
@@ -165,7 +186,7 @@ gg
 ```
 Bob Brainen is the NRBQ show. Contrast that to The Beach Boys, where interest is more spread around.
 ```{r, message=FALSE, warning=FALSE}
-artist_token<-'beachboys'
+artist_token<-'BeachBoys'
 
 play_count_by_DJ<-playlists %>% 
   ungroup() %>% 
@@ -198,13 +219,36 @@ gg<-gg+labs(title=paste("Who accounts for the most",artist_token,"plays every qu
 gg<-gg+scale_x_continuous()
 gg
 ```
+#Most played songs.
+Everybody likes top 10 lists.  WFMU's biggest hits! Ranked by year and number of DJ's that played the song, not by by number of plays.  A single DJ can greatly skew the results.  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
+```{r}
+DJ_count_by_song<-playlists %>%
+  ungroup() %>% 
+  transmute(DJ=DJ,AirDate=year(AirDate),Song=paste(ArtistToken,Title)) %>%
+  distinct() %>%
+  group_by(Song,AirDate) %>% 
+  summarise(DJ_Count=n()) %>% 
+  arrange(desc(DJ_Count)) %>% 
+  ungroup() %>% 
+  filter(DJ_Count>4)
 
+top_10_long<-DJ_count_by_song %>% group_by(AirDate) %>% arrange(AirDate,desc(DJ_Count))
+top_10<-NULL
+years_top_10 <-unique(top_10_long$AirDate)
+for (n in years_top_10){
+  ten<-filter(top_10_long,AirDate==n) %>%
+    pull(Song) %>% .[1:10] %>% as_tibble()
+  top_10<-bind_cols(top_10,ten)
+}
+names(top_10)<-years_top_10
+kable(top_10)
+```
 
 #Dead Artist Effect. 
 
 When did interest in an artist increase?
 ```{r}
-dead_artists=c('bowie','prince','amywinehouse','sharonjones','chuckberry','allmanbrothers')
+dead_artists=c('Bowie','Prince','AmyWinehouse','SharonJones','ChuckBerry','AllmanBrothers')
 
 dead_artist_plays<-playlists %>% 
   ungroup() %>% 
