@@ -73,9 +73,9 @@ playlists$ArtistToken<-str_trim(playlists$ArtistToken)
 playlists<-filter(playlists,Artist!="")
 playlists<-filter(playlists,Artist!="Artist")
 
-playlists<- filter(playlists,!str_detect(Artist, "Music Behind Dj:"))
+playlists<- filter(playlists,!str_detect(Artist, "Music Behind"))
+playlists<- filter(playlists,!str_detect(Title, "Music Behind"))
 playlists<- filter(playlists,!str_detect(Artist, "Wake N Bake"))
-
 
 numWords=2 #is two enought for uniqueness?
 
@@ -133,8 +133,20 @@ songs_to_strip<-playlists %>%
   arrange(desc(FirstPlayCount)) %>%
   filter(FirstPlayCount>20) %>% 
   pull(FirstSong)
-
 playlists<- playlists %>% filter(!(Artist_Song %in% songs_to_strip))
 
-write_csv(playlists,path="playlists.csv")
+#now strip closing songs
+songs_to_strip<-playlists %>% 
+  group_by(DJ,AirDate) %>% 
+  summarize(FirstSong=last(Artist_Song)) %>% 
+  group_by(FirstSong) %>% 
+  summarise(FirstPlayCount=n()) %>% 
+  arrange(desc(FirstPlayCount)) %>%
+  filter(FirstPlayCount>20) %>% 
+  pull(FirstSong)
+playlists<- playlists %>% filter(!(Artist_Song %in% songs_to_strip))
+
+playlists<-playlists %>% select(-Artist_Song) # remove before saving. much smaller file
+
 save(playlists,file="playlists.Rdata")
+write_csv(playlists,path="playlists.csv")
