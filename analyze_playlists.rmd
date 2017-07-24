@@ -17,7 +17,6 @@ library(dplyr)
 library(tidyverse)
 library(lubridate)
 library(broom)
-library(xts)
 library("ggplot2")
 #library(ggfortify)
 library("wordcloud")
@@ -42,8 +41,12 @@ year_count<-playlists %>%
   distinct() %>% nrow()
 dj_count<-playlists %>% summarise(DJs=n()) %>% nrow #DJs
 show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise(Shows=n()) %>% nrow()
-artist_count<-playlists %>% ungroup() %>% group_by(ArtistToken) %>% summarise(Artists=n()) %>% nrow() #Artists
-song_count<-playlists %>% ungroup() %>% transmute(songs=paste(ArtistToken,Title)) %>% distinct() %>% nrow() #songs
+#Artists
+artist_count<-playlists %>% ungroup() %>% select(ArtistToken) %>% distinct() %>% nrow()
+
+#songs
+song_count<-playlists %>% ungroup() %>% select(ArtistToken,Title) %>% distinct() %>% nrow()
+
 spins_count<-nrow(playlists) # spins
 
 the_numbers<-data_frame(
@@ -222,15 +225,28 @@ gg
 #Most played songs.
 Everybody likes top 10 lists.  WFMU's biggest hits! Ranked by year and number of DJ's that played the song, not by by number of plays.  A single DJ can greatly skew the results.  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
 ```{r}
+
+#combined artist and title
+playlist_songs<-playlists %>% 
+  ungroup() %>% 
+  transmute(DJ=DJ,AirDate=AirDate,Song=paste(ArtistToken,Title))
+
 DJ_count_by_song<-playlists %>%
   ungroup() %>% 
   transmute(DJ=DJ,AirDate=year(AirDate),Song=paste(ArtistToken,Title)) %>%
   distinct() %>%
   group_by(Song,AirDate) %>% 
   summarise(DJ_Count=n()) %>% 
-  arrange(desc(DJ_Count)) %>% 
-  ungroup() %>% 
-  filter(DJ_Count>4)
+  filter(DJ_Count>4) %>% 
+  arrange(AirDate,desc(DJ_Count))
+
+DJ_count_by_song<-playlists_songs %>%
+  mutate(AirDate=year(AirDate)) %>%
+  group_by(Song,AirDate) %>% 
+  summarise(DJ_Count=n()) %>% 
+  filter(DJ_Count>4) %>% 
+  arrange(AirDate,desc(DJ_Count))
+
 
 top_10_long<-DJ_count_by_song %>% group_by(AirDate) %>% arrange(AirDate,desc(DJ_Count))
 top_10<-NULL
