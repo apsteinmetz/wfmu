@@ -229,48 +229,15 @@ gg
 Everybody likes top 10 lists.  WFMU's biggest hits! Ranked by year and number of DJ's that played the song, not by by number of plays.  A single DJ can greatly skew the results.  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
 ```{r, message=FALSE, warning=FALSE}
 
-#function to calculate how much a single dj accounts for the plays of a song or how few djs do.
-# 1 means only one DJ plays it.  Lower numbers are more spread around.
-song_conc<-function(song){
-  g<-playlists_songs %>% 
-  filter(Song==song) %>% 
-  group_by(DJ) %>% 
-  summarise(n=n()) %>% 
-  right_join(DJKey) %>% 
-  arrange(desc(n)) %>% 
-  pull(n) %>% 
-  na.fill(0) %>% ineq::Gini()
-  return (g)
-}
-
 #combined artist and title
 playlists_songs<-playlists %>% 
   ungroup() %>% 
-  transmute(DJ=as.character(DJ),AirDate=AirDate,Song=paste(ArtistToken,Title))
-
-DJ_count_by_song<-playlists %>%
-  ungroup() %>% 
-  transmute(DJ=DJ,AirDate=year(AirDate),Song=paste(ArtistToken,Title)) %>%
-  distinct() %>%
-  group_by(Song,AirDate) %>% 
-  summarise(DJ_Count=n()) %>% 
-  filter(DJ_Count>4) %>% 
-  arrange(AirDate,desc(DJ_Count))
+  transmute(DJ=as.character(DJ),AirDate=year(AirDate),Song=paste(ArtistToken,Title))
 
 count_by_song<-playlists_songs %>%
-  mutate(AirDate=year(AirDate)) %>%
-  group_by(Song) %>% 
+  group_by(Song,AirDate) %>% 
   summarise(Song_Count=n()) %>% 
   arrange(desc(Song_Count))
-
-# how concentrated is a  song by DJ
-# if the index is greater than  0.99 only one DJ has ever played the song
-# if it's in the top 50 overall song plays, dump it as it will skew the top 10 lists
-for (n in 1:100){
-  print(song_conc(count_by_song$Song[n]))
-  
-}
-
 
 top_10_long<-DJ_count_by_song %>% group_by(AirDate) %>% arrange(AirDate,desc(DJ_Count))
 top_10<-NULL

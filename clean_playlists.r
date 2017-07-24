@@ -76,6 +76,8 @@ playlists<-filter(playlists,Artist!="Artist")
 playlists<- filter(playlists,!str_detect(Artist, "Music Behind"))
 playlists<- filter(playlists,!str_detect(Title, "Music Behind"))
 playlists<- filter(playlists,!str_detect(Artist, "Wake N Bake"))
+playlists<- filter(playlists,!str_detect(Title, "Wfmu"))
+playlists<- filter(playlists,!str_detect(Title, "Primavera"))
 
 numWords=2 #is two enought for uniqueness?
 
@@ -108,9 +110,9 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"EnnioMorricone","M
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"DavidBowie","Bowie")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"BobDylan","Dylan")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Yola","YoLaTengo")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"ElvisPresley","Elvis")
 
 playlists<-playlists %>% 
-  mutate(DJ=as.factor(DJ)) %>%
   filter(ArtistToken !="") %>% 
   filter(ArtistToken !="YourDj") %>% 
   filter(ArtistToken !="HoofMouth") %>% 
@@ -120,13 +122,17 @@ playlists<-playlists %>%
   distinct() %>% #why would there be dupes?  Don't know, but there are
   group_by(DJ) 
 
+#OPTIONAL
+#using judgement to pare legitimate entries that distort analysis
+print('Stripping signature songs that would distort analysis.  This takes a few minutes')
 #strip out signature opening songs where one opens a show more than 20 times
 #this will strip the song entirely from the database.
 #should strip the artist/title pair, not the title
-playlists <- playlists %>%  mutate(Artist_Song=paste(ArtistToken,Title)) 
+playlists <- playlists %>%  
+  mutate(Artist_Song=paste(ArtistToken,Title)) %>% 
+  group_by(DJ,AirDate)
 
 songs_to_strip<-playlists %>% 
-  group_by(DJ,AirDate) %>% 
   summarize(FirstSong=first(Artist_Song)) %>% 
   group_by(FirstSong) %>% 
   summarise(FirstPlayCount=n()) %>% 
@@ -134,10 +140,10 @@ songs_to_strip<-playlists %>%
   filter(FirstPlayCount>20) %>% 
   pull(FirstSong)
 playlists<- playlists %>% filter(!(Artist_Song %in% songs_to_strip))
+print(songs_to_strip)
 
 #now strip closing songs
 songs_to_strip<-playlists %>% 
-  group_by(DJ,AirDate) %>% 
   summarize(FirstSong=last(Artist_Song)) %>% 
   group_by(FirstSong) %>% 
   summarise(FirstPlayCount=n()) %>% 
@@ -145,7 +151,47 @@ songs_to_strip<-playlists %>%
   filter(FirstPlayCount>20) %>% 
   pull(FirstSong)
 playlists<- playlists %>% filter(!(Artist_Song %in% songs_to_strip))
+print(songs_to_strip)
 
+#Songs where only one DJ plays it - over and over even though it might not be a signature song
+#distort the analysis.  I use the Gini coefficent (used for measuring income inequality) to
+# test for song/DJ concentration.  If the Gini is over 0.990, just one DJ has overwhelmingly played it.  If it
+#is in the top 50 ranking of songs over all, I strip it out.
+
+song_conc<-function(song){
+  g<-playlists %>% 
+    filter(Artist_Song==song) %>% 
+    #group_by(DJ) %>%  #done already
+    summarise(n=n()) %>% 
+    right_join(DJKey) %>% 
+    arrange(desc(n)) %>% 
+    pull(n) %>% 
+    na.fill(0) %>% ineq::Gini()
+  return (g)
+}
+
+count_by_song<-playlists %>%
+  ungroup() %>% 
+  group_by(Artist_Song) %>% 
+  summarise(Song_Count=n()) %>% 
+  arrange(desc(Song_Count))
+
+songs_to_strip<-NULL
+for (n in 1:100){
+  song<-count_by_song$Artist_Song[n]
+  gini<-song_conc(song)
+  if (gini>0.990){
+    songs_to_strip<-c(songs_to_strip,song)
+  }
+  
+}
+print(songs_to_strip)
+
+playlists<- playlists %>% filter(!(Artist_Song %in% songs_to_strip))
+
+
+
+# save the results
 playlists<-playlists %>% select(-Artist_Song) # remove before saving. much smaller file
 
 save(playlists,file="playlists.Rdata")
