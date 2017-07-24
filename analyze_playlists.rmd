@@ -227,7 +227,7 @@ Everybody likes top 10 lists.  WFMU's biggest hits! Ranked by year and number of
 ```{r}
 
 #combined artist and title
-playlist_songs<-playlists %>% 
+playlists_songs<-playlists %>% 
   ungroup() %>% 
   transmute(DJ=DJ,AirDate=AirDate,Song=paste(ArtistToken,Title))
 
