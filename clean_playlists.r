@@ -164,7 +164,7 @@ print(songs_to_strip)
 song_conc<-function(song){
   g<-playlists %>% 
     filter(Artist_Song==song) %>% 
-    #group_by(DJ) %>%  #done already
+    group_by(DJ) %>%  #done already
     summarise(n=n()) %>% 
     right_join(DJKey) %>% 
     arrange(desc(n)) %>% 
