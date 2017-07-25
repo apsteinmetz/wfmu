@@ -408,10 +408,20 @@ top_artists<-playlists %>%
   ungroup() %>% 
   filter(AirDate>cutoff_date) %>%  #date range?
   group_by(ArtistToken)%>%
-    summarize(play_count=n())%>%
-    arrange(desc(play_count)) %>%
+  summarize(play_count=n())%>%
+  arrange(desc(play_count)) %>%
   .[1:cutoff_artists,] %>% 
   pull(ArtistToken)
+
+# we use total_spins to normalize trends vs. overall growth in the number of spins in the database
+total_spins<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(AirDate) %>% 
+  summarise(all_spins=n()) %>% 
+  arrange(AirDate)
+
 
 #getting into the tidyverse over my head here.
 #building linear trend models on entire data frame
@@ -424,11 +434,13 @@ trending_artists<-playlists %>%
   mutate(AirDate=as.yearqtr(AirDate))  %>% 
   group_by(ArtistToken,AirDate) %>% 
   summarise(Spins=n()) %>% 
+  left_join(total_spins,by='AirDate') %>% #normalize trend by trend in overall growth in playlists
+  mutate(adj_spins=Spins/all_spins) %>% # normalize trend
   arrange(AirDate) %>% 
   group_by(ArtistToken) %>% 
   nest() %>% 
   #heavy stuff here
-  mutate(model = purrr::map(data, ~ lm(Spins ~ AirDate, data = .))) %>% 
+  mutate(model = purrr::map(data, ~ lm(adj_spins ~ AirDate, data = .))) %>% 
   unnest(model %>% purrr::map(broom::tidy)) %>% 
   filter(term=="AirDate") %>% 
   filter(statistic>2.0) %>% #only statistically significant trends
