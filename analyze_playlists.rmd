@@ -9,7 +9,6 @@ author: Arthur Steinmetz
 
 
 library(devtools)
-#install_github('sinhrks/ggfortify')
 library(ggplot2)
 library(stringr)
 library(tm)
@@ -18,7 +17,7 @@ library(tidyverse)
 library(lubridate)
 library(broom)
 library("ggplot2")
-#library(ggfortify)
+library(ggfortify)
 library(xts)
 library("wordcloud")
 library("RColorBrewer")
@@ -498,9 +497,8 @@ I use some "big data" techniques here.  I join all the artists a DJ has played i
 
 
 ```
-Create term document matrices
+
 ```{r}
-print("Create document corpus and term document matrices")
 djCorpus <- VCorpus(VectorSource(concat_artists$Artists))
 
 
@@ -539,7 +537,6 @@ SPARSE<- 0.95 #sparsity of term document matrices
 djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(SPARSE)
 ```
 
-#Analyze similarity
 ```{r, warning=FALSE}
 jaccard <- function(m) {
   #http://stackoverflow.com/questions/36220585/efficient-jaccard-similarity-documenttermmatrix
@@ -590,11 +587,26 @@ CLUSTERS=5
   #}
   # now replace with new clustering
   #DJKey<-inner_join(DJKey,djCluster)%>%arrange(cluster)
-    
   
-  clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
+# traditional way.  I like ggplot2 better
+# clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
+    
+gg<-autoplot(kdj,data=j,label=TRUE,frame=TRUE,frame.type='norm')
+gg<-gg+labs(title="DJ Similarity Clusters") 
+gg<-gg + theme_minimal()+theme(legend.position="none")
+gg
+```
+So what does this mean?  We have some idea that DJs clustered together are somewhat similar, but how?  The "Components" have no specific attribute, by design, but we can get some intuition around them by looking at the most common artists for DJs at the extremes of each component.
+```{r}
+pca<-prcomp(j) %>% tidy()
+top_pc1_DJs<-pca %>% filter(PC==1) %>% top_n(3) %>% pull(row) %>% as.character()
+bottom_pc1_DJs<-pca %>% filter(PC==1) %>% top_n(-3) %>% pull(row) %>% as.character()
+top_pc2_DJs<-pca %>% filter(PC==2) %>% top_n(3) %>% pull(row) %>% as.character()
+bottom_pc2_DJs<-pca %>% filter(PC==2) %>% top_n(-3) %>% pull(row) %>% as.character()
 
 ```
+
+
 
 ```{r}
 #----------------------------------------------------------
