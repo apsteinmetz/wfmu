@@ -94,28 +94,38 @@ playlists %>%
 
 ```
 #Popular WFMU artists
-Who are the most popular artists amoung DJs that are on the current schedule over the past five years?
-```{r, message=FALSE, warning=FALSE}
+Who are the most popular artists?  One way to think about it is how widely played an artist is, regardless of how often they are played.  Has every DJ played them at least once?
+```{r}
+top_artists<-playlists %>%
+  ungroup() %>% 
+  select(DJ,ArtistToken) %>% 
+  distinct() %>%
+  group_by(ArtistToken) %>% 
+  summarise(play_count=n()) %>% 
+  arrange(desc(play_count))
 
+kable(top_artists[1:10,])
+```
+96 out of 150 DJ's have played David Bowie at least once.  Can is a venerable industrial Krautrock act that is the second most widely played artist.  Wild!
+
+Let's make a word cloud to visualize this.  I love word clouds!  
+```{r}
 #-------------------------------------------------------------------------------------
 # We love wordclouds!
 #scalefactor magnifies differences for wordcloud
 #use filters to select on or off schedule and constrain show airdate range
-scaleFactor=2
+scaleFactor=8
 maxWords = 200
-  #most popular artists
-  top_artists<-DJKey %>% 
-    filter(onSched==TRUE) %>% #on Sched or off?
-    left_join(playlists)%>%
-    group_by(ArtistToken)%>%
-    filter(AirDate<Sys.Date()-(365*5)) %>%  #date range?
-    summarize(play_count=n())%>%
-    arrange(desc(play_count))
-wordcloud(words = top_artists$ArtistToken, freq = top_artists$play_count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+wordcloud(words = top_artists$ArtistToken, 
+          freq = top_artists$play_count^scaleFactor,
+          max.words=maxWords, 
+          random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),
+          scale = c(3,.3))
 
 ```
-How about all playlists, on and off-schedule DJs?
+The above analysis ignores how often an artist is played.  Now let's take that into account. What artists get the most spins?
+
 ```{r, message=FALSE, warning=FALSE}
 
 #-------------------------------------------------------------------------------------
@@ -132,8 +142,39 @@ maxWords = 200
     #filter(AirDate<Sys.Date()-(365*5)) %>%  #date range?
     summarize(play_count=n())%>%
     arrange(desc(play_count))
-wordcloud(words = top_artists$ArtistToken, freq = top_artists$play_count^scaleFactor,max.words=maxWords, random.order=FALSE,rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+wordcloud(words = top_artists$ArtistToken, 
+          freq = top_artists$play_count^scaleFactor,
+          max.words=maxWords, 
+          random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),
+          scale = c(3,.3))
+
+```
+Beach Boys!  I never would have guessed.  They are along way from Can!
+
+We've gone back into ancient history but let's look at the recent past. Let's confine ourselves to the last five years using only DJ's who are on the current schedule. Who are the most popular artists among the current on-air DJs?
+```{r, message=FALSE, warning=FALSE}
+
+#-------------------------------------------------------------------------------------
+# We love wordclouds!
+#scalefactor magnifies differences for wordcloud
+#use filters to select on or off schedule and constrain show airdate range
+scaleFactor=1.3
+maxWords = 200
+  #most popular artists
+  top_artists<-DJKey %>% 
+    filter(onSched==TRUE) %>% #on Sched or off?
+    left_join(playlists)%>%
+    group_by(ArtistToken)%>%
+    filter(AirDate<Sys.Date()-(365*5)) %>%  #date range?
+    summarize(play_count=n())%>%
+    arrange(desc(play_count))
+wordcloud(words = top_artists$ArtistToken, 
+          freq = top_artists$play_count^scaleFactor,
+          max.words=maxWords, 
+          random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),
+          scale = c(3,.3))
 
 ```
 What's with NRBQ?  How many DJ's play them in any given quarter?  Not many, it seems.
@@ -226,9 +267,10 @@ gg<-gg+scale_x_continuous()
 gg
 ```
 #Most played songs.
-Everybody likes top 10 lists.  WFMU's biggest hits! Warning:  A single DJ can greatly skew the results.  I tried to strip out songs with high play counts where only one DJ was responsible.  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
+Everybody likes top 10 lists.  Here are WFMU's biggest hits by year! Looks like the Vivian Girls were the breakout band of 2008 with two songs in the top ten. Nice.
 
-Looks like the Vivian Girls were the breakout band of 2008. Nice.
+Warning:  A single DJ can greatly skew the results.  I tried to strip out songs with high play counts where only one DJ was responsible. Not a perfect process.  Once that was done, it only took about 10 plays to make the list.  WFMU is a very diverse station!  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
+
 ```{r, message=FALSE, warning=FALSE}
 
 #combined artist and title
