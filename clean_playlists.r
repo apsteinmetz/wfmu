@@ -121,7 +121,7 @@ playlists<-playlists %>%
   filter(ArtistToken !="HoofMouth") %>% 
   filter(ArtistToken !="TomWilson") %>%  #not songs
   filter(ArtistToken !="HankLevine") %>%  #not songs
-  filter(ArtistToken !="Commerical") %>%  #not songs
+  filter(ArtistToken !="Commercial") %>%  #not songs
   distinct() %>% #why would there be dupes?  Don't know, but there are
   group_by(DJ) 
 

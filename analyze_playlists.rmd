@@ -316,7 +316,7 @@ gg
 
 ```
 
-Diane "Kamikaze" Ferris is the only DJ with playlists from the 80s.  What a time capsule!  What were her most played artists back then?  More wordcloud!
+Diane "Kamikaze" Ferris is the only DJ with playlists from the 80s.  Yay, Diane! What a time capsule!  What were her most played artists back then?  More wordcloud!
 ```{r}
 scaleFactor=2
 maxWords = 200
@@ -336,9 +336,11 @@ wordcloud(words = DK$ArtistToken,
 
 
 ```
+Boy, that takes me back! 
+
 #Dead Artist Effect. 
 
-When did interest in an artist increase?
+If there's a rock and roll heaven you can find out who's there by analyzing WFMU playlists.  Apparently, Amy Winehouse isn't in it.
 ```{r}
 dead_artists=c('Bowie','Prince','AmyWinehouse','SharonJones','ChuckBerry','AllmanBrothers')
 
@@ -459,7 +461,7 @@ No newer artists?  Lots of new stuff gets played on WFMU but nothing percolates 
 
 #Analyze similarity 
 
-I use some "big data" techniques here.  I join all the artists a DJ has played into a single "document" and create a "document term matrix."  Then I compute an index of similarity for each possible pair of DJs using the "bray" algorithm.  Finally I use "k-means" to create clusters of similar DJs.  I chose five clusters in two dimensions but this is arbitrary. Two dimensions is sufficient to explain nearly 40% of the artist variation among DJs.  
+I use some "big data" techniques here.  I join all the artists a DJ has played into a single "document" and create a "document term matrix."  Then I compute an index of similarity for each possible pair of DJs using the "Bray" algorithm.  Finally I use "K-means" to create clusters of similar DJs.  I chose five clusters in two dimensions but this is arbitrary. Two dimensions is sufficient to explain nearly 40% of the artist variation among DJs.  
 
 ```{r}
 #-------------------------------------------------------------  
