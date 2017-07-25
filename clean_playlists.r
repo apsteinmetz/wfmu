@@ -1,6 +1,8 @@
 library(dplyr)
 library(stringr)
 library(readr)
+library(ineq) #inequality measures
+
 #clean up raw playlists
 
 load("playlists_raw.Rdata")
@@ -18,6 +20,7 @@ playlists<-playlists_raw %>%
 # go way too far back for about 10 shows.  I chose to lose them since Charlie has mucho
 # episodes
 playlists <- playlists %>% filter(AirDate>as.Date("1982-01-01"))
+playlists <-playlists %>% filter(!(AirDate<as.Date("1997-01-01")&DJ=="CL"))
 
 playlists$ArtistToken<-playlists$Artist
 # one artist is all punctuation so give !!! special treatment

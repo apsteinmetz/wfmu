@@ -26,7 +26,6 @@ library(igraph)
 library(cluster)
 # library(reshape2)
 library(vegan) #similarity measures
-library(ineq) #inequality measures
 library(Matrix)
 library(knitr)
 
@@ -42,7 +41,7 @@ year_count<-playlists %>%
   ungroup() %>% 
   transmute(Year_count=year(AirDate)) %>% 
   distinct() %>% nrow()
-dj_count<-playlists %>% summarise(DJs=n()) %>% nrow #DJs
+dj_count<-playlists %>% group_by(DJ) %>% summarise(DJs=n()) %>% nrow #DJs
 show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise(Shows=n()) %>% nrow()
 #Artists
 artist_count<-playlists %>% ungroup() %>% select(ArtistToken) %>% distinct() %>% nrow()
@@ -115,7 +114,7 @@ wordcloud(words = top_artists$ArtistToken, freq = top_artists$play_count^scaleFa
           colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
 
 ```
-How about all playlists, on an off-schedule DJs.
+How about all playlists, on and off-schedule DJs?
 ```{r, message=FALSE, warning=FALSE}
 
 #-------------------------------------------------------------------------------------
@@ -226,7 +225,9 @@ gg<-gg+scale_x_continuous()
 gg
 ```
 #Most played songs.
-Everybody likes top 10 lists.  WFMU's biggest hits! Ranked by year and number of DJ's that played the song, not by by number of plays.  A single DJ can greatly skew the results.  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
+Everybody likes top 10 lists.  WFMU's biggest hits! Warning:  A single DJ can greatly skew the results.  I tried to strip out songs with high play counts where only one DJ was responsible.  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
+
+Looks like the Vivian Girls were the breakout band of 2008. Nice.
 ```{r, message=FALSE, warning=FALSE}
 
 #combined artist and title
@@ -239,7 +240,11 @@ count_by_song<-playlists_songs %>%
   summarise(Song_Count=n()) %>% 
   arrange(desc(Song_Count))
 
-top_10_long<-DJ_count_by_song %>% group_by(AirDate) %>% arrange(AirDate,desc(DJ_Count))
+top_10_long<-count_by_song %>%
+  group_by(AirDate) %>%
+  filter(AirDate>2001) %>% 
+  arrange(AirDate,desc(Song_Count))
+
 top_10<-NULL
 years_top_10 <-unique(top_10_long$AirDate)
 for (n in years_top_10){
@@ -250,7 +255,44 @@ for (n in years_top_10){
 names(top_10)<-years_top_10
 kable(top_10)
 ```
+I dont' show years prior to 2002 because the number of DJ's who have playlists for airdates before 2002 is very small.
+```{r}
+dj_count<-playlists %>% 
+  ungroup() %>% 
+  mutate(AirDate=year(AirDate))  %>% 
+  group_by(AirDate,DJ) %>% 
+  summarise(Spins=n()) %>% 
+  summarise(DJs=n()) %>% 
+  filter(AirDate<2002)
+  
 
+gg<-dj_count %>% ggplot(aes(x=AirDate,y=DJs))+geom_col()
+gg<-gg+labs(title=paste("How many DJs have Playlists earlier than 2002?"))
+gg<-gg+scale_x_continuous()
+gg
+
+```
+
+Diane "Kamikaze" Ferris is the only DJ with playlists from the 80s.  What a time capsule!  What were her most played artists back then?  More wordcloud!
+```{r}
+scaleFactor=2
+maxWords = 200
+
+DK<-playlists %>% 
+  filter(AirDate<as.Date("1990-01-01")) %>% 
+  group_by(ArtistToken) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(desc(Spins))
+  
+
+wordcloud(words = DK$ArtistToken, 
+          freq = DK$Spins^scaleFactor,
+          max.words=maxWords, 
+          random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+
+
+```
 #Dead Artist Effect. 
 
 When did interest in an artist increase?
@@ -370,11 +412,12 @@ gg<-gg+labs(title="Trending Artists\nQuarterly Plays")
 gg
 
 ```
-No newer artists?  Lots of know stuff gets played on WFMU but nothing percolates into the conciousness of many DJs at once, it seems.  So "trending" seems to be irrelevant.  Despite that, let's see if we can identify similar DJs.
+No newer artists?  Lots of new stuff gets played on WFMU but nothing percolates into the conciousness of many DJs at once, it seems.  So "trending" seems to be irrelevant.  Despite that, let's see if we can identify similar DJs.
 
-#Analyze similarity
+#Analyze similarity 
 
-combine artist list into a single string per DJ
+I use some "big data" techniques here.  I join all the artists a DJ has played into a single "document" and create a "document term matrix."  Then I compute an index of similarity for each possible pair of DJs using the "bray" algorithm.  Finally I use "k-means" to create clusters of similar DJs.  I chose five clusters in two dimensions but this is arbitrary. Two dimensions is sufficient to explain nearly 40% of the artist variation among DJs.  
+
 ```{r}
 #-------------------------------------------------------------  
 #combineAllArtists
@@ -440,7 +483,7 @@ djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(SPARSE)
 ```
 
 #Analyze similarity
-```{r}
+```{r, warning=FALSE}
 jaccard <- function(m) {
   #http://stackoverflow.com/questions/36220585/efficient-jaccard-similarity-documenttermmatrix
   ## common values:
