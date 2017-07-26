@@ -16,8 +16,10 @@ library(dplyr)
 library(tidyverse)
 library(lubridate)
 library(broom)
+library(ggrepel)
 library("ggplot2")
 library(ggfortify)
+library(cowplot)
 library(xts)
 library("wordcloud")
 library("RColorBrewer")
@@ -538,25 +540,36 @@ djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(SPARSE)
 ```
 
 ```{r, warning=FALSE}
-jaccard <- function(m) {
-  #http://stackoverflow.com/questions/36220585/efficient-jaccard-similarity-documenttermmatrix
-  ## common values:
-  A <- tcrossprod(m)
-  im <- which(A > 0, arr.ind=TRUE, useNames = FALSE)
-  b <- rowSums(m)
-  Aim <- A[im]
-  J<-sparseMatrix(
-    i = im[,1],
-    j = im[,2],
-    x = Aim / (b[im[,1]] + b[im[,2]] - Aim),
-    dims = dim(A)
+#some functions used below
+#-----------------------------------------------------------
+songs_in_common<-function(Djs){
+  return(
+  playlists %>% 
+  filter(DJ %in% top_pc2_DJs) %>% 
+  group_by(DJ,ArtistToken) %>% 
+  summarise(n=n()) %>%
+  spread(DJ,n) %>% 
+  mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
+  mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
+  mutate(FaveIndex=sum_x-1.4*sd_x) %>% 
+  top_n(10) %>% 
+  select(-sum_x,-sd_x) %>% 
+  arrange(desc(FaveIndex))
   )
-  
-  #preserve row/column names, if any
-  rownames(J)<-rownames(m)
-  colnames(J)<-rownames(m)
-  return( J )
-}  
+}
+#-----------------------------------------------------------
+gg_wordcloud<-function(words_and_count){
+#hat tip:http://mhairihmcneill.com/blog/2016/04/05/wordclouds-in-ggplot.html
+gg<-words_and_count %>% 
+  ggplot(aes(x = 1, y = 1, size = count, label = word))+
+  geom_text_repel(segment.size = 0, force = 1) +
+  scale_size(range = c(2, 5), guide = FALSE) +
+  scale_y_continuous(breaks = NULL) +
+  scale_x_continuous(breaks = NULL) +
+  labs(x = '', y = '') +
+  theme_classic()
+return(gg)
+}
 #-----------------------------------------------------------
 getSimilarity<-function(djdtm=djdtm){
   m2<-as.matrix(sign(djdtm))
@@ -598,21 +611,52 @@ gg
 ```
 So what does this mean?  We have some idea that DJs clustered together are somewhat similar, but how?  The "PCs" have no specific attribute, by design, but we can get some intuition around them by looking at the most common artists for DJs at the extremes of each component.
 ```{r}
+top_count<-5
 pca<-prcomp(j) %>% tidy()
-top_pc1_DJs<-pca %>% filter(PC==1) %>% top_n(3) %>% pull(row) %>% as.character()
-bottom_pc1_DJs<-pca %>% filter(PC==1) %>% top_n(-3) %>% pull(row) %>% as.character()
-top_pc2_DJs<-pca %>% filter(PC==2) %>% top_n(3) %>% pull(row) %>% as.character()
-bottom_pc2_DJs<-pca %>% filter(PC==2) %>% top_n(-3) %>% pull(row) %>% as.character()
+top_pc1_DJs<-pca %>% filter(PC==1) %>% top_n(top_count) %>% pull(row) %>% as.character()
+bottom_pc1_DJs<-pca %>% filter(PC==1) %>% top_n(-top_count) %>% pull(row) %>% as.character()
+top_pc2_DJs<-pca %>% filter(PC==2) %>% top_n(top_count) %>% pull(row) %>% as.character()
+bottom_pc2_DJs<-pca %>% filter(PC==2) %>% top_n(-top_count) %>% pull(row) %>% as.character()
 
-playlists %>% 
-  filter(DJ %in% top_pc1_DJs) %>% 
+songs_in_common<-function(DJs){
+  return(
+  playlists %>% 
+  filter(DJ %in% DJs) %>% 
   group_by(DJ,ArtistToken) %>% 
   summarise(n=n()) %>%
   spread(DJ,n) %>% 
-  mutate(FaveIndex=.[[2]]+.[[3]]-abs(.[[2]]-.[[3]])) #%>% 
+  mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
+  mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
+  mutate(FaveIndex=sum_x-1.4*sd_x) %>% 
+  top_n(10) %>% 
+  select(-sum_x,-sd_x) %>% 
   arrange(desc(FaveIndex))
-  arrange(desc(n))
-  top_n(10)
+  )
+}
+
+quadrant_wc<-function(DJs,plot_quadrant=c("n","e","s","w")){
+  #quadrants in order are N,E,S,W
+  xy<-switch(plot_quadrant,
+         'n'=c(.4,.6),
+         's'=c(.4,.2) ,
+         'e'=c(.6,.4),
+         'w'=c(.2,.4))
+  songs<-songs_in_common(DJs) %>% 
+    rename(word=ArtistToken,count=FaveIndex)
+  gg<-gg_wordcloud(songs)
+  gg<-draw_plot(gg,xy[1],xy[2],width=0.2,height=0.35)
+  return (gg)
+  
+}
+gg<-autoplot(kdj,data=j,label=FALSE,frame=TRUE,frame.type='norm')
+gg<-gg+labs(title="DJ Similarity Clusters")
+gg<-gg + theme_minimal()+theme(legend.position="none")
+
+gg1<-quadrant_wc(top_pc1_DJs,'e')
+gg2<-quadrant_wc(top_pc2_DJs,'n')
+gg3<-quadrant_wc(bottom_pc2_DJs,'s')
+gg4<-quadrant_wc(bottom_pc1_DJs,'w')
+ggdraw()+gg1+gg2+gg3+gg4+draw_plot(gg)
 ```
 
 
@@ -657,30 +701,21 @@ likeDJs<-djdtm %>%
 dj1 <- "DK"
 dj2 <- "TM"
 
-likeDJs %>% 
-  ungroup() %>% 
-  filter(DJ1==dj1) %>% 
-  .[1:10,] %>% 
-  rename(DJ=DJ2) %>% 
-  left_join(DJKey) %>% 
-  select(ShowName,Similarity)
-
-
-
-songs1 <-playlists %>% 
-  filter(DJ==dj1) %>% 
-  group_by(ArtistToken) %>% 
-  summarise(plays=n()) %>% 
-  arrange(desc(plays))
-songs2 <-playlists %>% 
-  filter(DJ==dj2) %>% 
-  group_by(ArtistToken) %>% 
-  summarise(plays=n())%>% 
-  arrange(desc(plays))
-
-inner_join(songs2,songs1,by='ArtistToken') %>% 
-  mutate(FaveIndex=plays.x+plays.y-abs(plays.x-plays.y)) %>% 
+songs_in_common<-playlists %>% 
+  filter(DJ %in% c(dj1,dj2)) %>% 
+  group_by(DJ,ArtistToken) %>% 
+  summarise(n=n()) %>%
+  spread(DJ,n) %>% 
+  mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
+  mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
+  mutate(FaveIndex=sum_x-1.8*sd_x) %>% 
+  #select(ArtistToken,sum,FaveIndex) %>% 
+  top_n(10) %>% 
+  select(-sum_x,-sd_x) %>% 
   arrange(desc(FaveIndex))
+  
+songs_in_common
+
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
