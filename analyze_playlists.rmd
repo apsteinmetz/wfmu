@@ -352,7 +352,7 @@ wordcloud(words = DK$ArtistToken,
 ```
 Boy, that takes me back! You see the Canadian metal band, Voivod in that cloud?  They are also in the current show worldcloud above.  That's entirely due to Diane!
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 artist_token<-'Voivod'
 
 play_count_by_DJ<-playlists %>% 
@@ -709,7 +709,7 @@ gg4<-quadrant_wc(bottom_pc1_DJs,'w')
 ggdraw()+gg1+gg2+gg3+gg4+draw_plot(gg)
 ```
 
-Sometimes, when using principal components analysis, we can ascribe clear meanings to the dimensions.  In this case it's not so clear which shows that the DJs are not overly stuck in certain genres.  Looking at the artists, we might say that higher values of PC2 are associated with old-school classic rock that tilt towards R&B.  The other end of the dimension is "not that."  PC1 is even harder to interpret.  I'd say lower values are associated with alternative rock but that is iffy.
+Sometimes, when using principal components analysis, we can ascribe clear meanings to the dimensions.  In this case it's not so clear which shows that the DJs are not overly stuck in certain genres.  Looking at the artists, we might say that higher values of PC2 are associated with old-school classic rock that tilts towards R&B.  The other end of the dimension is "not that."  PC1 is even harder to interpret.  I'd say lower values are associated with alternative rock but that is iffy.
 
 ```{r}
 #----------------------------------------------------------
@@ -767,7 +767,3 @@ songs_in_common<-playlists %>%
 songs_in_common
 
 ```
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
