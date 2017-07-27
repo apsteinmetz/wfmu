@@ -408,7 +408,7 @@ gg<-gg+geom_col()+facet_wrap(~ArtistToken)
 gg<-gg+scale_x_continuous()+ggtitle("Dead Artist Effect")
 gg
 ```
-Prince is the prince but Bowie is the king.  The deaths of Prince and Davie Bowie led to some continuing interest in the artist, while plays for Chuck Berry, Sharon Jones and the Allman brothers dropped back to their pre-death background levels.  Amy Winehouse barely registers, before or after. To make this more visible, I'll clip the y-axis at 100. Now how does it look?
+Prince is the prince but Bowie is the king.  The deaths of Prince and Davie Bowie led to some continuing interest in the artist, while plays for Chuck Berry, Sharon Jones and the Allman brothers dropped back to their pre-death background levels.  Amy Winehouse barely registers, before or after. To make this more visible, zoom in by clipping the y-axis at 100. Now how does it look?
 ```{r}
 #clip outliers
 dead_artist_plays[dead_artist_plays$Spins>100,]$Spins=100
@@ -610,19 +610,6 @@ songs_in_common<-function(Djs){
   )
 }
 #-----------------------------------------------------------
-gg_wordcloud<-function(words_and_count){
-#hat tip:http://mhairihmcneill.com/blog/2016/04/05/wordclouds-in-ggplot.html
-gg<-words_and_count %>% 
-  ggplot(aes(x = 1, y = 1, size = count, label = word))+
-  geom_text_repel(segment.size = 0, force = 1) +
-  scale_size(range = c(2, 5), guide = FALSE) +
-  scale_y_continuous(breaks = NULL) +
-  scale_x_continuous(breaks = NULL) +
-  labs(x = '', y = '') +
-  theme_classic()
-return(gg)
-}
-  #-----------------------------------------------------------
 getSimilarity<-function(djdtm=djdtm){
   m2<-as.matrix(sign(djdtm))
   # get similarity
@@ -661,8 +648,33 @@ gg<-gg+labs(title="DJ Similarity Clusters")
 gg<-gg + theme_minimal()+theme(legend.position="none")
 gg
 ```
-So what does this mean?  We have some idea that DJs clustered together are somewhat similar, but how?  The "PCs" have no specific attribute, by design, but we can get some intuition around them by looking at the most common artists for DJs at the extremes of each component.
-```{r}
+So you are not a data nerd, what does this mean?  We have some idea that DJs clustered together are somewhat similar, but how?  The "PCs" have no specific attribute, by design, but we can get some intuition around them by looking at the most common artists for DJs at the extremes of each component.
+```{r, message=FALSE, warning=FALSE}
+
+#function to create wordclound in ggplot framework to allow further annotation
+gg_wordcloud<-function(words_and_count){
+#hat tip:http://mhairihmcneill.com/blog/2016/04/05/wordclouds-in-ggplot.html
+gg<-words_and_count %>% 
+  ggplot(aes(x = 1, y = 1, size = count, label = word))+
+  geom_text_repel(segment.size = 0, force = 2) +
+  scale_size(range = c(2, 5), guide = FALSE) +
+  scale_y_continuous(breaks = NULL) +
+  scale_x_continuous(breaks = NULL) +
+  labs(x = '', y = '') +
+  theme_classic()
+return(gg)
+}
+#-----------------------------------------------------------
+gg_wordlist<-function(words_and_count){
+#hat tip:http://mhairihmcneill.com/blog/2016/04/05/wordclouds-in-ggplot.html
+gg<-words_and_count %>% 
+  ggplot()+
+  annotate("text",label="some text")
+  theme_classic()
+return(gg)
+}
+
+#-----------------------------------------------------------
 top_count<-5
 pca<-prcomp(j) %>% tidy()
 top_pc1_DJs<-pca %>% filter(PC==1) %>% top_n(top_count) %>% pull(row) %>% as.character()
@@ -701,7 +713,23 @@ quadrant_wc<-function(DJs,plot_quadrant=c("n","e","s","w")){
   
 }
 
-gg$layers[[1]]=NULL
+quadrant_wl<-function(gg,DJs,plot_quadrant=c("n","e","s","w")){
+  #quadrants in order are N,E,S,W
+  xy<-switch(plot_quadrant,
+         'n'=c(0.0,.15),
+         's'=c(-.15,0.0),
+         'e'=c(.7,.4),
+         'w'=c(.1,.3))
+  songs<-songs_in_common(DJs) %>% 
+    rename(word=ArtistToken,count=FaveIndex)
+  gg<-gg+ggplot2::annotate("text",x=xy[1],y=xy[2],paste(songs$word,collapse = '\n'))
+  return (gg)
+  
+}
+gg<-autoplot(kdj,data=j,label=FALSE,frame=TRUE,frame.type='norm')
+gg<-gg+labs(title="DJ Similarity Clusters") 
+gg<-gg + theme_minimal()+theme(legend.position="none")
+gg$layers[[1]]=NULL #this only works the first time invoked
 gg1<-quadrant_wc(top_pc1_DJs,'e')
 gg2<-quadrant_wc(top_pc2_DJs,'n')
 gg3<-quadrant_wc(bottom_pc2_DJs,'s')
