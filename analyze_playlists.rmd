@@ -40,7 +40,7 @@ DJKey$DJ<-as.character(DJKey$DJ)
 ```
 Free form radio, WFMU.ORG, maintains a huge trove of past playlists from many DJ's radio shows.  More recently, web-only programming has been added to this.  This dataset offers lots of opportunities for analysis.  I scraped all the playlists I could from the web site and started asking questions.
 
-The scraping and data-cleaning process was the most time consumer part of the exercise. Playlist tables are not in a consistent format and my HTML skills are rudementary.  Further, the DJ's are inconsistent in how they enter artist names.  There are 12 different ways Andy Breckman can spell "Bruce Springsteen"  I take a stab at fixing some of the glaring errors.  Also, many DJs have signature songs to open and/or close their shows.  Including these skews the play count for songs.  I have chosen to strip those out, or try to.  In a few cases the air date is clearly wrong. I strip those shows out as well. The result is an reasonably accurate but incomplete record of all the playlists availabe at WFMU.ORG as of July 2017.
+The scraping and data-cleaning process was the most time consumer part of the exercise. Playlist tables are not in a consistent format and my HTML skills are rudimentary.  Further, the DJ's are inconsistent in how they enter artist names.  There are 12 different ways Andy Breckman can misspell "Bruce Springsteen"  I take a stab at fixing some of the glaring errors. Additionally, many artist names are variant due to collaborators with "featuring," "and the," "with," etc in the name.  I condense the first two words of every artist name into a token and drop the rest. Also, many DJs have signature songs to open and/or close their shows.  Including these skews the play count for songs.  I have chosen to strip those out, or try to.  In a few cases the air date is clearly wrong. I strip those shows out as well. The result is an reasonably accurate but incomplete record of all the playlists availabe at WFMU.ORG as of July 2017.
 
 I ask questions about the data below.  I take a meandering path and there is no real narrative here, just questions I thought were interesting.
 
@@ -709,7 +709,7 @@ quadrant_wc<-function(DJs,plot_quadrant=c("n","e","s","w")){
          'w'=c(.1,.3))
   artists<-artists_in_common(DJs) %>% 
     rename(word=ArtistToken,count=FaveIndex)
-  gg<-gg_wordcloud(songs)
+  gg<-gg_wordcloud(artists)
   gg<-draw_plot(gg,xy[1],xy[2],width=0.2,height=0.35)
   return (gg)
   
@@ -723,7 +723,7 @@ quadrant_wl<-function(gg,DJs,plot_quadrant=c("n","e","s","w")){
          's'=c(-.15,0.0),
          'e'=c(.7,.4),
          'w'=c(.1,.3))
-  songs<-songs_in_common(DJs) %>% 
+  artists<-artists_in_common(DJs) %>% 
     rename(word=ArtistToken,count=FaveIndex)
   gg<-gg+ggplot2::annotate("text",x=xy[1],y=xy[2],paste(songs$word,collapse = '\n'))
   return (gg)
@@ -752,7 +752,7 @@ prcomp(j) %>%
   kable(digits=3)
 
 ```
-
+Finally, let's look at similarities among specific DJ's. I listen religiously to Bill Kelly.  When I started this project, I was looking to anwser the question "what DJ's are most similar to Bill?" As this project shows, there is generally little overlap among DJ's and I know it's a point of pride at WFMU.  Still, let's answer the ur-question shall we?  Here are the shows most similar to "Teenage Wasteland."
 
 ```{r}
 DJ_similarity<-djdtm %>%
@@ -768,36 +768,55 @@ DJ_similarity<-djdtm %>%
   group_by(DJ1) %>% 
   arrange(desc(Similarity))
 
-dj1 <- "TW"
-dj2 <- "CF"
+dj1<-"TW"
+similar_DJS<-DJ_similarity %>% 
+  filter(DJ1==dj1) %>% 
+  arrange(desc(Similarity)) %>% 
+  top_n(5) %>% pull(DJ2)
 
-artists_in_common<-playlists %>% 
-  filter(DJ %in% c(dj1,dj2)) %>% 
-  group_by(DJ,ArtistToken) %>% 
-  summarise(n=n()) %>%
+DJKey %>% 
+  filter(DJ %in% similar_DJS) %>% 
+  kable(title="DJs most similar to Bill Kelly")
+
+
+```
+Here are the artists and songs each DJ have in common, with the play counts shown.
+```{r}
+artists_in_common<-function(dj1,dj2){
+  artists<-playlists %>% 
+    filter(DJ %in% c(dj1,dj2)) %>% 
+    group_by(DJ,ArtistToken) %>% 
+    summarise(n=n()) %>%
     spread(DJ,n) %>% 
-  mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
-  mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
-  mutate(FaveIndex=sum_x-1.8*sd_x) %>% 
-  #select(ArtistToken,sum,FaveIndex) %>% 
-  top_n(10) %>% 
-  select(-sum_x,-sd_x) %>% 
-  arrange(desc(FaveIndex))
+    mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
+    mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
+    mutate(FaveIndex=sum_x-1.8*sd_x) %>% 
+    #select(ArtistToken,sum,FaveIndex) %>% 
+    top_n(10) %>% 
+    select(-sum_x,-sd_x) %>% 
+    arrange(desc(FaveIndex))
+  return(artists)
+}
 
-songs_in_common<-playlists %>% 
-  filter(DJ %in% c(dj1,dj2)) %>%
-  mutate(Artist_Title=paste(Artist,Title)) %>% 
-  group_by(DJ,Artist_Title) %>% 
-  summarise(n=n()) %>%
-  spread(DJ,n) %>% 
-  mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
-  mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
-  mutate(FaveIndex=sum_x-1.8*sd_x) %>% 
-  #select(ArtistToken,sum,FaveIndex) %>% 
-  top_n(10) %>% 
-  select(-sum_x,-sd_x) %>% 
-  arrange(desc(FaveIndex))
+songs_in_common<-function(dj1,dj2){
+  songs<-playlists %>% 
+    filter(DJ %in% c(dj1,dj2)) %>%
+    mutate(Artist_Title=paste(Artist,Title)) %>% 
+    group_by(DJ,Artist_Title) %>% 
+    summarise(n=n()) %>%
+    spread(DJ,n) %>% 
+    mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
+    mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
+    mutate(FaveIndex=sum_x-1.8*sd_x) %>% 
+    #select(ArtistToken,sum,FaveIndex) %>% 
+    top_n(10) %>% 
+    select(-sum_x,-sd_x) %>% 
+    arrange(desc(FaveIndex))
+  return(songs)
+}
 
-artists_in_common
-songs_in_common
+for(dj2 in similar_DJS){
+  print(artists_in_common(dj1,dj2))
+  print(songs_in_common(dj1,dj2))
+}
 ```
