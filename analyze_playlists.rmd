@@ -752,7 +752,7 @@ prcomp(j) %>%
   kable(digits=3)
 
 ```
-Finally, let's look at similarities among specific DJ's. I listen religiously to Bill Kelly.  When I started this project, I was looking to anwser the question "what DJ's are most similar to Bill?" As this project shows, there is generally little overlap among DJ's and I know it's a point of pride at WFMU.  Still, let's answer the ur-question shall we?  Here are the shows most similar to "Teenage Wasteland."
+Finally, let's look at similarities among specific DJ's. I listen religiously to Bill Kelly.  When I started this project, I was looking to anwser the question "what DJ's are most similar to Bill?" As this project shows, there is generally little overlap among DJ's and I know it's a point of pride at WFMU.  Still, let's answer the ur-question shall we?  Here are the shows most similar to "Teenage Wasteland."  Similarity is defined as an index of common artists defined by the "Bray" similarity measure.
 
 ```{r}
 DJ_similarity<-djdtm %>%
@@ -780,8 +780,8 @@ DJKey %>%
 
 
 ```
-Here are the artists and songs each DJ have in common, with the play counts shown.
-```{r}
+Here are the artists Bill has in common with his most simpatico show, with the play counts shown.  
+```{r, message=FALSE}
 artists_in_common<-function(dj1,dj2){
   artists<-playlists %>% 
     filter(DJ %in% c(dj1,dj2)) %>% 
@@ -815,8 +815,27 @@ songs_in_common<-function(dj1,dj2){
   return(songs)
 }
 
-for(dj2 in similar_DJS){
+for(dj2 in similar_DJS[1]){
+  print(paste("Bill Kelly and",DJKey %>% filter(DJ==dj2) %>% pull(ShowName)))
   print(artists_in_common(dj1,dj2))
-  print(songs_in_common(dj1,dj2))
 }
 ```
+Here are the songs they most often have in common.
+```{r, message=FALSE}
+for(dj2 in similar_DJS[1]){
+  print(paste("Bill Kelly and",DJKey %>% filter(DJ==dj2) %>% pull(ShowName)))
+  print(songs_in_common(dj1,dj2))
+}
+
+```
+Now lets choose a DJ that I also like but is not very similar, Sheila B. They still have some overlap. Bill likes the ladies and Sheila features "female-fronted" pop. Leslie Gore, FTW!
+
+```{r}
+dj2="CF"
+print(paste("Bill Kelly and",DJKey %>% filter(DJ==dj2) %>% pull(ShowName)))
+print(artists_in_common(dj1,dj2))
+print(songs_in_common(dj1,dj2))
+
+
+```
+I've already exhausted your tolerance for this naval gazing but I'll end with some fireworks. Let's visualize Bill Kelly affinity universe with an arc graph.
