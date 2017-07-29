@@ -1,6 +1,8 @@
 ---
 title: "How similar (or not) are WFMU DJs?"
-output: html_notebook
+output: 
+  html_notebook: 
+    code_folding: hide
 author: Arthur Steinmetz
 ---
  
@@ -737,14 +739,26 @@ gg4<-quadrant_wc(bottom_pc1_DJs,'w')
 ggdraw()+gg1+gg2+gg3+gg4+draw_plot(gg)
 ```
 
-Sometimes, when using principal components analysis, we can ascribe clear meanings to the dimensions.  In this case it's not so clear which shows that the DJs are not overly stuck in certain genres.  Looking at the artists, we might say that higher values of PC2 are associated with old-school classic rock that tilts towards R&B.  The other end of the dimension is "not that."  PC1 is even harder to interpret.  I'd say lower values are associated with alternative rock but that is iffy.
+Sometimes, when using principal components analysis, we can ascribe clear meanings to the dimensions.  In this case it's not so clear. This shows that the DJs are not very tied to certain genres.  Looking at the artists, we might say that higher values of PC2 are associated with old-school classic rock that tilts towards R&B.  The other end of the dimension is "not that."  PC1 is even harder to interpret.  I'd say lower values are associated with alternative rock but that is iffy.  PC1, whatever it is, is the stronger determinant.  It accounts for 33% of the variance among DJs, while PC2 accounts for 14%.
+```{r}
+prcomp(j) %>% 
+  summary() %>%
+  .$importance %>% 
+  as.data.frame() %>% 
+#  as_tibble() %>% 
+  rownames_to_column(var='Stat') %>% 
+  select(Stat,PC1,PC2) %>% 
+  kable(digits=3)
+
+```
+
 
 ```{r}
 #----------------------------------------------------------
 similarDJs<-function(whichDJ="TW",compareDJ="TM"){
   #djs for example
-  #whichDJ <- "TW"
-  #compareDJ<-"TM"
+  whichDJ <- "TW"
+  compareDJ<-"TM"
 likeDJs<-data_frame(DJ=row.names(j),similarity=as.matrix(j)[,whichDJ]) %>% 
   arrange(desc(similarity)) #sort descending and remove self DJ
 
@@ -752,7 +766,7 @@ likeDJs<-data_frame(DJ=row.names(j),similarity=as.matrix(j)[,whichDJ]) %>%
   compareDJ<-likeDJs[1:3,1] %>% pull() 
   whichShow<-DJKey%>%filter(DJ==whichDJ)%>%.$ShowName%>%as.character()
   compareShow<-DJKey%>%filter(DJ %in% compareDJ)%>%.$ShowName%>%as.character()
-  print(paste(whichShow,"is most similar to",compareShow))
+  print(paste(whichShow,"is similar to",compareShow))
   print(paste("Similarity Index:",format(pull(likeDJs[1:3,2]),digits=2),"/1.00"))
   
   commonArtists<-intersect(artistTokens[which(artistTokens$DJ==whichDJ),]$artistToken,artistTokens[which(artistTokens$DJ==compareDJ),]$artistToken)
