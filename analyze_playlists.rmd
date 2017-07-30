@@ -33,7 +33,7 @@ library(vegan) #similarity measures
 library(Matrix)
 library(knitr)
 
-
+source('arcdiagram.r')
 load("playlists.rdata")
 load('djkey.rdata')
 DJKey$DJ<-as.character(DJKey$DJ)
@@ -768,11 +768,21 @@ DJ_similarity<-djdtm %>%
   group_by(DJ1) %>% 
   arrange(desc(Similarity))
 
+DJ_similarity<- j %>%
+  as.data.frame() %>% 
+  mutate(DJ1=rownames(.)) %>% 
+  as_tibble() %>% 
+  gather(DJ2,Similarity,-DJ1) %>% 
+  mutate(Similarity=1-Similarity) %>% 
+  filter(DJ1 != DJ2) %>%  #remove diagonals
+  group_by(DJ1) %>% 
+  arrange(desc(Similarity))
+
 dj1<-"TW"
 similar_DJS<-DJ_similarity %>% 
   filter(DJ1==dj1) %>% 
   arrange(desc(Similarity)) %>% 
-  top_n(5) %>% pull(DJ2)
+  top_n(10) %>% pull(DJ2)
 
 DJKey %>% 
   filter(DJ %in% similar_DJS) %>% 
@@ -838,4 +848,32 @@ print(songs_in_common(dj1,dj2))
 
 
 ```
-I've already exhausted your tolerance for this naval gazing but I'll end with some fireworks. Let's visualize Bill Kelly affinity universe with an arc graph.
+I've already exhausted your tolerance for this naval gazing but I'll end it with one more chart. Let's visualize Bill Kelly affinity universe with an arc graph.  The width of the arcs is proportional to the similiary among DJs. I selected the 10 DJ's with the most similarity.  Dave the Spazz is the center of this garage rock universe!
+
+```{r}
+djCorpus_subset<-tm_filter(djCorpus, FUN = function(x) meta(x)[["DJ"]] %in% c(similar_DJS,dj1))
+# get document-term matrix
+djdtm_subset = DocumentTermMatrix(djCorpus_subset) %>% removeSparseTerms(0.50)
+
+dj_mat<-as.matrix(djdtm_subset)
+
+adj_mat1 = dj_mat %*% t(dj_mat)
+# set zeros in diagonal
+diag(adj_mat1) = 0
+
+#change from dJ to show name
+dimnames(adj_mat1)<-rep(list(Docs=filter(DJKey,DJ  %in% row.names(adj_mat1)) %>% pull(ShowName)),2)
+# create graph from adjacency matrix
+graph_artists1 = graph.adjacency(adj_mat1, mode="undirected", weighted=TRUE, diag=FALSE)
+# get edgelist 1
+edges1 = get.edgelist(graph_artists1)
+
+# arc widths based on graph_artists1
+w1 = E(graph_artists1)$weight
+lwds = w1/20000
+
+# arc-diagram
+arcDiagram(edges1, lwd=lwds, cex=0.8, mar=c(7,1,4,1))
+title("Selected DJ Associations", cex.main=0.9)
+```
+
