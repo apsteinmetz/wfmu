@@ -543,7 +543,7 @@ I use some "big data" techniques here.  I join all the artists a DJ has played i
                           filter(DJ==dj)%>%
                           pull(ArtistToken)%>% 
                           paste(collapse=" ")%>%
-                          str_replace_all("[^a-z ]","")%>%as.character() ,
+                          str_replace_all("[^A-Za-z ]","")%>%as.character() ,
                           onSched=DJKey%>%filter(DJ==dj)%>%pull(onSched)
                         ))
   }
@@ -650,7 +650,7 @@ gg<-gg+labs(title="DJ Similarity Clusters")
 gg<-gg + theme_minimal()+theme(legend.position="none")
 gg
 ```
-So you are not a data nerd, what does this mean?  We have some idea that DJs clustered together are somewhat similar, but how?  This is not a very interesting cluster analysis as the clusters are not well define and have a lot of overlap.  It's a pretty evenly distributed cloud.  The "PC" axes have no specific attribute, by design, but we can get some intuition around them by looking at the most common artists for DJs at the extremes of each component.
+So you are not a data nerd, what does this mean?  We have some idea that DJs clustered together are somewhat similar, but how?  This is not a very interesting as cluster analyses go as the clusters are not well defined and have a lot of overlap.  It's a pretty evenly distributed cloud.  The "PC" axes have no specific attribute, by design, but we can get some intuition around them by looking at the most common artists for DJs at the extremes of each component.
 ```{r, message=FALSE, warning=FALSE}
 
 #function to create wordclound in ggplot framework to allow further annotation
