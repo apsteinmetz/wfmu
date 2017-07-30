@@ -754,21 +754,11 @@ prcomp(j) %>%
 ```
 Finally, let's look at similarities among specific DJ's. I listen religiously to Bill Kelly.  When I started this project, I was looking to anwser the question "what DJ's are most similar to Bill?" As this project shows, there is generally little overlap among DJ's and I know it's a point of pride at WFMU.  Still, let's answer the ur-question shall we?  Here are the shows most similar to "Teenage Wasteland."  Similarity is defined as an index of common artists defined by the "Bray" similarity measure.
 
-```{r}
+```{r, message=FALSE}
 DJ_similarity<-djdtm %>%
   as.matrix() %>% 
   vegdist(method="bray") %>% 
   as.matrix() %>% 
-  as.data.frame() %>% 
-  mutate(DJ1=rownames(.)) %>% 
-  as_tibble() %>% 
-  gather(DJ2,Similarity,-DJ1) %>% 
-  mutate(Similarity=1-Similarity) %>% 
-  filter(DJ1 != DJ2) %>%  #remove diagonals
-  group_by(DJ1) %>% 
-  arrange(desc(Similarity))
-
-DJ_similarity<- j %>%
   as.data.frame() %>% 
   mutate(DJ1=rownames(.)) %>% 
   as_tibble() %>% 
