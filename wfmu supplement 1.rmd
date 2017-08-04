@@ -1,0 +1,89 @@
+---
+title: "A Statistical Examination Playlists WFMU.org: Supplement 1."
+output: 
+  html_notebook: 
+    code_folding: hide
+author: Arthur Steinmetz
+---
+# Answering some of Ken's questions 
+
+```{r, message=FALSE, warning=FALSE}
+
+
+library(devtools)
+library(ggplot2)
+library(stringr)
+library(tm)
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(broom)
+library(ggrepel)
+library("ggplot2")
+library(ggfortify)
+library(cowplot)
+library(xts)
+library("wordcloud")
+library("RColorBrewer")
+#library("SnowballC")
+library(igraph)
+library(cluster)
+# library(reshape2)
+library(vegan) #similarity measures
+library(Matrix)
+library(knitr)
+
+source('arcdiagram.r')
+load("playlists.rdata")
+load('djkey.rdata')
+DJKey$DJ<-as.character(DJKey$DJ)
+```
+Ken: On the Top Ten by year and in a few other places I see things that are parts of theme songs or that kind of thing.. like Steve Martin "Under the Bamboo Tree" which is part of Frank OToole's into song/collage. 
+
+Art: As I noted I tried to catch these but have undoubtedly missed some.  Where you see specific song's that distorts results you would like to see deleted, let me know.
+
+Frank's a weird case but his intro song does introduce distortions.  Let's strip out ALL of Frank's first plays because the same song is listed so many different ways. He does play a lot of Beach Boys, intro and otherwise.
+```{r}
+#careful.  every time you run this is will strip out the first song from each airdate,
+#creating a new first song.  Eventually, there will be nothing left.
+
+frank<-playlists %>% filter(DJ=="FX") #only frank
+playlists<-playlists %>% filter(DJ!="FX") #frank is gone
+songs_to_strip<-frank %>% 
+  group_by(AirDate) %>% 
+  summarize(first_song=first(Title)) %>%
+  group_by(first_song) %>% 
+  summarize(count=n()) %>% 
+  pull(first_song)
+
+frank<-frank %>% filter(!(Title %in% songs_to_strip))
+playlists<-playlists %>% bind_rows(frank) #frank is back
+```
+Ken: Could I see the DJ Similarity Clusters in a larger format so I can see what's going on better? It's hard to read the two letter codes and the band names. 
+
+Art: Let's try tabular format for now.
+```{r}
+
+```
+
+Ken: I would love to see a simple ranking of the most played songs. 
+```{r}
+top_songs <- playlists %>% 
+  mutate(artist_song=paste(ArtistToken,Title))
+
+top_100<- top_songs %>% 
+  group_by(artist_song) %>% 
+  summarise(play_count=n()) %>% 
+  arrange(desc(play_count)) %>% 
+  top_n(100)
+
+top_100_last5<- top_songs %>% 
+  filter(AirDate>Sys.Date()-(365*5)) %>% 
+  summarise(play_count=n()) %>% 
+  arrange(desc(play_count)) %>% 
+  top_n(100)
+```
+
+
+
+
