@@ -79,9 +79,16 @@ top_100<- top_songs %>%
 
 top_100_last5<- top_songs %>% 
   filter(AirDate>Sys.Date()-(365*5)) %>% 
+  group_by(artist_song) %>% 
   summarise(play_count=n()) %>% 
   arrange(desc(play_count)) %>% 
   top_n(100)
+
+top_songs %>% 
+  filter(artist_song=="Focus Hocus Pocus") %>% 
+  group_by(DJ) %>% 
+  summarise(count=n()) %>% 
+  arrange(desc(count))
 ```
 
 
