@@ -45,8 +45,10 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"(live @ |live on|@
 
 #now get rid of remaining non-word characters except space
 
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"[^a-z^ ^0-9]","")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"[^A-Z^a-z^ ^0-9]","")
 
+#while we are at it, strip punctuantion from songs, as well
+playlists$Title<-str_replace_all(playlists$Title,"[^A-Z^a-z^ ^0-9]","")
 
 # get rid of 'interview'
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"(interview w|interview)","")
@@ -132,28 +134,28 @@ print('Stripping signature songs that would distort analysis.  This takes a few 
 #this will strip the song entirely from the database.
 #should strip the artist/title pair, not the title
 playlists <- playlists %>%  
-  mutate(Artist_Song=paste(ArtistToken,Title)) %>% 
+  mutate(artist_song=paste(ArtistToken,Title)) %>% 
   group_by(DJ,AirDate)
 
 songs_to_strip<-playlists %>% 
-  summarize(FirstSong=first(Artist_Song)) %>% 
+  summarize(FirstSong=first(artist_song)) %>% 
   group_by(FirstSong) %>% 
   summarise(FirstPlayCount=n()) %>% 
   arrange(desc(FirstPlayCount)) %>%
   filter(FirstPlayCount>20) %>% 
   pull(FirstSong)
-playlists<- playlists %>% filter(!(Artist_Song %in% songs_to_strip))
+playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 print(songs_to_strip)
 
 #now strip closing songs
 songs_to_strip<-playlists %>% 
-  summarize(FirstSong=last(Artist_Song)) %>% 
+  summarize(FirstSong=last(artist_song)) %>% 
   group_by(FirstSong) %>% 
   summarise(FirstPlayCount=n()) %>% 
   arrange(desc(FirstPlayCount)) %>%
   filter(FirstPlayCount>20) %>% 
   pull(FirstSong)
-playlists<- playlists %>% filter(!(Artist_Song %in% songs_to_strip))
+playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 print(songs_to_strip)
 
 #Songs where only one DJ plays it - over and over even though it might not be a signature song
@@ -163,7 +165,7 @@ print(songs_to_strip)
 
 song_conc<-function(song){
   g<-playlists %>% 
-    filter(Artist_Song==song) %>% 
+    filter(artist_song==song) %>% 
     group_by(DJ) %>%  #done already
     summarise(n=n()) %>% 
     right_join(DJKey) %>% 
@@ -175,27 +177,27 @@ song_conc<-function(song){
 
 count_by_song<-playlists %>%
   ungroup() %>% 
-  group_by(Artist_Song) %>% 
+  group_by(artist_song) %>% 
   summarise(Song_Count=n()) %>% 
   arrange(desc(Song_Count))
 
 songs_to_strip<-NULL
 for (n in 1:100){
-  song<-count_by_song$Artist_Song[n]
+  song<-count_by_song$artist_song[n]
   gini<-song_conc(song)
-  if (gini>0.990){
+  if (gini>0.985){
     songs_to_strip<-c(songs_to_strip,song)
   }
   
 }
 print(songs_to_strip)
 
-playlists<- playlists %>% filter(!(Artist_Song %in% songs_to_strip))
+playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 
 
 
 # save the results
-playlists<-playlists %>% select(-Artist_Song) # remove before saving. much smaller file
+playlists<-playlists %>% select(-artist_song) # remove before saving. much smaller file
 
 save(playlists,file="playlists.Rdata")
 write_csv(playlists,path="playlists.csv")
