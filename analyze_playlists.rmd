@@ -10,7 +10,7 @@ author: Arthur Steinmetz
 ```{r, message=FALSE, warning=FALSE}
 
 
-library(devtools)
+#library(devtools)
 library(ggplot2)
 library(stringr)
 library(tm)

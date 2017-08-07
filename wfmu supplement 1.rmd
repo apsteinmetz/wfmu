@@ -67,30 +67,79 @@ Art: Let's try tabular format for now.
 ```
 
 Ken: I would love to see a simple ranking of the most played songs. 
+
 ```{r}
-top_songs <- playlists %>% 
+playlists <- playlists %>% 
   mutate(artist_song=paste(ArtistToken,Title))
 
-top_100<- top_songs %>% 
+count_by_song<- playlists %>% 
   group_by(artist_song) %>% 
   summarise(play_count=n()) %>% 
-  arrange(desc(play_count)) %>% 
+  arrange(desc(play_count))
+
+top_100 <- count_by_song %>% 
   top_n(100)
 
-top_100_last5<- top_songs %>% 
+top_100_last5<- playlists %>% 
   filter(AirDate>Sys.Date()-(365*5)) %>% 
   group_by(artist_song) %>% 
   summarise(play_count=n()) %>% 
   arrange(desc(play_count)) %>% 
   top_n(100)
 
-top_songs %>% 
+top_100
+```
+
+Art: Hocus Pocus by Focus.  Another problem arises. A single DJ really pushes this song to the top. This begs the question: Is the top song list just a representation of single DJ's passion for a particular song?  Are the tastes of DJs so diverse that no single song is widely played?
+
+Here is the play count for Hocus Pocus by DJ.
+
+```{r}
+playlists %>% 
   filter(artist_song=="Focus Hocus Pocus") %>% 
   group_by(DJ) %>% 
   summarise(count=n()) %>% 
   arrange(desc(count))
 ```
+So, should it be in the top 100?  Back in the cleaning stage I used a play concentration measure to strip out songs that were overwhelmingly played by just one DJ.  Maybe we need to loosen the criterion a smidge.  Let's move it from 0.990 to 0.985
+```{r}
+songs_to_strip<-NULL
+for (n in 1:100){
+  song<-count_by_song$artist_song[n]
+  gini<-song_conc(song)
+  if (gini>0.985){
+    songs_to_strip<-c(songs_to_strip,song)
+  }
+}
+playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 
+```
+Let's do the list again.
+```{r}
+count_by_song<- playlists %>% 
+  group_by(artist_song) %>% 
+  summarise(play_count=n()) %>% 
+  arrange(desc(play_count))
 
+top_100 <- count_by_song %>% 
+  top_n(100)
 
+top_100_last5<- playlists %>% 
+  filter(AirDate>Sys.Date()-(365*5)) %>% 
+  group_by(artist_song) %>% 
+  summarise(play_count=n()) %>% 
+  arrange(desc(play_count)) %>% 
+  top_n(100)
 
+top_100
+
+```
+Now let's look at the new top song.  There is DJ concentration but the DJ who plays the song the most accounts for less than half the total plays.
+
+```{r}
+playlists %>% 
+  filter(artist_song=="WandaJackson Funnel Of Love") %>% 
+  group_by(DJ) %>% 
+  summarise(count=n()) %>% 
+  arrange(desc(count))
+```
