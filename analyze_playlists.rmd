@@ -40,7 +40,11 @@ DJKey$DJ<-as.character(DJKey$DJ)
 ```
 Free form radio, WFMU.ORG, maintains a huge trove of past playlists from many DJ's radio shows.  More recently, web-only programming has been added to this.  This dataset offers lots of opportunities for analysis.  I scraped all the playlists I could from the web site and started asking questions.
 
-The scraping and data-cleaning process was the most time consuming part of the exercise. Playlist tables are not in a consistent format and my HTML skills are rudimentary.  Further, the DJ's are inconsistent in how they enter artist names.  There are 12 different ways Andy Breckman can misspell "Bruce Springsteen"  I take a stab at fixing some of the glaring errors. Additionally, many artist names are variant due to collaborators with "featuring," "and the," "with," etc in the name.  I condense the first two words of every artist name into a token and drop the rest. Also, many DJs have signature songs to open and/or close their shows.  Including these skews the play count for songs.  I have chosen to strip those out, or try to.  In a few cases the air date is clearly wrong. I strip those shows out as well. The result is an reasonably accurate but incomplete record of all the playlists available at WFMU.ORG as of July 2017.  The code used for scraping and cleaning is not included here but is available at https://github.com/apsteinmetz/wfmu, as is the cleaned playlist file in R data and csv format.
+The scraping and data-cleaning process was the most time consuming part of the exercise. Playlist tables are not in a consistent format and my HTML skills are rudimentary.  Further, the DJ's are inconsistent in how they enter artist names.  There are 12 different ways Andy Breckman can misspell "Bruce Springsteen"  I take a stab at fixing some of the glaring errors. Additionally, many artist names are variant due to collaborators with "featuring," "and the," "with," etc in the name.  I condense the first two words of every artist name into a token and drop the rest. In a very few cases the air date is clearly wrong. I strip those shows out.
+
+There is a final step which is really a judgement call.  Many DJs have signature songs to open and/or close their shows.  Including these skews the play count for songs.  I have chosen to strip those out, or try to.  Songs where one DJ accounts for just about all the plays are stripped out as well.  Should they count anyway?  In the cleaning step I created playlist files with and without lopsided songs stripped out. The analysis below uses the more pared down list.
+
+The end result is an reasonably accurate but incomplete record of all the playlists available at WFMU.ORG as of July 2017.  The code used for scraping and cleaning is not included here but is available at https://github.com/apsteinmetz/wfmu, as is the cleaned playlist file in R data and csv format.
 
 I ask questions about the data below.  I take a meandering path and there is no real narrative here, just questions I thought were interesting.
 
@@ -281,11 +285,9 @@ gg<-gg+scale_x_continuous()
 gg
 ```
 #Most played songs.
-Everybody likes top 10 lists.  Here are WFMU's biggest hits by year! Looks like the Vivian Girls were the breakout band of 2008 with two songs in the top ten. Nice.
+What are the most played songs ever on WFMU? Remember, I am using a data set with opening, closing and single-DJ-played songs stripped out.
 
-Warning:  A single DJ can greatly skew the results.  I tried to strip out songs with high play counts where only one DJ was responsible. Not a perfect process.  Once that was done, it only took about 10 plays to make the list.  WFMU is a very diverse station!  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
-
-```{r, message=FALSE, warning=FALSE}
+```{r}
 
 #combined artist and title
 playlists_songs<-playlists %>% 
@@ -296,6 +298,18 @@ count_by_song<-playlists_songs %>%
   group_by(Song,AirDate) %>% 
   summarise(Song_Count=n()) %>% 
   arrange(desc(Song_Count))
+
+count_by_song %>% 
+  summarise(count=n()) %>% 
+  arrange(desc(count)) %>% 
+  top_n(100)
+```
+
+Here are WFMU's biggest hits by year! Looks like the Vivian Girls were the breakout band of 2008 with two songs in the top ten. Nice.
+
+Warning:  A single DJ can greatly skew the results.  I tried to strip out songs with high play counts where only one DJ was responsible. Not a perfect process.  Once that was done, it only took about 10 plays to make the list.  WFMU is a very diverse station!  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
+
+```{r, message=FALSE, warning=FALSE}
 
 top_10_long<-count_by_song %>%
   group_by(AirDate) %>%
@@ -537,14 +551,17 @@ I use some "big data" techniques here.  I join all the artists a DJ has played i
   #make sure there aren't extra levels
   playlists$DJ<-factor(playlists$DJ,as.character(unique(playlists$DJ)))
   for (dj in levels(playlists$DJ)){
+    print(dj)
     #put all words in string for each DJ
-    concat_artists<-bind_rows(concat_artists,data_frame(DJ=dj,
-                        Artists= playlists%>%
-                          filter(DJ==dj)%>%
-                          pull(ArtistToken)%>% 
-                          paste(collapse=" ")%>%
-                          str_replace_all("[^A-Za-z ]","")%>%as.character() ,
-                          onSched=DJKey%>%filter(DJ==dj)%>%pull(onSched)
+    concat_artists<-bind_rows(concat_artists,
+                              data_frame(
+                                DJ=dj,
+                                Artists= playlists%>%
+                                  filter(DJ==dj)%>%
+                                  pull(ArtistToken)%>% 
+                                  paste(collapse=" ")%>%
+                                  str_replace_all("[^A-Za-z ]","")%>%as.character() ,
+                                onSched=DJKey%>%filter(DJ==dj)%>%pull(onSched)
                         ))
   }
   #artists should not have factor levels
