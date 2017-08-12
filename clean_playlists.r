@@ -2,6 +2,7 @@ library(dplyr)
 library(stringr)
 library(readr)
 library(ineq) #inequality measures
+library(xts)
 
 #clean up raw playlists
 
@@ -127,33 +128,39 @@ playlists<-playlists %>%
   distinct() %>% #why would there be dupes?  Don't know, but there are
   group_by(DJ) 
 
+
+playlists_full<-playlists
+save(playlists_full,file="playlists_full.Rdata")
+write_csv(playlists,path="playlists_full.csv")
+
 #OPTIONAL
 #using judgement to pare legitimate entries that distort analysis
 print('Stripping signature songs that would distort analysis.  This takes a few minutes')
 #strip out signature opening songs where one opens a show more than 20 times
 #this will strip the song entirely from the database.
 #should strip the artist/title pair, not the title
+STRIP_THRESHOLD <- 20
 playlists <- playlists %>%  
   mutate(artist_song=paste(ArtistToken,Title)) %>% 
   group_by(DJ,AirDate)
 
-songs_to_strip<-playlists %>% 
-  summarize(FirstSong=first(artist_song)) %>% 
-  group_by(FirstSong) %>% 
-  summarise(FirstPlayCount=n()) %>% 
+songs_to_strip<-playlists %>%
+  summarize(FirstSong=first(artist_song)) %>%
+  group_by(FirstSong) %>%
+  summarise(FirstPlayCount=n()) %>%
   arrange(desc(FirstPlayCount)) %>%
-  filter(FirstPlayCount>20) %>% 
+  filter(FirstPlayCount>STRIP_THRESHOLD) %>%
   pull(FirstSong)
 playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 print(songs_to_strip)
 
 #now strip closing songs
-songs_to_strip<-playlists %>% 
-  summarize(FirstSong=last(artist_song)) %>% 
-  group_by(FirstSong) %>% 
-  summarise(FirstPlayCount=n()) %>% 
+songs_to_strip<-playlists %>%
+  summarize(FirstSong=last(artist_song)) %>%
+  group_by(FirstSong) %>%
+  summarise(FirstPlayCount=n()) %>%
   arrange(desc(FirstPlayCount)) %>%
-  filter(FirstPlayCount>20) %>% 
+  filter(FirstPlayCount>STRIP_THRESHOLD) %>%
   pull(FirstSong)
 playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 print(songs_to_strip)
@@ -163,15 +170,20 @@ print(songs_to_strip)
 # test for song/DJ concentration.  If the Gini is over 0.990, just one DJ has overwhelmingly played it.  If it
 #is in the top 50 ranking of songs over all, I strip it out.
 
+TOLERANCE <- 0.987 #how aggressive should we be in scrubbing artists with lopsided appeal?
+NUM_DJS<- length(unique(playlists$DJ))
+
 song_conc<-function(song){
   g<-playlists %>% 
+    ungroup() %>% 
     filter(artist_song==song) %>% 
-    group_by(DJ) %>%  #done already
+    select(DJ,artist_song) %>% 
+    group_by(DJ) %>%
     summarise(n=n()) %>% 
-    right_join(DJKey) %>% 
     arrange(desc(n)) %>% 
     pull(n) %>% 
-    na.fill(0) %>% ineq::Gini()
+    c(rep(0,NUM_DJS)) %>% .[1:NUM_DJS] %>% #pad to include no-play DJs in Gini calc
+    ineq::Gini()
   return (g)
 }
 
@@ -182,7 +194,8 @@ count_by_song<-playlists %>%
   arrange(desc(Song_Count))
 
 songs_to_strip<-NULL
-for (n in 1:100){
+for (n in 1:200){
+  print(n)
   song<-count_by_song$artist_song[n]
   gini<-song_conc(song)
   if (gini>0.985){
@@ -194,10 +207,9 @@ print(songs_to_strip)
 
 playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 
-
-
 # save the results
 playlists<-playlists %>% select(-artist_song) # remove before saving. much smaller file
 
 save(playlists,file="playlists.Rdata")
 write_csv(playlists,path="playlists.csv")
+
