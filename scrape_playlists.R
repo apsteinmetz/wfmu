@@ -59,6 +59,7 @@ getShowNames<-function(DJURLs) {
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"-","")
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylist|(R|r)ecent","")
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"WFMU|wfmu","")
+  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"The ","")
   DJKey$ShowName<-str_trim(DJKey$ShowName)
   
 

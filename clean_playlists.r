@@ -170,7 +170,9 @@ print(songs_to_strip)
 # test for song/DJ concentration.  If the Gini is over 0.990, just one DJ has overwhelmingly played it.  If it
 #is in the top 50 ranking of songs over all, I strip it out.
 
-TOLERANCE <- 0.987 #how aggressive should we be in scrubbing artists with lopsided appeal?
+#how aggressive should we be in scrubbing artists with lopsided appeal?
+#Setting TOLERANCE to 1.000 would only filter songs with exactly one DJ accounting for all plays.
+TOLERANCE <- 0.987 
 NUM_DJS<- length(unique(playlists$DJ))
 
 song_conc<-function(song){

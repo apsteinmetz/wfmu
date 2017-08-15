@@ -32,8 +32,10 @@ library(cluster)
 library(vegan) #similarity measures
 library(Matrix)
 library(knitr)
+library(arcdiagram)
+library(circlize)
+library(RColorBrewer)
 
-source('arcdiagram.r')
 load("playlists.rdata")
 load('djkey.rdata')
 DJKey$DJ<-as.character(DJKey$DJ)
@@ -855,7 +857,7 @@ print(songs_in_common(dj1,dj2))
 
 
 ```
-I've already exhausted your tolerance for this naval gazing but I'll end it with one more chart. Let's visualize Bill Kelly affinity universe with an arc graph.  The width of the arcs is proportional to the similiary among DJs. I selected the 10 DJ's with the most similarity.  Dave the Spazz is the center of this garage rock universe!
+I've already exhausted your tolerance for this naval gazing but I'll end it with one more chart. Let's visualize Bill Kelly affinity universe with a "chord" graph.  The width of the chords is proportional to the similiary among DJs. I selected the 10 DJ's with the most similarity.  Dave the Spazz is the center of this garage rock universe!
 
 ```{r}
 djCorpus_subset<-tm_filter(djCorpus, FUN = function(x) meta(x)[["DJ"]] %in% c(similar_DJS,dj1))
@@ -879,8 +881,24 @@ edges1 = get.edgelist(graph_artists1)
 w1 = E(graph_artists1)$weight
 lwds = w1/20000
 
-# arc-diagram
-arcDiagram(edges1, lwd=lwds, cex=0.8, mar=c(7,1,4,1))
-title("Selected DJ Associations", cex.main=0.9)
+# # arc-diagram
+# arcDiagram(edges1, lwd=lwds, cex=0.8, mar=c(7,1,4,1))
+# arcplot(edges1, lwd.arcs=lwds, cex.nodes = 0.8, mar=c(7,1,4,1))
+# title("Selected DJ Associations", cex.main=0.9)
+
+
+#chord diagrams
+cdf<-bind_cols(as_data_frame(edges1),value=lwds)
+#reorder columns gets a better appearance
+cdf<- cdf %>% select(V2,V1,value)
+#make show names compact
+cdf$V2<-str_replace_all(cdf$V2,"[^A-Z^a-z^ ^0-9]","")
+cdf$V1<-str_replace_all(cdf$V1,"[^A-Z^a-z^ ^0-9]","")
+cdf<-cdf %>% lapply(str_replace_all,"The ","") %>% bind_rows
+cdf<-cdf %>% lapply(str_trim) %>% bind_rows
+cdf<-cdf %>% lapply(str_replace_all," ",'\n') %>% bind_rows
+cdf$value <- as.numeric(cdf$value)
+colset<-RColorBrewer::brewer.pal(11,'Paired')
+chordDiagram(cdf,annotationTrack = c('grid','name'),grid.col = colset)
 ```
 
