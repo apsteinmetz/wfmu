@@ -168,7 +168,7 @@ print(songs_to_strip)
 #Songs where only one DJ plays it - over and over even though it might not be a signature song
 #distort the analysis.  I use the Gini coefficent (used for measuring income inequality) to
 # test for song/DJ concentration.  If the Gini is over 0.990, just one DJ has overwhelmingly played it.  If it
-#is in the top 50 ranking of songs over all, I strip it out.
+#is also in the top 200 ranking of songs over all, I strip it out.
 
 #how aggressive should we be in scrubbing artists with lopsided appeal?
 #Setting TOLERANCE to 1.000 would only filter songs with exactly one DJ accounting for all plays.

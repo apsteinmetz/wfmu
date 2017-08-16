@@ -38,59 +38,43 @@ load("playlists.rdata")
 load('djkey.rdata')
 DJKey$DJ<-as.character(DJKey$DJ)
 ```
-Ken: On the Top Ten by year and in a few other places I see things that are parts of theme songs or that kind of thing.. like Steve Martin "Under the Bamboo Tree" which is part of Frank OToole's into song/collage. 
+**Ken:** On the Top Ten by year and in a few other places I see things that are parts of theme songs or that kind of thing.. like Steve Martin "Under the Bamboo Tree" which is part of Frank OToole's into song/collage. 
 
-Art: As I noted I tried to catch these but have undoubtedly missed some.  Where you see specific song's that distorts results you would like to see deleted, let me know.
+**Art:** As I noted I tried to catch these but have undoubtedly missed some.  Where you see specific song's that distorts results you would like to see deleted, let me know.
 
-Frank's a weird case but his intro song does introduce distortions.  Let's strip out ALL of Frank's first plays because the same song is listed so many different ways. He does play a lot of Beach Boys, intro and otherwise.
+Frank's a weird case but his intro song does introduce distortions.  I've tightened up the criteria to filter out songs that are overwhelmingly played by just one DJ, whether or not it is an intro song.  But we have to be careful since at some point we start to lose good information as we get more aggressive in stripping songs. 
+
+**Ken:** I would love to see a simple ranking of the most played songs. 
+
+**Art:** Given the problem with single-DJ distortions I've made two playlist data sets.  Unfiltered and filtered. Here is the unfiltered top song list
 ```{r}
-#careful.  every time you run this is will strip out the first song from each airdate,
-#creating a new first song.  Eventually, there will be nothing left.
+playlists_full <- playlists_full %>% 
+  mutate(artist_song=paste(ArtistToken,Title))
 
-frank<-playlists %>% filter(DJ=="FX") #only frank
-playlists<-playlists %>% filter(DJ!="FX") #frank is gone
-songs_to_strip<-frank %>% 
-  group_by(AirDate) %>% 
-  summarize(first_song=first(Title)) %>%
-  group_by(first_song) %>% 
-  summarize(count=n()) %>% 
-  pull(first_song)
+count_by_song_full<- playlists_full %>% 
+  group_by(artist_song) %>% 
+  summarise(play_count=n()) %>% 
+  arrange(desc(play_count)) %>% 
+  top_n(100)
 
-frank<-frank %>% filter(!(Title %in% songs_to_strip))
-playlists<-playlists %>% bind_rows(frank) #frank is back
+kable(count_by_song_full)
 ```
-Ken: Could I see the DJ Similarity Clusters in a larger format so I can see what's going on better? It's hard to read the two letter codes and the band names. 
-
-Art: Let's try tabular format for now.
-```{r}
-
-```
-
-Ken: I would love to see a simple ranking of the most played songs. 
-
-```{r}
+Here is the list with opening/closing themes and just plain obsessive plays stripped out.
+```{r, message=FALSE}
 playlists <- playlists %>% 
   mutate(artist_song=paste(ArtistToken,Title))
 
 count_by_song<- playlists %>% 
   group_by(artist_song) %>% 
   summarise(play_count=n()) %>% 
-  arrange(desc(play_count))
-
-top_100 <- count_by_song %>% 
-  top_n(100)
-
-top_100_last5<- playlists %>% 
-  filter(AirDate>Sys.Date()-(365*5)) %>% 
-  group_by(artist_song) %>% 
-  summarise(play_count=n()) %>% 
   arrange(desc(play_count)) %>% 
   top_n(100)
 
-top_100
+kable(count_by_song)
 ```
 
-Art: Hocus Pocus by Focus.  Another problem arises. A single DJ really pushes this song to the top. This begs the question: Is the top song list just a representation of single DJ's passion for a particular song?  Are the tastes of DJs so diverse that no single song is widely played?
+
+**Art:** "Hocus Pocus" by Focus. A single DJ really pushes this song to the top. This begs the question: Is the top song list just a representation of single DJ's passion for a particular song?  Are the tastes of DJs so diverse that no single song is widely played?
 
 Here is the play count for Hocus Pocus by DJ.
 
@@ -99,47 +83,76 @@ playlists %>%
   filter(artist_song=="Focus Hocus Pocus") %>% 
   group_by(DJ) %>% 
   summarise(count=n()) %>% 
-  arrange(desc(count))
+  arrange(desc(count)) %>% 
+  kable()
 ```
-So, should it be in the top 100?  Back in the cleaning stage I used a play concentration measure to strip out songs that were overwhelmingly played by just one DJ.  Maybe we need to loosen the criterion a smidge.  Let's move it from 0.990 to 0.985
-```{r}
-songs_to_strip<-NULL
-for (n in 1:100){
-  song<-count_by_song$artist_song[n]
-  gini<-song_conc(song)
-  if (gini>0.985){
-    songs_to_strip<-c(songs_to_strip,song)
-  }
-}
-playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
+So, should it be in the top 100? Again, the more aggressive we are in filtering, the information we potentially give up.
 
-```
-Let's do the list again.
-```{r}
-count_by_song<- playlists %>% 
-  group_by(artist_song) %>% 
-  summarise(play_count=n()) %>% 
-  arrange(desc(play_count))
-
-top_100 <- count_by_song %>% 
-  top_n(100)
-
-top_100_last5<- playlists %>% 
-  filter(AirDate>Sys.Date()-(365*5)) %>% 
-  group_by(artist_song) %>% 
-  summarise(play_count=n()) %>% 
-  arrange(desc(play_count)) %>% 
-  top_n(100)
-
-top_100
-
-```
-Now let's look at the new top song.  There is DJ concentration but the DJ who plays the song the most accounts for less than half the total plays.
+Now let's look at the #2 song, Wanda Jackson, "Funnel Of Love."  There is DJ concentration but the DJ who plays the song the most accounts for less than half the total plays.
 
 ```{r}
 playlists %>% 
   filter(artist_song=="WandaJackson Funnel Of Love") %>% 
   group_by(DJ) %>% 
   summarise(count=n()) %>% 
-  arrange(desc(count))
+  arrange(desc(count)) %>% 
+  kable()
+```
+**Ken:** Could I see the DJ Similarity Clusters in a larger format so I can see what's going on better? It's hard to read the two letter codes and the band names. 
+
+**Art:** As I said in the original analysis, the cluster technique doesn't tell us a whole lot.  No obvious groupings emerge.  That said, I redid it with 4 clusters and it makes a bit more sense.  Let's try tabular format for now.
+```{r}
+#cluster plot of DJs
+set.seed(1)
+CLUSTERS=4
+  kdj<-kmeans(j,CLUSTERS)
+  clust<-kdj$cluster
+
+gg<-autoplot(kdj,data=j,label=TRUE,frame=TRUE,frame.type='norm')
+gg<-gg+labs(title="DJ Similarity Clusters") 
+gg<-gg + theme_minimal()+theme(legend.position="none")
+gg
+```
+Here are the DJs in each cluster.
+```{r}
+clust_table<-kdj$cluster %>% 
+  tidy() %>%
+  select(Cluster=x,DJ=names)  %>% 
+  arrange(Cluster)
+
+kable(clust_table)
+```
+Here are the top 25 artists in each cluster.  It is possible for an artist to be popular in more than one cluster.
+```{r, message=FALSE}
+count_by_artist<-NULL
+
+for (n in 1:CLUSTERS){
+  top_artists<-clust_table %>% 
+  filter(Cluster==n) %>% 
+  select(DJ) %>% 
+  left_join(playlists) %>% 
+  group_by(ArtistToken) %>% 
+  summarise(play_count=n()) %>% 
+  arrange(desc(play_count)) %>% 
+  top_n(25) %>% 
+  mutate(Cluster=n) %>% 
+  select(Cluster,ArtistToken,play_count)
+  count_by_artist<-bind_rows(count_by_artist,top_artists)
+}
+kable(count_by_artist)
+```
+
+Not one of your questions but I made a better version of the affinity graph, called a "chord" chart.  Again, we're looking at the artist overlap of the DJs most similar to Bill Kelly.  I need to clean up the labels but iit s otherwise sure purty.
+```{r}
+cdf<-bind_cols(as_data_frame(edges1),value=lwds)
+#reorder columns gets a better appearance
+cdf<- cdf %>% select(V2,V1,value)
+cdf$V2<-str_replace_all(cdf$V2,"[^A-Z^a-z^ ^0-9]","")
+cdf$V1<-str_replace_all(cdf$V1,"[^A-Z^a-z^ ^0-9]","")
+cdf<-cdf %>% lapply(str_replace_all,"The ","") %>% bind_rows
+cdf<-cdf %>% lapply(str_trim) %>% bind_rows
+cdf<-cdf %>% lapply(str_replace_all," ",'\n') %>% bind_rows
+cdf$value <- as.numeric(cdf$value)
+colset<-RColorBrewer::brewer.pal(11,'Paired')
+chordDiagram(cdf,annotationTrack = c('grid','name'),grid.col = colset)
 ```
