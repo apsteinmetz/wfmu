@@ -1,5 +1,5 @@
 ---
-title: "A Statistical Examination Playlists WFMU.org: Supplement 1."
+title: "A Statistical Examination of Playlists WFMU.org: Supplement 1."
 output: 
   html_notebook: 
     code_folding: hide
@@ -9,45 +9,35 @@ author: Arthur Steinmetz
 
 ```{r, message=FALSE, warning=FALSE}
 
-
-library(devtools)
-library(ggplot2)
-library(stringr)
-library(tm)
-library(dplyr)
-library(tidyverse)
-library(lubridate)
-library(broom)
-library(ggrepel)
-library("ggplot2")
-library(ggfortify)
-library(cowplot)
-library(xts)
-library("wordcloud")
-library("RColorBrewer")
-#library("SnowballC")
-library(igraph)
-library(cluster)
-# library(reshape2)
-library(vegan) #similarity measures
-library(Matrix)
-library(knitr)
-
-source('arcdiagram.r')
-load("playlists.rdata")
-load('djkey.rdata')
-DJKey$DJ<-as.character(DJKey$DJ)
+# this is a supplement to analyze_playlists.rmd.  The code here will only run successfully
+# if that notebook has been run first.
+```
+This was not one of your questions but I made a better version of the affinity graph, called a "chord" chart.  Again, we're looking at the artist overlap of the DJs most similar to Bill Kelly.  We could start with any DJ. I need to clean up the labels but iit s otherwise sure purty.  In theory, we could do this for all DJs at once but the result would be an unreadable rat's nest.
+```{r}
+cdf<-bind_cols(as_data_frame(edges1),value=lwds)
+#reorder columns gets a better appearance
+cdf<- cdf %>% select(V2,V1,value)
+cdf$V2<-str_replace_all(cdf$V2,"[^A-Z^a-z^ ^0-9]","")
+cdf$V1<-str_replace_all(cdf$V1,"[^A-Z^a-z^ ^0-9]","")
+cdf<-cdf %>% lapply(str_replace_all,"The ","") %>% bind_rows
+cdf<-cdf %>% lapply(str_trim) %>% bind_rows
+cdf<-cdf %>% lapply(str_replace_all," ",'\n') %>% bind_rows
+cdf$value <- as.numeric(cdf$value)
+colset<-RColorBrewer::brewer.pal(11,'Paired')
+chordDiagram(cdf,annotationTrack = c('grid','name'),grid.col = colset)
 ```
 **Ken:** On the Top Ten by year and in a few other places I see things that are parts of theme songs or that kind of thing.. like Steve Martin "Under the Bamboo Tree" which is part of Frank OToole's into song/collage. 
 
-**Art:** As I noted I tried to catch these but have undoubtedly missed some.  Where you see specific song's that distorts results you would like to see deleted, let me know.
+**Art:** As I noted I tried to catch these but have undoubtedly missed some. Frank's a weird case and his intro song does introduce distortions.  I've tightened up the criteria to filter out songs that are overwhelmingly played by just one DJ, whether or not it is an intro song.  But we have to be careful since at some point we start to lose good information as we get more aggressive in stripping songs.
 
-Frank's a weird case but his intro song does introduce distortions.  I've tightened up the criteria to filter out songs that are overwhelmingly played by just one DJ, whether or not it is an intro song.  But we have to be careful since at some point we start to lose good information as we get more aggressive in stripping songs. 
+There are other ways to fudge this.  I am thinking about applying a discount factor to the song count based on the Gini coefficient.  This would avoid erasing the song's existance but would mean the top songs would determined by something other than simple play count.
 
 **Ken:** I would love to see a simple ranking of the most played songs. 
 
-**Art:** Given the problem with single-DJ distortions I've made two playlist data sets.  Unfiltered and filtered. Here is the unfiltered top song list
-```{r}
+**Art:** Given the problem with single-DJ distortions I've made two playlist data sets.  Unfiltered and filtered. If you or your team want to play around with the raw data you can download three versions raw, cleaned and cleaned with filtering.  "playlists.csv" is the filtered one.  [Get them here](https://drive.google.com/open?id=0ByM56hPvHXIYbHVuV29Wekg3SzQ)
+
+Here is the unfiltered top song list.
+```{r, message=FALSE, warning=FALSE}
 playlists_full <- playlists_full %>% 
   mutate(artist_song=paste(ArtistToken,Title))
 
@@ -76,7 +66,7 @@ kable(count_by_song)
 
 **Art:** "Hocus Pocus" by Focus. A single DJ really pushes this song to the top. This begs the question: Is the top song list just a representation of single DJ's passion for a particular song?  Are the tastes of DJs so diverse that no single song is widely played?
 
-Here is the play count for Hocus Pocus by DJ.
+Here is the play count by DJ for "Hocus Pocus."
 
 ```{r}
 playlists %>% 
@@ -86,7 +76,7 @@ playlists %>%
   arrange(desc(count)) %>% 
   kable()
 ```
-So, should it be in the top 100? Again, the more aggressive we are in filtering, the information we potentially give up.
+So, should it be in the top 100? Again, the more aggressive we are in filtering, the more information we potentially give up.
 
 Now let's look at the #2 song, Wanda Jackson, "Funnel Of Love."  There is DJ concentration but the DJ who plays the song the most accounts for less than half the total plays.
 
@@ -110,7 +100,7 @@ CLUSTERS=4
 
 gg<-autoplot(kdj,data=j,label=TRUE,frame=TRUE,frame.type='norm')
 gg<-gg+labs(title="DJ Similarity Clusters") 
-gg<-gg + theme_minimal()+theme(legend.position="none")
+gg<-gg + theme_minimal()
 gg
 ```
 Here are the DJs in each cluster.
@@ -122,7 +112,7 @@ clust_table<-kdj$cluster %>%
 
 kable(clust_table)
 ```
-Here are the top 25 artists in each cluster.  It is possible for an artist to be popular in more than one cluster.
+Can we ascribe some "personality" to each cluster? Here are the top 25 artists in each cluster.  Note that it is possible for an artist to be popular in more than one cluster.
 ```{r, message=FALSE}
 count_by_artist<-NULL
 
@@ -142,17 +132,44 @@ for (n in 1:CLUSTERS){
 kable(count_by_artist)
 ```
 
-Not one of your questions but I made a better version of the affinity graph, called a "chord" chart.  Again, we're looking at the artist overlap of the DJs most similar to Bill Kelly.  I need to clean up the labels but iit s otherwise sure purty.
+There are some DJ that are very close together and hard to read.  My 4-cluster grouping doesn't help you much there.  Again, the number of clusters is arbitrary so let's jack it up to 10 and see who fits in each.
 ```{r}
-cdf<-bind_cols(as_data_frame(edges1),value=lwds)
-#reorder columns gets a better appearance
-cdf<- cdf %>% select(V2,V1,value)
-cdf$V2<-str_replace_all(cdf$V2,"[^A-Z^a-z^ ^0-9]","")
-cdf$V1<-str_replace_all(cdf$V1,"[^A-Z^a-z^ ^0-9]","")
-cdf<-cdf %>% lapply(str_replace_all,"The ","") %>% bind_rows
-cdf<-cdf %>% lapply(str_trim) %>% bind_rows
-cdf<-cdf %>% lapply(str_replace_all," ",'\n') %>% bind_rows
-cdf$value <- as.numeric(cdf$value)
-colset<-RColorBrewer::brewer.pal(11,'Paired')
-chordDiagram(cdf,annotationTrack = c('grid','name'),grid.col = colset)
+#cluster plot of DJs
+set.seed(1)
+CLUSTERS=10
+  kdj<-kmeans(j,CLUSTERS)
+  clust<-kdj$cluster
+
+gg<-autoplot(kdj,data=j,label=TRUE,frame=TRUE,frame.type='norm')
+gg<-gg+labs(title="DJ Similarity Clusters") 
+gg<-gg + theme_minimal()
+gg
 ```
+Here are the DJs in each cluster.
+```{r}
+clust_table<-kdj$cluster %>% 
+  tidy() %>%
+  select(Cluster=x,DJ=names)  %>% 
+  arrange(Cluster)
+
+kable(clust_table)
+```
+So, again using Bill Kelly as the example, he is in cluster 3.  Who else is?
+```{r, message=FALSE, warning=FALSE}
+clust_table %>% 
+  filter(Cluster==3) %>% 
+  select(DJ) %>% 
+  left_join(DJKey) %>% 
+  select(ShowName)
+```
+This basically confirms the analysis we did earlier using a different technique.
+
+Cluster 6 looks about the farthest away from cluster 3 so we might say those DJs are the most unlike the cluster 3 DJs.  Who are they?
+```{r, message=FALSE, warning=FALSE}
+clust_table %>% 
+  filter(Cluster==6) %>% 
+  select(DJ) %>% 
+  left_join(DJKey) %>% 
+  select(ShowName)
+```
+
