@@ -155,7 +155,7 @@ scaleFactor=2
 maxWords = 200
   #most popular artists
   top_artists<-DJKey %>% 
-    #filter(onSched==TRUE) %>% #on Sched or off?
+    #filter(onSched=='YES') %>% #on Sched or off?
     left_join(playlists)%>%
     group_by(ArtistToken)%>%
     #filter(AirDate<Sys.Date()-(365*5)) %>%  #date range?
@@ -182,7 +182,7 @@ scaleFactor=1.3
 maxWords = 200
   #most popular artists
   top_artists<-DJKey %>% 
-    filter(onSched==TRUE) %>% #on Sched or off?
+    filter(onSched=='YES') %>% #on Sched or off?
     left_join(playlists)%>%
     group_by(ArtistToken)%>%
     filter(AirDate<Sys.Date()-(365*5)) %>%  #date range?

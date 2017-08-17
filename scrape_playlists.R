@@ -52,8 +52,8 @@ getShowNames<-function(DJURLs) {
     print(showName)
   }
   # now identifty those DJs which are currently ON MIC
-  DJKey$onSched <- TRUE
-  DJKey$onSched[which(DJKey$DJ %in% getDJsOffSched())]<-FALSE
+  DJKey$onSched <- 'YES'
+  DJKey$onSched[which(DJKey$DJ %in% getDJsOffSched())]<-'NO'
   #strip "WFMU" and "Playlists and Archives" and some punctuation
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylists (and|&) (A|a)rchives","")
   DJKey$ShowName<-str_replace_all(DJKey$ShowName,"-","")
