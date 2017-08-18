@@ -380,7 +380,6 @@ for (dj in djList) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
     rowid_to_column() %>% 
-    filter(rowid>51) %>% 
     select(playlistURL)
   for (n in 1:nrow(plURLs)){
     plURL<-plURLs[n,1]
@@ -394,3 +393,8 @@ for (dj in djList) {
 }
 
 bad_Tables<-anti_join(tibble(DJ=djList),testPL)
+
+playlists_raw<-playlists_raw %>% 
+  distinct() %>% 
+  filter(Artist != Title) #single column span across table.  Not a song.
+save(playlists_raw,file="playlists_raw.Rdata")

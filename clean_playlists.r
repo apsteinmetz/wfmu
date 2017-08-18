@@ -11,9 +11,7 @@ load("djkey.Rdata")
 
 #Clean up inconsistant artist names
 
-playlists<-playlists_raw %>% 
-  distinct() %>% 
-  filter(Artist != Title) #single column span across table.  Not a song.
+playlists<-playlists_raw
 
 #filter out squirrelly dates
 #only Diane "Kamikaze" has archived playlists stretching back to the '80s.  Yay, Diane!

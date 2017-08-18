@@ -1,0 +1,23 @@
+---
+title: "WFMU Supplement2"
+output: html_notebook
+---
+ 
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(readr)
+
+playlists_WA <- playlists_full %>% 
+  filter(DJ=="WA")
+
+songs_WA<-playlists_WA %>% 
+  mutate(artist_song=paste(ArtistToken,Title)) %>% 
+  group_by(artist_song) %>% 
+  summarise(count=n()) %>% 
+  arrange(desc(count)) %>% 
+  separate(artist_song,into=c("artist","title"))
+
+write_csv(songs_WA,path="songs_wa.csv")
+```
