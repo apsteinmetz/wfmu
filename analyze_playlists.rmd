@@ -32,7 +32,6 @@ library(cluster)
 library(vegan) #similarity measures
 library(Matrix)
 library(knitr)
-library(arcdiagram)
 library(circlize)
 library(RColorBrewer)
 
@@ -888,7 +887,7 @@ lwds = w1/20000
 
 
 #chord diagrams
-cdf<-bind_cols(as_data_frame(edges1),value=lwds)
+cdf<-bind_cols(as_tibble(edges1),value=lwds)
 #reorder columns gets a better appearance
 cdf<- cdf %>% select(V2,V1,value)
 #make show names compact
