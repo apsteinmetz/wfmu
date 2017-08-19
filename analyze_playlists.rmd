@@ -775,7 +775,7 @@ dj_similarity_tidy<-dj_similarity%>%
 save(dj_similarity_tidy,file='djsimilarity.rdata')
 
 dj1<-"TW"
-similar_DJS<-DJ_similarity %>% 
+similar_DJS<-dj_similarity_tidy %>% 
   filter(DJ1==dj1) %>% 
   arrange(desc(Similarity)) %>% 
   top_n(10) %>% pull(DJ2)
