@@ -630,26 +630,16 @@ songs_in_common<-function(Djs){
   )
 }
 #-----------------------------------------------------------
-getSimilarity<-function(djdtm=djdtm){
-  m2<-as.matrix(sign(djdtm))
-  # get similarity
-  j<-vegdist(m2,method="bray") %>% as.matrix()
-  j<-1-j
-  #j<-jaccard(m2)
-  
-  save(j,file="djSimilarity.RData")
-  return(j)
-}
-#-----------------------------------------------------------
 
-
-# get similarity index matrix using Jaccard
-j<-getSimilarity(djdtm)
+dj_similarity<-djdtm %>%
+  as.matrix() %>% 
+  vegdist(method="bray") %>% 
+  as.matrix()
 
 #cluster plot of DJs
 set.seed(1)
 CLUSTERS=4
-  kdj<-kmeans(j,CLUSTERS)
+  kdj<-kmeans(dj_similarity,CLUSTERS)
   clust<-kdj$cluster
   #djCluster<-cbind(DJ=names(clust),data.frame(cluster=clust))
   
@@ -760,7 +750,7 @@ ggdraw()+gg1+gg2+gg3+gg4+draw_plot(gg)
 
 Sometimes, when using principal components analysis, we can ascribe clear meanings to the dimensions.  In this case it's not so clear. This shows that the DJs are not very tied to certain genres.  Looking at the artists, we might say that higher values of PC2 are associated with old-school classic rock that tilts towards R&B.  The other end of the dimension is "not that."  PC1 is even harder to interpret.  I'd say lower values are associated with alternative rock but that is iffy.  PC1, whatever it is, is the stronger determinant.  It accounts for 33% of the variance among DJs, while PC2 accounts for 14%.
 ```{r}
-prcomp(j) %>% 
+prcomp(dj_similarity) %>% 
   summary() %>%
   .$importance %>% 
   as.data.frame() %>% 
@@ -773,10 +763,7 @@ prcomp(j) %>%
 Finally, let's look at similarities among specific DJ's. I listen religiously to Bill Kelly.  When I started this project, I was looking to anwser the question "what DJ's are most similar to Bill?" As this project shows, there is generally little overlap among DJ's and I know it's a point of pride at WFMU.  Still, let's answer the ur-question shall we?  Here are the shows most similar to "Teenage Wasteland."  Similarity is defined as an index of common artists defined by the "Bray" similarity measure.
 
 ```{r, message=FALSE}
-DJ_similarity<-djdtm %>%
-  as.matrix() %>% 
-  vegdist(method="bray") %>% 
-  as.matrix() %>% 
+dj_similarity_tidy<-dj_similarity%>% 
   as.data.frame() %>% 
   mutate(DJ1=rownames(.)) %>% 
   as_tibble() %>% 
@@ -785,6 +772,7 @@ DJ_similarity<-djdtm %>%
   filter(DJ1 != DJ2) %>%  #remove diagonals
   group_by(DJ1) %>% 
   arrange(desc(Similarity))
+save(dj_similarity_tidy,file='djsimilarity.rdata')
 
 dj1<-"TW"
 similar_DJS<-DJ_similarity %>% 
