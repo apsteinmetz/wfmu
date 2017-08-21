@@ -213,3 +213,10 @@ playlists<-playlists %>% select(-artist_song) # remove before saving. much small
 save(playlists,file="playlists.Rdata")
 write_csv(playlists,path="playlists.csv")
 
+#get a better show count tally
+show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise()%>% summarise(showCount=n())
+DJKey<-DJKey %>% select(-showCount) %>% left_join(show_count)
+save(DJKey,file="DJKey.RData")
+
+
+
