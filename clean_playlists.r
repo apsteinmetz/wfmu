@@ -98,7 +98,7 @@ playlists$ArtistToken<-apply(t,MARGIN=1,FUN=paste,collapse="")
 playlists<- playlists %>%   
   mutate(ArtistToken=replace(ArtistToken,
                              str_detect(ArtistToken,'BruceSp'),
-                             "springsteen"))
+                             "Springsteen"))
 
 #Code below used for unique list of artists. Not used here.
 #now that tokens are created extract unique ones for each dj so mulitples don't occur
