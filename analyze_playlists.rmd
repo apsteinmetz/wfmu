@@ -877,7 +877,7 @@ lwds = w1/20000
 #chord diagrams
 cdf<-bind_cols(as_tibble(edges1),value=lwds)
 #reorder columns gets a better appearance
-cdf<- cdf %>% select(V2,V1,value)
+#cdf<- cdf %>% select(V2,V1,value)
 #make show names compact
 cdf$V2<-str_replace_all(cdf$V2,"[^A-Z^a-z^ ^0-9]","")
 cdf$V1<-str_replace_all(cdf$V1,"[^A-Z^a-z^ ^0-9]","")

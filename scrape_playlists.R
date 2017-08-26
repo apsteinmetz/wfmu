@@ -67,37 +67,55 @@ getShowNames<-function(DJURLs) {
   #save(DJKey,file="DJKey.RData")
 }
 
+# -------------get the URLs of the playlist pages for a DJ ----------
+#should work to delve into earlier years
+get_playlist_page_URLs<-function(dj) {
+  latest_url<-paste0("/playlists/",dj)
+  singleDJ<- read_html(paste0("http://wfmu.org",url_suffix))
+  pl_url<-singleDJ %>%
+    html_nodes(xpath=paste0("//a[contains(@href,'playlists/",dj,"')]")) %>%
+    html_attr("href")
+  pl_url<-c(latest_url,pl_url) %>% unique()
+  
+return(pl_url)
+}
+
 # #---------------------------------------------------
 # get the URLs of the playlists for a DJ
 getDJPlaylistURLs<-function(music_djs) {
-  allDJPlayLists = NULL
+  DJ_playlists = NULL
   dudList<-NULL
   #DJKey = data.frame()
   for (dj in music_djs) {
-    singleDJ<- read_html(paste("http://wfmu.org/playlists/",dj,sep=''))
-    #singleDJ<- read_html("http://wfmu.org/playlists/HN")
-    pl<-singleDJ%>%
+    print(dj)
+    url_suffixes<-get_playlist_page_URLs(dj)
+    for (u in url_suffixes){
+      print(u)
+      singleDJ<- read_html(paste0("http://wfmu.org",u))
+      #singleDJ<- read_html("http://wfmu.org/playlists/HN")
+      pl<-singleDJ%>%
         html_nodes(xpath="//a[contains(@href,'playlists/shows')]") %>%
         html_attr("href")
-    #format for newer shows
-    pl<-as.character(na.omit(pl[str_detect(pl,"playlists/shows")]))
-    # format for older shows
-    if (length(pl)<1) pl<-as.character(na.omit(pl[str_detect(pl,"Playlist")]))
-    
-    #assume a full URL is a fill-in DJ.  We omit these from the analysis
-    pl<-pl[!str_detect(pl,"http")]
-    
-    playlistURL<-pl %>% as.character()
-    print(dj)
-    #omit shows without valid playlists.  Talk shows?
-    if (length(playlistURL)>0) {
-      allDJPlayLists = bind_rows(allDJPlayLists, data_frame(DJ=dj,playlistURL = playlistURL))
-    } else { 
-      print("DUD")
-      dudList<-c(dudList,dj) }
+      #format for newer shows
+      pl<-as.character(na.omit(pl[str_detect(pl,"playlists/shows")]))
+      # format for older shows
+      if (length(pl)<1) pl<-as.character(na.omit(pl[str_detect(pl,"Playlist")]))
+      
+      #assume a full URL is a fill-in DJ.  We omit these from the analysis
+      pl<-pl[!str_detect(pl,"http")]
+      
+      playlistURL<-pl %>% as.character()
+      #omit shows without valid playlists.  Talk shows?
+      if (length(playlistURL)>0) {
+        DJ_playlists = bind_rows(DJ_playlists, data_frame(DJ=dj,playlistURL = playlistURL))
+      } else { 
+        print("DUD")
+        dudList<-c(dudList,dj) }
+      
+    }
   }  
   
-  return(allDJPlayLists)
+  return(DJ_playlists)
 }
 
 #-------------------------------------------------
