@@ -304,17 +304,19 @@ get_playlist <- function(plURL, dj) {
             break
           }
         }
-        if (n == nrow(pl_table)) {
-          plraw<-NULL
-          #try idiosyncratic djs
-          if (dj=="TW") plraw<-try_BK(wholepage)
-          if (dj=="HN") plraw<-try_HN(wholepage)
-          if (is.null(plraw)) print("DUD. Can't find header")
-          #final dead end
-        }
       }
     }
   }
+      
+# SPECIAL DJ TREATMENT
+  if (is.null(plraw)){
+    #try idiosyncratic djs
+    if (dj=="TW") plraw<-try_BK(wholepage)
+    if (dj=="HN") plraw<-try_HN(wholepage)
+    if (is.null(plraw)) print("DUD. Can't find header")
+    #final dead end
+    }
+    
   plraw<-fixHeaders(plraw)
   # final clean up if we have something
   if (is.null(plraw)) {
@@ -401,7 +403,9 @@ djList <- DJKey %>%
   filter(showCount > numShows, !(DJ %in% excludeDJs)) %>%
   pull(DJ)
 
-playlists_raw = data_frame()
+#careful not to trash intermediate results!
+#playlists_raw = data_frame()
+
 for (dj in djList) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
@@ -421,7 +425,9 @@ for (dj in djList) {
 bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw)
 
 playlists_raw<-playlists_raw %>% 
-  distinct() %>% 
-  filter(Artist != Title) #single column span across table.  Not a song.
+  filter(Artist != Title) %>% #single column span across table.  Not a song.
+  distinct()
+
 save(playlists_raw,file="playlists_raw.Rdata")
+
 
