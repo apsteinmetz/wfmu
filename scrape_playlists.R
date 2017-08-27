@@ -353,6 +353,7 @@ testgetPlaylist <- function(plURL, dj) {
 #-------------- MAIN -----------------
 DJURLs<-getDJURLs()
 DJKey<-getShowNames(DJURLs)
+save(DJKey,file="DJKey.RData")
 #load(file='djkey.rdata')
 
 excludeDJs <-
@@ -421,3 +422,4 @@ playlists_raw<-playlists_raw %>%
   distinct() %>% 
   filter(Artist != Title) #single column span across table.  Not a song.
 save(playlists_raw,file="playlists_raw.Rdata")
+

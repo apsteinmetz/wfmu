@@ -98,7 +98,7 @@ playlists$ArtistToken<-apply(t,MARGIN=1,FUN=paste,collapse="")
 playlists<- playlists %>%   
   mutate(ArtistToken=replace(ArtistToken,
                              str_detect(ArtistToken,'BruceSp'),
-                             "springsteen"))
+                             "Springsteen"))
 
 #Code below used for unique list of artists. Not used here.
 #now that tokens are created extract unique ones for each dj so mulitples don't occur
@@ -212,4 +212,11 @@ playlists<-playlists %>% select(-artist_song) # remove before saving. much small
 
 save(playlists,file="playlists.Rdata")
 write_csv(playlists,path="playlists.csv")
+
+#get a better show count tally
+show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise()%>% summarise(showCount=n())
+DJKey<-DJKey %>% select(-showCount) %>% left_join(show_count)
+save(DJKey,file="DJKey.RData")
+
+
 
