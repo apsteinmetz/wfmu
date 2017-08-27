@@ -69,9 +69,16 @@ getShowNames<-function(DJURLs) {
 
 # -------------get the URLs of the playlist pages for a DJ ----------
 #should work to delve into earlier years
-get_playlist_page_URLs<-function(dj) {
-  latest_url<-paste0("/playlists/",dj)
+get_playlist_page_URLs<-function(url_suffix) {
+  #first call should be the base DJ page with links to any earlier year playlist lists
+  if (str_length(url_suffix)==2){
+    dj<-url_suffix
+    latest_url<-paste0("/playlists/",url_suffix)
+    url_suffix<-latest_url
+  }
   singleDJ<- read_html(paste0("http://wfmu.org",url_suffix))
+  #this assumes the earlier year playlist links are of the form
+  # wfmu.org/playlists/<dj><year>/
   pl_url<-singleDJ %>%
     html_nodes(xpath=paste0("//a[contains(@href,'playlists/",dj,"')]")) %>%
     html_attr("href")
@@ -92,7 +99,6 @@ getDJPlaylistURLs<-function(music_djs) {
     for (u in url_suffixes){
       print(u)
       singleDJ<- read_html(paste0("http://wfmu.org",u))
-      #singleDJ<- read_html("http://wfmu.org/playlists/HN")
       pl<-singleDJ%>%
         html_nodes(xpath="//a[contains(@href,'playlists/shows')]") %>%
         html_attr("href")
