@@ -235,7 +235,7 @@ fixHeaders <- function(pl) {
 #--------------------------------------------------------------------
 testgetPlaylist <- function(plURL, dj) {
   
-  wholepage <- read_html(paste(ROOT_URL, plURL, sep = ''))
+  wholepage <- read_html(paste0(ROOT_URL, plURL))
   #try to pull out the show date.  assume first date in text on page is the show date
   airDate <- wholepage %>%
     html_text() %>%
@@ -397,9 +397,8 @@ numShows <- 50
 djList <- DJKey %>% 
   filter(showCount > numShows, !(DJ %in% excludeDJs)) %>%
   pull(DJ)
-#djList<-filter(DJKey,showCount>numShows-1) %>%select(DJ) %>% .[,1]
 
-#playlists_raw = data_frame()
+playlists_raw = data_frame()
 for (dj in djList) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
