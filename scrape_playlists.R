@@ -233,7 +233,7 @@ fixHeaders <- function(pl) {
 }
 
 #--------------------------------------------------------------------
-testgetPlaylist <- function(plURL, dj) {
+get_playlist <- function(plURL, dj) {
   
   wholepage <- read_html(paste0(ROOT_URL, plURL))
   #try to pull out the show date.  assume first date in text on page is the show date
@@ -289,7 +289,8 @@ testgetPlaylist <- function(plURL, dj) {
     # no song class, now what? is it a table? try to  find header
     #seems like cellspacing means its a row column thing
     pl_table<-wholepage %>% html_node(xpath = "//table[@cellspacing and @cellpadding]")
-    if (length(pl_table)>2) {
+    num_rows<-pl_table %>% html_nodes("tr") %>% length()
+    if (num_rows>2) {
       pl_table<-html_table(pl_table,fill = TRUE)
       if (any(names(pl_table) %in% altHeaderNames)) {
         plraw<-pl_table
@@ -392,7 +393,8 @@ showCounts<-playlistURLs %>%
   summarise(showCount=n()) %>% 
   arrange(desc(showCount))
 DJKey<-left_join(DJKey,showCounts)
-#limit analysis to DJs with at least numShows shows and take the last numshows shows.
+#limit analysis to DJs with at least numShows shows.
+# This also excludes DJs where we couldn't extract valid playlist URLs.
 numShows <- 50
 # non-music shows
 djList <- DJKey %>% 
@@ -409,14 +411,14 @@ for (dj in djList) {
     plURL<-plURLs[n,1]
     print(paste(dj, n, plURL,Sys.time()))
     if (!is.na(pull(plURLs[1,1]))){
-      playlists_raw <- bind_rows(playlists_raw, testgetPlaylist(plURL, dj))
+      playlists_raw <- bind_rows(playlists_raw, get_playlist(plURL, dj))
     }
   }
   #save to disk after each dj
   save(playlists_raw,file="playlists_raw.Rdata")
 }
 
-bad_Tables<-anti_join(tibble(DJ=djList),testPL)
+bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw)
 
 playlists_raw<-playlists_raw %>% 
   distinct() %>% 
