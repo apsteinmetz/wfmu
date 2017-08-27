@@ -6,8 +6,8 @@ library(xts)
 
 #clean up raw playlists
 
-load("playlists_raw.Rdata")
-load("djkey.Rdata")
+#load("playlists_raw.Rdata")
+#load("djkey.Rdata")
 
 #Clean up inconsistant artist names
 
@@ -193,6 +193,7 @@ count_by_song<-playlists %>%
   summarise(Song_Count=n()) %>% 
   arrange(desc(Song_Count))
 
+print('Computing DJ concentration of most-played songs')
 songs_to_strip<-NULL
 for (n in 1:200){
   print(n)
@@ -203,6 +204,7 @@ for (n in 1:200){
   }
   
 }
+print("Stripping")
 print(songs_to_strip)
 
 playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
