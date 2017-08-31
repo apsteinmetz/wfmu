@@ -221,4 +221,25 @@ DJKey<-DJKey %>% select(-showCount) %>% left_join(show_count)
 save(DJKey,file="DJKey.RData")
 
 
+#use artisttoken to select the most common version of the artist name and make that the token.
+playlists<-playlists %>% 
+  ungroup() %>% 
+  select(ArtistToken,Artist) %>% 
+  group_by(ArtistToken,Artist) %>% 
+  summarise(n=n()) %>% 
+  top_n(1) %>% rename(base_artist=Artist) %>% 
+  right_join(playlists,by='ArtistToken') %>%
+  ungroup() %>% 
+  select(-ArtistToken,-n) %>% 
+  rename(ArtistToken=base_artist)
 
+
+#test section
+#clean it again
+#get rid of punctution
+
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"[^A-Z^a-z^ ^0-9]","")
+#and leading "the"
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^The "," ")
+# strip leading/trailing whitespace
+playlists$ArtistToken<-str_trim(playlists$ArtistToken)

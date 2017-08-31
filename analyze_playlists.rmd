@@ -653,7 +653,7 @@ CLUSTERS=4
 # traditional way.  I like ggplot2 better
 # clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
     
-gg<-autoplot(kdj,data=j,label=TRUE,frame=TRUE,frame.type='norm')
+gg<-autoplot(kdj,data=dj_similarity,label=TRUE,frame=TRUE,frame.type='norm')
 gg<-gg+labs(title="DJ Similarity Clusters") 
 gg<-gg + theme_minimal()+theme(legend.position="none")
 gg
@@ -737,7 +737,7 @@ quadrant_wl<-function(gg,DJs,plot_quadrant=c("n","e","s","w")){
   return (gg)
   
 }
-gg<-autoplot(kdj,data=j,label=FALSE,frame=TRUE,frame.type='norm')
+gg<-autoplot(kdj,data=dj_similarity,label=FALSE,frame=TRUE,frame.type='norm')
 gg<-gg+labs(title="DJ Similarity Clusters") 
 gg<-gg + theme_minimal()+theme(legend.position="none")
 gg$layers[[1]]=NULL #this only works the first time invoked
@@ -748,7 +748,7 @@ gg4<-quadrant_wc(bottom_pc1_DJs,'w')
 ggdraw()+gg1+gg2+gg3+gg4+draw_plot(gg)
 ```
 
-Sometimes, when using principal components analysis, we can ascribe clear meanings to the dimensions.  In this case it's not so clear. This shows that the DJs are not very tied to certain genres.  Looking at the artists, we might say that higher values of PC2 are associated with old-school classic rock that tilts towards R&B.  The other end of the dimension is "not that."  PC1 is even harder to interpret.  I'd say lower values are associated with alternative rock but that is iffy.  PC1, whatever it is, is the stronger determinant.  It accounts for 33% of the variance among DJs, while PC2 accounts for 14%.
+Sometimes, when using principal components analysis, we can ascribe clear meanings to the dimensions.  In this case it's not so clear. This shows that the DJs are not very tied to certain genres.  Looking at the artists, we might say that higher values of PC2 are associated with old-school classic rock that tilts towards R&B.  The other end of the dimension is "not that."  PC1 is even harder to interpret.  I'd say lower values are associated with alternative rock but that is iffy.  PC1, whatever it is, is the stronger determinant.  It accounts for 20% of the variance among DJs, while PC2 accounts for 10%.
 ```{r}
 prcomp(dj_similarity) %>% 
   summary() %>%
@@ -844,8 +844,7 @@ print(songs_in_common(dj1,dj2))
 
 
 ```
-I've already exhausted your tolerance for this naval gazing but I'll end it with one more chart. Let's visualize Bill Kelly affinity universe with a "chord" graph.  The width of the chords is proportional to the similiary among DJs. I selected the 10 DJ's with the most similarity.  Dave the Spazz is the center of this garage rock universe!
-
+I've already exhausted your tolerance for this naval gazing but I'll end it with one more chart. Let's visualize Bill Kelly affinity universe with a "chord" graph.  The width of the chords is proportional to the similiary among DJs. I selected the 10 DJ's with the most similarity. 
 ```{r}
 djCorpus_subset<-tm_filter(djCorpus, FUN = function(x) meta(x)[["DJ"]] %in% c(similar_DJS,dj1))
 # get document-term matrix
