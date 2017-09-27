@@ -249,7 +249,7 @@ get_playlist <- function(plURL, dj) {
       as.Date("%d %B %Y")
     
   }
-  
+  if (airDate < most_recent_date) break()
   plraw <- NULL
   #hand-rolled
   #simplest case. A table with obvious header names
@@ -405,13 +405,29 @@ djList <- DJKey %>%
 
 #careful not to trash intermediate results!
 #playlists_raw = data_frame()
-
+UPDATE_ONLY =TRUE
+if (UPDATE_ONLY) {
+  print(paste("Updating ONLY last",go_back_num,"Shows"))
+  #assume at most 5 shows per week
+  #most shows are 1/week except the morning show
+  most_recent_date<-max(playlists_raw$AirDate)
+  go_back_num<- as.integer(round ((Sys.Date() - most_recent_date) * 5/7))
+  print(paste("Updating ONLY last",go_back_num,"Shows"))
+} else{
+  go_back_num<-as.Date("1900-01-01") #arbitrarily far back so it's not a binding constraint
+}
+  
 for (dj in djList) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
     rowid_to_column() %>% 
     select(playlistURL)
-  for (n in 1:nrow(plURLs)){
+  if (UPDATE_ONLY) {
+    print(paste("Updating ONLY last",go_back_num,"Shows"))
+  } else{
+    go_back_num<-nrow(plURLs)
+  }
+  for (n in 1:go_back_num){
     plURL<-plURLs[n,1]
     print(paste(dj, n, plURL,Sys.time()))
     if (!is.na(pull(plURLs[1,1]))){
