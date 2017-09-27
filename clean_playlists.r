@@ -213,7 +213,6 @@ playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 playlists<-playlists %>% select(-artist_song) # remove before saving. much smaller file
 
 save(playlists,file="playlists.Rdata")
-write_csv(playlists,path="playlists.csv")
 
 #get a better show count tally
 show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise()%>% summarise(showCount=n())
@@ -243,3 +242,5 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"[^A-Z^a-z^ ^0-9]",
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^The "," ")
 # strip leading/trailing whitespace
 playlists$ArtistToken<-str_trim(playlists$ArtistToken)
+save(playlists,file="playlists.Rdata")
+#write_csv(playlists,path="playlists.csv")
