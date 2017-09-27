@@ -249,7 +249,10 @@ get_playlist <- function(plURL, dj) {
       as.Date("%d %B %Y")
     
   }
-  if (airDate < most_recent_date) break()
+  if (airDate < most_recent_date) {
+    print("Back Far Enough")
+    return(NULL)
+  }
   plraw <- NULL
   #hand-rolled
   #simplest case. A table with obvious header names
