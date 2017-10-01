@@ -40,7 +40,7 @@ getDJsOffSched <- function(){
 #---------------------------------------------------
 # get the shownames for a DJ
 getShowNames<-function(DJURLs) {
-  DJKey = data.frame()
+  DJKey <- data.frame()
   for (page in DJURLs) {
     singleDJ<- read_html(page)
     showName <- html_node(singleDJ,"title")%>%html_text()
@@ -249,7 +249,7 @@ get_playlist <- function(plURL, dj) {
       as.Date("%d %B %Y")
     
   }
-  if (airDate < most_recent_date) {
+  if (airDate < most_recent_date-7) {
     print("Back Far Enough")
     return(NULL)
   }
