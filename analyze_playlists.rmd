@@ -609,6 +609,7 @@ SPARSE<- 0.95 #sparsity of term document matrices
 
 # now create Document Term Matrix where DJs are the column
 djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(SPARSE)
+save(djdtm,file="djdtm.RData")
 ```
 
 ```{r, warning=FALSE}
