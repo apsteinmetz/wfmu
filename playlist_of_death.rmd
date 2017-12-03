@@ -3,21 +3,127 @@ title: "Playlist of Death"
 output: html_notebook
 ---
 
-Can we determine musician mortality rates by analysing WFMU playlists?
+Can we determine musician mortality rates by analysing WFMU radio playlists?
 
 
-```{r}
+#Load Required Libraries and Data
+```{r message=FALSE, warning=FALSE}
 library(ggplot2)
 library(stringr)
 library(tidyverse)
 library(lubridate)
 library(knitr)
+library(xts)
 
 load("playlists.rdata")
 ```
+#The Data Set
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+Free form radio, WFMU.ORG, maintains a huge trove of past playlists from many DJ's radio shows.  More recently, web-only programming has been added to this.  This dataset offers lots of opportunities for analysis.  I scraped all the playlists I could from the web site and started asking questions (after I got permission to scrape from station manager, Ken Freedman).  While not qualifying as "big data," the data set is pretty extensive. Let's look as some summary stats.
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+```{r}
+year_count<-playlists %>% 
+  ungroup() %>% 
+  transmute(Year_count=year(AirDate)) %>% 
+  distinct() %>% nrow()
+dj_count<-playlists %>% group_by(DJ) %>% summarise(DJs=n()) %>% nrow #DJs
+show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise(Shows=n()) %>% nrow()
+#Artists
+artist_count<-playlists %>% ungroup() %>% select(ArtistToken) %>% distinct() %>% nrow()
 
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+#songs
+song_count<-playlists %>% ungroup() %>% select(ArtistToken,Title) %>% distinct() %>% nrow()
+
+spins_count<-nrow(playlists) # spins
+
+the_numbers<-data_frame(
+           Count=c(year_count,dj_count,show_count,artist_count,song_count,spins_count),Stat=c("Years","DJs","Shows","Artists","Songs","Spins"))
+
+the_numbers %>% 
+  kable(caption="WFMU Archives by the Numbers",
+        col.names=c('WFMU',' Archives by the Numbers'),
+        format.args = list(big.mark=","))
+```
+
+
+You can see the ultimate result of my work at the [WFMU Playlist Explorer](wfmu.servebeer.com), a fun toy, if I do say so.
+
+#Morbid Thoughts
+
+When playing around with the artist data for "Prince" I noticed a spike in plays around his death.  
+```{r}
+#few playlists before 2002
+cutoff_date<-as.Date("2002-01-01")
+dead_artist_plays<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  filter(ArtistToken=="Prince") %>% 
+  mutate(AirDate=as.yearqtr(AirDate)) %>% 
+  group_by(AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate)
+gg<-dead_artist_plays %>% ggplot(aes(x=AirDate,y=Spins))+geom_col()
+gg<-gg+scale_x_continuous()
+gg<-gg+labs(y="Spins per Quarter",title="Dead Artist Effect: Prince")
+gg
+
+```
+
+WFMU is a "free form" station where DJs play what they like, so this is not a surpise. This got me to thinking, can we use the data set to tell us who died and when?
+
+This is still "small data" in the scheme of things.  Plenty of song plays but not plenty of artists who died and who are popular with the DJs at the station.  So, this won't be an excercise in machine learning as we don't have a robust training set.  Still, as we saw with the Prince data the motality, the spike is quite the outlier.  Maybe we can simply calibrate a number that gives us a high accuracy rate and discover some deaths that don't immediately come to mind.  The recenly departed that immediately pop into my head are Prince, Bowie and Chuck Barry.  How do they look?
+
+
+```{r}
+cutoff_date<-as.Date("2008-01-01")
+dead_artists=c('Bowie','Prince','ChuckBerry')
+
+dead_artist_plays<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  filter(ArtistToken %in% dead_artists) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate)
+gg<-dead_artist_plays %>% ggplot(aes(x=AirDate,y=Spins))
+gg<-gg+geom_col()+facet_wrap(~ArtistToken)
+gg<-gg+scale_x_continuous(breaks=seq(2008,2017,by=2))
+gg<-gg+ggtitle("Dead Artist Effect")
+gg
+```
+
+Yes, I think we are onto something.  The question is what is a suitable filter to determine probable mortality.  Z-score is what I often use to look at anomolous movements in financial markets.  This is the number of standard deviations from the mean. The three artists shown above are (were) superstars so I would guess their spikes were extreme.  I wouldn't expect more obscure artists to be picked up by a wide swath of the DJ population.  Let's expiriment with different screen levels.
+
+First let's bucket all the artist plays by quarter, find the mean number of plays and the z-score.
+
+
+```{r}
+play_count_z<-playlists %>% 
+  ungroup() %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate) %>% 
+  mutate(avg=mean(Spins),sd=sd(Spins)) %>% 
+  filter(!is.na(sd)) %>% 
+  mutate(z_score=(Spins-avg)/sd) %>% 
+  filter(!is.na(z_score))
+
+head(play_count_z)
+```
+
+We have compared the number of spins each quarter to the average spins per quarter and computed the z-score as `(Spins-avg)/sd`.   How do we screen for deaths?  Can we look at the distribution of z-scores to see if they are lumpy beyond some extreme range.  Overall the density of z-scores follows the pattern we would expect.
+
+```{r}
+play_count_z %>% ggplot(aes(z_score))+geom_density()
+```
+
+There is no extreme tail visible.  What z-scores did the artists we showed above show at their extremes?
+
+```{r}
+play_count_z %>% 
+  filter(ArtistToken %in% dead_artists) %>% 
+  group_by(AirDate,ArtistToken) %>% 
+  summarize(death=max(z_score))
+```
