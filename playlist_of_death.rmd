@@ -113,17 +113,21 @@ play_count_z<-playlists %>%
 head(play_count_z)
 ```
 
-We have compared the number of spins each quarter to the average spins per quarter and computed the z-score as `(Spins-avg)/sd`.   How do we screen for deaths?  Can we look at the distribution of z-scores to see if they are lumpy beyond some extreme range.  Overall the density of z-scores follows the pattern we would expect.
-
-```{r}
-play_count_z %>% ggplot(aes(z_score))+geom_density()
-```
-
-There is no extreme tail visible.  What z-scores did the artists we showed above show at their extremes?
+We have compared the number of spins each quarter to the average spins per quarter and computed the z-score as `(Spins-avg)/sd`.   How do we screen for deaths? What z-scores did the artists we showed above show at their extremes?
 
 ```{r}
 play_count_z %>% 
   filter(ArtistToken %in% dead_artists) %>% 
-  group_by(AirDate,ArtistToken) %>% 
-  summarize(death=max(z_score))
+  group_by(ArtistToken) %>% 
+  summarize(z_score=max(z_score)) %>% 
+  left_join(play_count_z)
 ```
+
+So a z-score of seven might be a good screen level
+```{r}
+play_count_z %>% 
+  group_by(ArtistToken) %>% 
+  filter(z_score>6)
+
+```
+
