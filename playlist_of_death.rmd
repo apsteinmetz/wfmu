@@ -14,6 +14,7 @@ library(tidyverse)
 library(lubridate)
 library(knitr)
 library(xts)
+library(tsoutliers)
 
 load("playlists.rdata")
 ```
@@ -129,5 +130,19 @@ play_count_z %>%
   group_by(ArtistToken) %>% 
   filter(z_score>6)
 
+```
+
+Try 'tsouliers' package
+```{r}
+wide_play_count <- play_count_z %>%   
+  ungroup() %>% 
+  filter(AirDate > as.yearqtr(as.Date("2002-01-01"))) %>% 
+  filter(ArtistToken %in% dead_artists) %>% 
+  select(AirDate,ArtistToken,Spins) %>% 
+  spread(ArtistToken,Spins)
+
+ts_play_count<-as.ts(xts(select(wide_play_count,-AirDate),order.by = as.Date(wide_play_count$AirDate)))
+
+wide_play_count[tso0(ts_play_count[,2],types = "AO",cval=10,maxit.iloop = 1,maxit.oloop=1,tsmethod = "arima") %>% .$time,]
 ```
 
