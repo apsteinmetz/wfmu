@@ -124,13 +124,14 @@ play_count_z %>%
   left_join(play_count_z)
 ```
 
-So a z-score of seven might be a good screen level
+So is a z-score of seven a good screen level? How about 6, just to be safe?
 ```{r}
 play_count_z %>% 
   group_by(ArtistToken) %>% 
   filter(z_score>6)
 
 ```
+93? That is too many,me thinks
 
 Try 'tsouliers' package
 ```{r}
