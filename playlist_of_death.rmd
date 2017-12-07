@@ -139,13 +139,21 @@ play_count_z %>%
   filter(ArtistToken %in% dead_artists)
 ```
 
+<<<<<<< HEAD
 So a z-score of 6.5 might be a good screen level.
+=======
+So is a z-score of seven a good screen level? How about 6, just to be safe?
+>>>>>>> cf9258cb6365f142953d53f6ecd82dfc578c7ab7
 ```{r}
 play_count_z %>% 
   filter(z_score>6.5)
 
 ```
+<<<<<<< HEAD
 The weakness in this approach is our threshhold captures a lot of bands/artists where there was no mortality event. ELO, The Dictators, The Clash, etc. The false postive rate is pretty high. Further, the threshold to use for z-scores to use is not obvious. There are no obvious outliers of outliers.
+=======
+93? That is too many,me thinks
+>>>>>>> cf9258cb6365f142953d53f6ecd82dfc578c7ab7
 
 ```{r}
 cutoff_date<-as.Date("2001-01-01")
