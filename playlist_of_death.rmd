@@ -38,7 +38,8 @@ song_count<-playlists %>% ungroup() %>% select(ArtistToken,Title) %>% distinct()
 spins_count<-nrow(playlists) # spins
 
 the_numbers<-data_frame(
-           Count=c(year_count,dj_count,show_count,artist_count,song_count,spins_count),Stat=c("Years","DJs","Shows","Artists","Songs","Spins"))
+           Count=c(year_count,dj_count,show_count,artist_count,song_count,spins_count),
+           Stat=c("Years","DJs","Shows","Artists","Songs","Spins"))
 
 the_numbers %>% 
   kable(caption="WFMU Archives by the Numbers",
@@ -215,3 +216,36 @@ not_dead_artists %>% gg_play_freq_dj(cutoff_date)
 Huzzah!  In every mortality case a diverse group of DJs played the artist and in every not-dead case one DJ amounted to the lion's share of plays.  
 
 The Dictators are a less clear example, showing huge spike by many DJs in the fall of 2007 with no deaths.  This is an example of a new album release spike.  "Every Day is Saturday" is a collection of Dictators rarities officially released in January of 2008.  The 'Tators are a NYC favorite and I assume WFMU got an early copy. These cases are going to slip through our screens and produce false positives.
+
+Let's rebuild and add a feature to our data set that includes the number of DJs who played the artist in any quarter.
+```{r}
+dj_count<-playlists %>% 
+  ungroup() %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate,DJ) %>% 
+  summarise(Spins=n()) %>% 
+  summarise(DJ_count=n())
+
+play_count_z2<- play_count_z %>% 
+  select(ArtistToken,AirDate,z_score) %>% 
+  left_join(dj_count)
+
+head(play_count_z2)
+```
+Now we have to find the right mix of z_score and dj_count that gives us the best trade-off of detected deaths without false positives.  What does the distribution of DJ counts look like at the max z-score points?
+```{r}
+play_count_z2 %>%
+  filter(DJ_count<12) %>% 
+  ggplot(aes(DJ_count))+geom_histogram(bins=12)
+  
+```
+
+There is a sharp break between two and three. Let's make greater than two DJs playing the artist and a z-score above 6 the cuts.  We loosen the z-score criteria and hope that our new DJ count feature will help.
+```{r}
+play_count_z2 %>% filter(z_score>6,DJ_count>2)
+```
+
+We still see, Bjork, ELO and Buddy Holly on this list.  Holly died, of course, but outside of the timeframe of our analysis.  Bobby Womack died but only 5 DJs played him.  Let's try looking at DJ play counts above the average for the artist.
+```{r}
+play_count_z2 %>% filter(z_score>6)
+```
