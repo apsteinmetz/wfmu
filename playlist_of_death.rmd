@@ -100,15 +100,13 @@ dead_artists=c('Bowie','Prince','ChuckBerry','LesleyGore')
 gg_play_freq(dead_artists,cutoff_date)
 ```
 
-Yes, I think we are onto something.  We need to do some outlier detection. The question is what is a suitable filter to determine probable mortality.  One simple way might be to simply look at the play count in a quarter as a multiple of the average and select everything above a certain multiple.
-
-Z-score is what I often use to look at anomalous movements in financial markets.  This is the number of standard deviations from the mean. It is a little superior to the first method as is scales the outline by how much beyond the normal variability it is.
+Yes, I think we are onto something.  We need to do some outlier detection. The question is what is a suitable filter to determine probable mortality.  One simple way might be to simply look at the play count in a quarter as a multiple of the average and select everything above a certain multiple. A better way, Z-score, is what I often use to look at anomalous movements in financial markets.  This is the number of standard deviations from the mean. It is a little superior to the first method as is scales the outline by how much beyond the normal variability it is.
 
 We could use more formal statistical methods of of outlier detection. One might be to use a linear model to detrend the data before looking at a z-score.  The rising number of DJs posting playlists over time means there is trend growth for most artists. Visually,though, we see the spikes in plays are so extreme they reduce the trend to irrelevance.  We could also use autoreggresive moving average (ARIMA) techniques. This is common to detect outliers in time series.  I will not be exploring these for two reasons.  The series of play counts we are looking at are reasonably stationary.  Our simple techniques do a good job highlighting the spikes.  The other is computing time.  Running an outlier detection package like `tsoutlier` does a good job but no better than our simple tools and is much, much slower.  Hand grenade when a fly swatter works and all that.  Still, it prompted me to learn how to use the package so WIN!
 
 Three artists shown above are (were) superstars so I would guess their spikes were extreme.  I wouldn't expect more obscure artists, like Lesley Gore to be picked up by a wide swath of the DJ population.  Let's experiment with different screen levels.
 
-First let's bucket all the artist plays by quarter, find the mean number of plays, the multiple and the z-score.  Then keep just the maximum z_score period for each artist.
+First let's bucket all the artist plays by quarter, find the mean number of plays and the z-score, then keep just the maximum z_score period for each artist.
 
 
 ```{r}
@@ -120,8 +118,6 @@ play_count<-playlists %>%
   mutate(avg=mean(Spins),sd=sd(Spins)) %>% 
   filter(!is.na(sd)) %>% 
   mutate(z_score=(Spins-avg)/sd) %>% 
-  mutate(multiple=Spins/avg) %>% 
-  filter(!is.na(multiple)) %>% 
   filter(!is.na(z_score))
 
 play_count_z<- play_count %>% 
@@ -210,8 +206,9 @@ Huzzah!  In every mortality case a diverse group of DJs played the artist and in
 
 The Dictators are a less clear example, showing huge spike by many DJs in the fall of 2007 with no deaths.  This is an example of a new album release spike.  "Every Day is Saturday" is a collection of Dictators rarities officially released in January of 2008.  The 'Tators are a NYC favorite and I assume WFMU got an early copy. These cases are going to slip through our screens and produce false positives.
 
-Let's rebuild and add a feature to our data set that includes the number of DJs who played the artist in any quarter and how many times the average number of DJs who played the artist.
+Let's rebuild and add a feature to our data set that includes the number of DJs who played the artist in any quarter and how many times the average number of DJs who played the artist.  Further, let's calculate the fraction of plays accounted for by one DJ.
 ```{r}
+#find DJ play diversity
 dj_counts<-playlists %>% 
   ungroup() %>% 
   mutate(AirDate=as.yearqtr(AirDate))  %>% 
@@ -230,17 +227,35 @@ play_count_z2<- play_count_z %>%
 
 head(play_count_z2)
 ```
+
+```{r}
+# find fraction of plays in a quarter from one DJ
+max_dj_counts<-playlists %>% 
+  ungroup() %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate,DJ) %>% 
+  summarise(Spins=n()) %>% 
+  mutate(spin_count=sum(Spins)) %>% 
+  top_n(1,Spins) %>% 
+  mutate(dj_concentration=Spins/spin_count) %>% 
+  select(dj_concentration)
+
+play_count_z2<- play_count_z2 %>%  
+  left_join(max_dj_counts) %>% 
+  unique()
+
+```
+
 Now we have to find the right mix of z_score and dj_count that gives us the best trade-off of detected deaths without false positives.  What does the distribution of DJ counts look like at the max z-score points?
 ```{r}
 play_count_z2 %>%
-  filter(dj_count<12) %>% 
-  ggplot(aes(dj_count))+geom_histogram(bins=12)
+  ggplot(aes(x=dj_multiple,y=z_score))+geom_point()
   
 ```
 
-There is a sharp break between two and three. Let's make greater than two DJs playing the artist and a z-score above 6 the cuts.  We loosen the z-score criteria and hope that our new DJ count feature will help.
+
 ```{r}
-play_count_z2 %>% filter(dj_multiple>7)
+play_count_z2 %>% filter(z_score>5.5,dj_multiple>5)
 ```
 
 We still see, Bjork, ELO and Buddy Holly on this list.  Holly died, of course, but outside of the timeframe of our analysis.  Bobby Womack died but only 5 DJs played him.  Let's try looking at DJ play counts above the average for the artist.
