@@ -304,7 +304,6 @@ deaths<-bind_rows(temp1,temp2)
 #while we are at it, what are common causes of death
 #remove footnotes
 deaths<-deaths %>% mutate(Cause_of_Death=str_replace(Cause_of_Death,"\\[[0-9,]+\\]",""))
-deaths<-deaths %>% mutate(Cause_of_Death=str_replace(Cause_of_Death,"\\[[0-9,]+\\]",""))
 
 deaths %>% group_by(Cause_of_Death) %>% summarise(Count=n()) %>% arrange(desc(Count))
 ```
