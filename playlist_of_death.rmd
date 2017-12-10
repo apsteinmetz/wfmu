@@ -14,7 +14,7 @@ library(tidyverse)
 library(lubridate)
 library(knitr)
 library(xts)
-library(tsoutliers)
+library(rvest)
 
 load("playlists.rdata")
 ```
@@ -246,7 +246,7 @@ play_count_z2<- play_count_z2 %>%
 
 ```
 
-Now we have to find the right mix of z_score and dj_count that gives us the best trade-off of detected deaths without false positives.  What does the distribution of DJ counts look like at the max z-score points?
+Now we have to find the right mix of z_score and dj_multiple and dj_concentration that gives us the best trade-off of detected deaths without false positives.  What does the distribution of DJ counts look like at the max z-score points?
 ```{r}
 play_count_z2 %>%
   ggplot(aes(x=dj_multiple,y=z_score))+geom_point()
@@ -255,10 +255,52 @@ play_count_z2 %>%
 
 
 ```{r}
-play_count_z2 %>% filter(z_score>5.5,dj_multiple>5)
+z_s<-6.5
+dj_m<-4
+dj_c<-0.5
+play_count_z2 %>% filter(z_score>z_s,dj_multiple>dj_m)
 ```
 
-We still see, Bjork, ELO and Buddy Holly on this list.  Holly died, of course, but outside of the timeframe of our analysis.  Bobby Womack died but only 5 DJs played him.  Let's try looking at DJ play counts above the average for the artist.
 ```{r}
-play_count_z2 %>% filter(z_score>6.5)
+play_count_z2 %>% filter(z_score>z_s,dj_multiple>dj_m,dj_concentration<dj_c)
 ```
+
+We've taken feature engineering about as far is it can go.  We have a pretty good idea, experimentally, what mix of feature thresholds we need to get it a good list but there are still false postives and negatives galore.  We need some way to get good external check on the whether an arist has died.  Let's turn to Wikipedia and [this page.](https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll).
+
+```{r}
+death_page<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll")
+save(death_page,file="death_page_html.rdata")
+write_html(death_page,file="death_page.html")
+#did a manual text replace of the html file to break the artist name and band names into two columns
+# by replacing '<small>' with '</td><td>' and '</small>' with ''.
+death_page<-read_html("death_page.html")
+death_table_nodes<-death_page %>% html_nodes("table")
+#wish I could just get the table but
+deaths_2010s<-death_table_nodes[[length(death_table_nodes)]] %>% html_table(fill=TRUE) %>% .[,1:6]
+deaths_2000s<-death_table_nodes[[length(death_table_nodes)-1]] %>% html_table(fill=TRUE) %>% .[,1:6]
+deaths<-bind_rows(deaths_2000s,deaths_2010s) %>% .[,1:6]
+names(deaths)<-c("Name","Band","Age","Date","Location","Cause_of_Death")
+deaths<-as_data_frame(deaths)
+#replace all footnotes with null
+
+# shift columns where no band names exist
+temp<-deaths %>% 
+  mutate(test=as.numeric(Age))
+
+temp1<-temp %>% 
+  filter(is.na(test)) %>% 
+  mutate(Cause_of_Death=Location) %>% 
+  mutate(Location=Date) %>% 
+  mutate(Date=Age) %>% 
+  mutate(Age=Band) %>% 
+  mutate(Band='') %>% 
+  select(-test)
+
+temp2 <- temp %>%
+    filter(!is.na(test)) %>% 
+    select(-test)
+deaths<-bind_rows(temp1,temp2)
+
+deaths %>% group_by(Cause_of_Death) %>% summarise(Count=n()) %>% arrange(desc(Count))
+```
+
