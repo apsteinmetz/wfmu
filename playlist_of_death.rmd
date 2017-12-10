@@ -267,21 +267,34 @@ play_count_z2 %>% filter(z_score>z_s,dj_multiple>dj_m,dj_concentration<dj_c)
 
 We've taken feature engineering about as far is it can go.  We have a pretty good idea, experimentally, what mix of feature thresholds we need to get it a good list but there are still false postives and negatives galore.  We need some way to get good external check on the whether an arist has died.  Let's turn to Wikipedia and [this page.](https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll).
 
+Parsing HTML is a dark art and I would not rise to the level of sorcerer's apprentice.  Helpfully, the date we want is in tables.  Unhelpfully, if a band name is associated with an artist name it appears in the same table cell as the artist, encased in a `<small><\small>` tag.  Extracting the just the text from the cell concatates the two items without a separator.  We would like to break the person and the band into separate columns and we need to search/replace the raw html text to do it. So instead of `<td>Person<small>Band<\small><\td>` we get `<td>Person<\td>Band<\td>`.
+
 ```{r}
 death_page<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll")
 save(death_page,file="death_page_html.rdata")
 write_html(death_page,file="death_page.html")
-#did a manual text replace of the html file to break the artist name and band names into two columns
-# by replacing '<small>' with '</td><td>' and '</small>' with ''.
-death_page<-read_html("death_page.html")
+
+# read it in as a raw text file and edit the tags
+# to break the artist name and band names into two columns
+# by replacing '<small>' with '</td><td>' and
+# '</small>' with ''.
+death_page_text<-read_file("death_page.html")
+death_page_text<- gsub( "<small>", "</td><td>", death_page_text )
+death_page_text<- gsub( "</small>", "", death_page_text )
+#read it back in
+death_page<-read_html(death_page_text)
+
+#save modified html
+save(death_page,file="death_page_html.rdata")
+write_html(death_page,file="death_page.html")
+
+#get tables
 death_table_nodes<-death_page %>% html_nodes("table")
-#wish I could just get the table but
 deaths_2010s<-death_table_nodes[[length(death_table_nodes)]] %>% html_table(fill=TRUE) %>% .[,1:6]
 deaths_2000s<-death_table_nodes[[length(death_table_nodes)-1]] %>% html_table(fill=TRUE) %>% .[,1:6]
 deaths<-bind_rows(deaths_2000s,deaths_2010s) %>% .[,1:6]
 names(deaths)<-c("Name","Band","Age","Date","Location","Cause_of_Death")
 deaths<-as_data_frame(deaths)
-#replace all footnotes with null
 
 # shift columns where no band names exist
 temp<-deaths %>% 
@@ -301,10 +314,17 @@ temp2 <- temp %>%
     select(-test)
 deaths<-bind_rows(temp1,temp2)
 
-#while we are at it, what are common causes of death
 #remove footnotes
 deaths<-deaths %>% mutate(Cause_of_Death=str_replace(Cause_of_Death,"\\[[0-9,]+\\]",""))
+deaths<-deaths %>% mutate(Cause_of_Death=str_replace(Cause_of_Death,"","Not Specified"))
+deaths<-deaths %>% mutate(is.na(Cause_of_Death)="Not Specified")
+
+#while we are at it, what are common causes of death
 
 deaths %>% group_by(Cause_of_Death) %>% summarise(Count=n()) %>% arrange(desc(Count))
+```
+Now we need to put the nicely formatted data into a form consistent with the data in our playlists.  To to this we need to parse the date string and put both the artist name and band name(s) into a tokenized list conforming the playlist rules.
+```{r}
+
 ```
 
