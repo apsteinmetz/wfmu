@@ -429,3 +429,23 @@ play_count<-left_join(play_count,death_tokens) %>%
   mutate_cond(is.na(death_flag),death_flag=FALSE)
 ```
 
+# The curious case of Bobby Womack
+He died on a June 27 so his date is in the second quarter but within days of the third quarter The pickup in plays of his songs shows up in Q3.  Further most DJs at the station have shows only weekly, so there will be lag.
+
+Perhaps we should advance the death dates by a week to determine the quarter they will fall in.
+```{r}
+death_tokens %>% filter(ArtistToken=="BobbyWomack")
+play_count %>% ungroup() %>% filter(ArtistToken=="BobbyWomack",z_score>0.5)
+
+```
+
+```{r}
+death_tokens_adj<-death_tokens %>% mutate(AirDate=as.yearqtr(Date+7))
+
+play_count<-left_join(select(play_count,-death_flag),death_tokens_adj) %>% 
+  select(-Date) %>% 
+  mutate_cond(is.na(death_flag),death_flag=FALSE)
+
+play_count %>% ungroup() %>% filter(ArtistToken=="BobbyWomack",z_score>0)
+```
+That fixed it.
