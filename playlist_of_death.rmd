@@ -16,6 +16,7 @@ library(knitr)
 library(xts)
 library(rvest)
 
+# function to mutate only rows meeting a certain condition
 #most useful enhancement to dplyr ever!
 mutate_cond <- function(.data, condition, ..., envir = parent.frame()) {
   condition <- eval(substitute(condition), .data, envir)
@@ -114,6 +115,7 @@ We could use more formal statistical methods of of outlier detection. One might 
 
 Three artists shown above are (were) superstars so I would guess their spikes were extreme.  I wouldn't expect more obscure artists, like Lesley Gore to be picked up by a wide swath of the DJ population.  Let's experiment with different screen levels.
 
+#Play Count Features
 First let's bucket all the artist plays by quarter, find the mean number of plays and the z-score, then keep just the maximum z_score period for each artist.
 
 
@@ -126,7 +128,8 @@ play_count<-playlists %>%
   mutate(avg=mean(Spins),sd=sd(Spins)) %>% 
   filter(!is.na(sd)) %>% 
   mutate(z_score=(Spins-avg)/sd) %>% 
-  filter(!is.na(z_score))
+  filter(!is.na(z_score)) %>% 
+  select(-avg,-sd)
 
 play_count_z<- play_count %>% 
   group_by(ArtistToken) %>% 
@@ -233,9 +236,13 @@ play_count_z2<- play_count_z %>%
   select(ArtistToken,AirDate,z_score) %>% 
   left_join(dj_counts)
 
+play_count<-play_count %>%
+  left_join(dj_counts)
+
 head(play_count_z2)
 ```
 
+Add DJ concentration feature
 ```{r}
 # find fraction of plays in a quarter from one DJ
 max_dj_counts<-playlists %>% 
@@ -246,11 +253,17 @@ max_dj_counts<-playlists %>%
   mutate(spin_count=sum(Spins)) %>% 
   top_n(1,Spins) %>% 
   mutate(dj_concentration=Spins/spin_count) %>% 
-  select(dj_concentration)
+  ungroup() %>% 
+  select(AirDate,ArtistToken,dj_concentration) %>% 
+  unique() %>% 
+  {.}
 
 play_count_z2<- play_count_z2 %>%  
   left_join(max_dj_counts) %>% 
   unique()
+
+play_count<-play_count %>% 
+  left_join(max_dj_counts)
 
 ```
 
@@ -419,25 +432,28 @@ death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"WindFire","E
 death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"LakePalmer","EmersonLake")
 
 #add a dummy column to flag mortality when we join it with play counts
-death_tokens<-death_tokens %>% mutate(death_flag=TRUE)
+death_tokens<-death_tokens %>% mutate(death_flag="Death")
 
 ```
 Now merge it with play counts
 ```{r}
 play_count<-left_join(play_count,death_tokens) %>% 
   select(-Date) %>% 
-  mutate_cond(is.na(death_flag),death_flag=FALSE)
+  mutate_cond(is.na(death_flag),death_flag="NonEvent")
+
+play_count %>% filter(death_flag=="Death")
 ```
+We have 833 instances where there is a mortality event associated with the artist or band. Note that, where an artist name comes up, it does not necessarily mean that artist died, just that someone associated died.  Alice Cooper is alive and kicking but "Alice Cooper," the band, lost a member in 2014.
 
 # The curious case of Bobby Womack
-He died on a June 27 so his date is in the second quarter but within days of the third quarter The pickup in plays of his songs shows up in Q3.  Further most DJs at the station have shows only weekly, so there will be lag.
-
-Perhaps we should advance the death dates by a week to determine the quarter they will fall in.
+He died on a June 27 so his date is in the second quarter but within days of the third quarter The pickup in plays of his songs shows up in Q3.  Further, most DJs at the station have shows only weekly, so there will be lag.
 ```{r}
 death_tokens %>% filter(ArtistToken=="BobbyWomack")
 play_count %>% ungroup() %>% filter(ArtistToken=="BobbyWomack",z_score>0.5)
 
 ```
+
+Perhaps we should advance the death dates by a week to determine the `AirDate` quarter they will fall in.
 
 ```{r}
 death_tokens_adj<-death_tokens %>% mutate(AirDate=as.yearqtr(Date+7))
@@ -449,3 +465,19 @@ play_count<-left_join(select(play_count,-death_flag),death_tokens_adj) %>%
 play_count %>% ungroup() %>% filter(ArtistToken=="BobbyWomack",z_score>0)
 ```
 That fixed it.
+
+# Let the Machine Learn!
+
+We have the features, `Spins`, `z_score`, `dj_concentration` `dj_count` and `dj_multiple`.  We have the prediction variable, `death_flag`.  
+
+First, normalize all the features.
+```{r}
+
+play_count_norm<-
+
+```
+
+play_count_norm<-
+
+Separate into training and test sets.
+
