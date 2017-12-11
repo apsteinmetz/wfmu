@@ -133,7 +133,7 @@ play_count_z<- play_count %>%
   summarize(z_score=max(z_score)) %>% 
   left_join(play_count)
 
-rm(play_count) #This is a 400 thousand-long table that we don't need any more.
+#rm(play_count) #This is a 400 thousand-long table that we don't need any more.
 head(play_count_z)
 ```
 
@@ -307,9 +307,6 @@ deaths_2000s<-death_table_nodes[[length(death_table_nodes)-1]] %>% html_table(fi
 deaths<-bind_rows(deaths_2000s,deaths_2010s) %>% .[,1:6]
 names(deaths)<-c("Name","Band","Age","Date","Location","Cause_of_Death")
 deaths<-as_data_frame(deaths)
-```
-
-```{r}
 # shift columns where no band names exist
 temp<-deaths %>% 
   mutate(test=as.numeric(Age))
@@ -343,77 +340,92 @@ Now we need to put the nicely formatted data into a form consistent with the dat
 deaths<-deaths %>% mutate(Date=parse_date(Date,"%B %d, %Y")) %>% filter(!is.na(Date))
 #playlist count uses yearqtr as airdate
 deaths<-deaths %>% mutate(AirDate=as.yearqtr(Date))
-```
-
-create list of name/band tokens for each row
-```{r}
 #take at most three band names.
 deaths<-deaths %>% separate(Band,into=c("band1","band2","band3"),sep=", ",extra="drop")
+```
 
-#we don't acutally care what artist is in what band, just that we have a token and a yearqtr variable for each.
+Create list of name/band tokens for each row.  This data wrangling is identical to the process by which the `ArtistToken`s were created in the playlist data set.
+```{r}
+
+#we don't acutally care what artist is in what band, just that we have a token for all bands and artists
+#and a yearqtr variable for each.
 #use tidyr to gather the tokens
 death_tokens<-deaths %>% 
-  select(-Age,-Location,-Cause_of_Death,-Date) %>% 
-  gather(key="key",value="ArtistToken",-AirDate) %>% 
+  select(-Age,-Location,-Cause_of_Death) %>% 
+  gather(key="key",value="ArtistToken",-AirDate,-Date) %>% 
   select(-key) %>% 
-  filter(!is.na(ArtistToken))
-#tokeniize
+  filter(!is.na(ArtistToken)) %>% 
+  arrange(Date)
 
-tokenize_artist<-function(artist){
-  playlists$ArtistToken<-playlists$Artist
+#tokenize
 # one artist is all punctuation so give !!! special treatment
 # now change some common punctuation to space
 print("Stripping Punctuation")
 
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"\\&"," ")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"\\&"," ")
 
-playlists$ArtistToken<-str_to_lower(playlists$ArtistToken)
+death_tokens$ArtistToken<-str_to_lower(death_tokens$ArtistToken)
 # I choose to strip out the stuff below though dealing with it might get better analysis
 #remove any text in parentheses
 print("Stripping filler words")
 # get rid of anything between parenthesis
 #tricky regex to handle cases of multiple parentheticals in one artist
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"(\\([^(]+\\))","")
-# remove 'featuring' or 'with' artists
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"(\\([^(]+\\))","")
+
+#How pretentious
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"Ö","O")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"ö","o")
+
 #now get rid of remaining non-word characters except space
 
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"[^A-Z^a-z^ ^0-9]","")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"[^A-Z^a-z^ ^0-9]","")
 #make "new york" one word.  Lots of bands start with the term
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"new york","newyork")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"new york","newyork")
 
 #make "x ray" one word. hopefully we've stripped out the dash already.Lots of bands start with the term
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"x ray","xray")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"x ray","xray")
 
 #now some connecting words that might be spelled/used variantly
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"and | of | the "," ")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"and | of | the "," ")
 
 #and leading "the"
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^the "," ")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"^the "," ")
 # strip leading/trailing whitespace
-playlists$ArtistToken<-str_trim(playlists$ArtistToken)
+death_tokens$ArtistToken<-str_trim(death_tokens$ArtistToken)
 
 #did we create any null entries
 playlists<-filter(playlists,Artist!="")
 playlists<-filter(playlists,Artist!="Artist")
 
-numWords=2 #is two enought for uniqueness?
+#restore title case
+death_tokens$ArtistToken<-death_tokens$ArtistToken %>% str_to_title()
 
-# we replaced all punctuation with spaces
-#maybe strip spaces and combine all artist Words
 #combine first two words
-print("Trying to make sense of artist names")
-#does this break if numWords> number of words?
-playlists$ArtistToken<-playlists$ArtistToken %>% str_to_title()
-t<-str_split_fixed(playlists$ArtistToken,pattern="[ ]+",n=numWords+1)[,1:numWords]
-playlists$ArtistToken<-apply(t,MARGIN=1,FUN=paste,collapse="")
-print("Combining iconic 2-name artists into one name")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"RollingStones","Stones")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"EnnioMorricone","Morricone") #only on WFMU!
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"DavidBowie","Bowie")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"BobDylan","Dylan")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Yola","YoLaTengo")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"ElvisPresley","Elvis")
+death_tokens<-death_tokens %>% 
+  separate(ArtistToken,into=c("token1","token2"),extra="drop",fill="right") %>%
+  transmute(Date=Date,AirDate=AirDate,ArtistToken=paste0(token1,if_else(!is.na(token2),token2,""))) %>% 
+  filter(ArtistToken != "")
 
-}
+print("Combining iconic 2-name artists into one name")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"RollingStones","Stones")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"EnnioMorricone","Morricone") #only on WFMU!
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"DavidBowie","Bowie")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"BobDylan","Dylan")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"Yola","YoLaTengo")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"ElvisPresley","Elvis")
+
+#Using comma as a band separator messed up commas in band names. What we know:
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"WindFire","EarthWind")
+death_tokens$ArtistToken<-str_replace_all(death_tokens$ArtistToken,"LakePalmer","EmersonLake")
+
+#add a dummy column to flag mortality when we join it with play counts
+death_tokens<-death_tokens %>% mutate(death_flag=TRUE)
+
+```
+Now merge it with play counts
+```{r}
+play_count<-left_join(play_count,death_tokens) %>% 
+  select(-Date) %>% 
+  mutate_cond(is.na(death_flag),death_flag=FALSE)
 ```
 
