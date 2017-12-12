@@ -9,6 +9,7 @@ Can we determine musician mortality rates by analyzing WFMU radio playlists?
 #Load Required Libraries and Data
 ```{r message=FALSE, warning=FALSE}
 library(ggplot2)
+library(GGally)
 library(stringr)
 library(tidyverse)
 library(lubridate)
@@ -442,6 +443,12 @@ play_count<-left_join(play_count,death_tokens) %>%
   mutate_cond(is.na(death_flag),death_flag="NonEvent")
 
 play_count %>% filter(death_flag=="Death")
+
+play_count_z2<-play_count_z2 %>% 
+  left_join(death_tokens) %>%
+  mutate_cond(is.na(death_flag),death_flag="NonEvent")
+
+
 ```
 We have 833 instances where there is a mortality event associated with the artist or band. Note that, where an artist name comes up, it does not necessarily mean that artist died, just that someone associated died.  Alice Cooper is alive and kicking but "Alice Cooper," the band, lost a member in 2014.
 
@@ -462,7 +469,7 @@ play_count<-left_join(select(play_count,-death_flag),death_tokens_adj) %>%
   select(-Date) %>% 
   mutate_cond(is.na(death_flag),death_flag=FALSE)
 
-play_count %>% ungroup() %>% filter(ArtistToken=="BobbyWomack",z_score>0)
+play_count %>% ungroup() %>% filter(ArtistToken=="BobbyWomack",z_score>0.5)
 ```
 That fixed it.
 
@@ -470,25 +477,34 @@ Now we have to find the right mix of z_score and dj_multiple and dj_concentratio
 
 ```{r, message=FALSE, warning=FALSE}
 
-play_count_z2<-play_count_z2 %>%
+play_count<-play_count %>%
   left_join(death_tokens_adj) %>% 
   mutate_cond(is.na(death_flag),death_flag="NonEvent")
 
-play_count_z2 %>%
+play_count %>%
   ggplot(aes(x=z_score,fill=death_flag))+geom_density(alpha=0.6)+
   labs(title="Z_Score")
 
-play_count_z2 %>%
+play_count %>%
   ggplot(aes(x=dj_multiple,fill=death_flag))+geom_density(alpha=0.6)+
   labs(title="dj_multiple")
 
-play_count_z2 %>%
+play_count %>%
   ggplot(aes(x=dj_concentration,fill=death_flag))+geom_density(alpha=0.6)+
   labs(title="dj_concentration")
+```
+```{r}
+play_count %>% 
+  ungroup() %>% 
+  select(z_score,dj_concentration,dj_multiple,death_flag) %>% 
+  unique() %>% 
+  ggpairs(aes(color = death_flag, alpha = 0.4))
 ```
 
 
 # Let the Machine Learn!
+
+There are two differnt questions we might apply our classifier to.  First, when an outlier occurs, does it signify a death?  This was our original question. Second, using the whole sample, can we identify when a death occurs?
 
 We have the features, `Spins`, `z_score`, `dj_concentration` `dj_count` and `dj_multiple`.  We have the prediction variable, `death_flag`.  
 
