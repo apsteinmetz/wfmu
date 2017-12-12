@@ -466,6 +466,28 @@ play_count %>% ungroup() %>% filter(ArtistToken=="BobbyWomack",z_score>0)
 ```
 That fixed it.
 
+Now we have to find the right mix of z_score and dj_multiple and dj_concentration that gives us the best trade-off of detected deaths without false positives.  What does the distribution of DJ counts look like at the max z-score points?  Add death flag to the set of feature at maximum z_score.
+
+```{r, message=FALSE, warning=FALSE}
+
+play_count_z2<-play_count_z2 %>%
+  left_join(death_tokens_adj) %>% 
+  mutate_cond(is.na(death_flag),death_flag="NonEvent")
+
+play_count_z2 %>%
+  ggplot(aes(x=z_score,fill=death_flag))+geom_density(alpha=0.6)+
+  labs(title="Z_Score")
+
+play_count_z2 %>%
+  ggplot(aes(x=dj_multiple,fill=death_flag))+geom_density(alpha=0.6)+
+  labs(title="dj_multiple")
+
+play_count_z2 %>%
+  ggplot(aes(x=dj_concentration,fill=death_flag))+geom_density(alpha=0.6)+
+  labs(title="dj_concentration")
+```
+
+
 # Let the Machine Learn!
 
 We have the features, `Spins`, `z_score`, `dj_concentration` `dj_count` and `dj_multiple`.  We have the prediction variable, `death_flag`.  
