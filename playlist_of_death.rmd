@@ -508,14 +508,57 @@ There are two differnt questions we might apply our classifier to.  First, when 
 
 We have the features, `Spins`, `z_score`, `dj_concentration` `dj_count` and `dj_multiple`.  We have the prediction variable, `death_flag`.  
 
-First, normalize all the features.
-```{r}
+#Detrend?
 
-play_count_norm<-
+Note that total plays and the number of DJs have been increasing.  So there is a trend to the play counts.  There is not a trend to the ratios, however to we can safely not detrend the data.  How can the number of DJs increase when there are only so many hours in the week?  The rotations have gotten more frequent and the emergence of web streams has broough more DJs "on air."
+
+```{r}
+play_count %>% 
+  group_by(AirDate) %>% 
+  summarize(n=n()) %>% 
+  ggplot(aes(AirDate,n))+geom_col()
+```
+
+No trend.
+```{r}
+play_count_z2 %>% 
+  group_by(AirDate) %>% 
+  summarize(z_score=mean(z_score)) %>% 
+  ggplot(aes(AirDate,z_score))+geom_col()
 
 ```
 
-play_count_norm<-
+Filter out pre-2002, select only relevant features and classifier and normalize data.
+```{r}
+normalize<-function(x){
+  (x-min(x))/(max(x)-min(x))
+}
 
-Separate into training and test sets.
+play_count_norm<-play_count %>% 
+  ungroup() %>% 
+  filter(AirDate>as.yearqtr("2002-01-01")) %>% 
+  select(z_score,dj_multiple,dj_concentration,death_flag) %>% 
+  unique() %>% 
+  mutate_if(is.double,normalize) %>% 
+  mutate(death=ifelse(death_flag=="Death",1,0)) %>% 
+  select(-death_flag)
+```
+
+```{r}
+model <- glm(death ~.,
+             family=binomial(link='logit'),
+             data=play_count_norm)
+summary(model)
+```
+```{r}
+library(ROCR)
+p <- predict(model, play_count_norm, type="response")
+pr <- prediction(p, test$Survived)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
 
