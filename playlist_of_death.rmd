@@ -16,6 +16,7 @@ library(lubridate)
 library(knitr)
 library(xts)
 library(rvest)
+library(class) #k-nn 
 
 # function to mutate only rows meeting a certain condition
 #most useful enhancement to dplyr ever!
@@ -467,7 +468,7 @@ death_tokens_adj<-death_tokens %>% mutate(AirDate=as.yearqtr(Date+7))
 
 play_count<-left_join(select(play_count,-death_flag),death_tokens_adj) %>% 
   select(-Date) %>% 
-  mutate_cond(is.na(death_flag),death_flag=FALSE)
+  mutate_cond(is.na(death_flag),death_flag="NonEvent")
 
 play_count %>% ungroup() %>% filter(ArtistToken=="BobbyWomack",z_score>0.5)
 ```
@@ -544,21 +545,32 @@ play_count_norm<-play_count %>%
   select(-death_flag)
 ```
 
+
+Do it again with just the two significant variables
 ```{r}
-model <- glm(death ~.,
+model <- glm(death ~ z_score + dj_concentration,
              family=binomial(link='logit'),
              data=play_count_norm)
-summary(model)
-```
-```{r}
-library(ROCR)
-p <- predict(model, play_count_norm, type="response")
-pr <- prediction(p, test$Survived)
-prf <- performance(pr, measure = "tpr", x.measure = "fpr")
-plot(prf)
 
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
-auc
+p <- predict(model, type="response")
+Class<-p > 0.5
+table(class)
+
 ```
+It doesn't work. There are just too many deaths that, while the artist may have been played at least once, do not register any change in plays.
+
+Try another approach.  How about k-nearest neighbors?
+```{r}
+death.knn<-knn(play_count_norm,play_count_norm,play_count_norm$death,k=3)
+summary(death.knn)
+```
+We are generating positive values, at least.  Are they any good?
+```{r}
+table(play_count_norm$death,death.knn)
+confusionMatrix(table(play_count_norm$death,death.knn))
+```
+
+
+try another approach.  How about Baysian, where we condition a prediction of death upon the play count being an outlier?
+
 
