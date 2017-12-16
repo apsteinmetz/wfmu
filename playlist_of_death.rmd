@@ -554,15 +554,25 @@ model <- glm(death ~ z_score + dj_concentration,
 
 p <- predict(model, type="response")
 Class<-p > 0.5
-table(class)
+table(Class)
 
 ```
 It doesn't work. There are just too many deaths that, while the artist may have been played at least once, do not register any change in plays.
 
-Try another approach.  How about k-nearest neighbors?
+Try another approach.  How about k-nearest neighbors? Spilt set this time.
 ```{r}
-death.knn<-knn(play_count_norm,play_count_norm,play_count_norm$death,k=3)
+train_sample<-sample(1:nrow(play_count_norm),nrow(play_count_norm)*0.7)
+play_train<-play_count_norm[train_sample,]
+play_train_label<-transmute(play_train,death_label=as.factor(ifelse(death==0,"NonEvent","Death")))
+play_test<-play_count_norm[-train_sample,]
+play_test_label<-transmute(play_test,death_label=as.factor(ifelse(death==0,"NonEvent","Death")))
+play_train<-play_train %>% select(z_score,dj_multiple,dj_concentration)
+play_test<-play_test %>% select(z_score,dj_multiple,dj_concentration)
+
+rbind(prop.table(table(play_train_label),prop.table(table(play_train_label))))
+death.knn<-knn(play_train,play_test,play_test$death,k=3)
 summary(death.knn)
+
 ```
 We are generating positive values, at least.  Are they any good?
 ```{r}
