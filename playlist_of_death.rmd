@@ -17,6 +17,8 @@ library(knitr)
 library(xts)
 library(rvest)
 library(class) #k-nn 
+library(gmodels) #CrossTable
+library(e1071) #naiveBayes
 
 # function to mutate only rows meeting a certain condition
 #most useful enhancement to dplyr ever!
@@ -548,11 +550,11 @@ play_count_norm<-play_count %>%
 
 Do it again with just the two significant variables
 ```{r}
-model <- glm(death ~ z_score + dj_concentration,
+model_logit <- glm(death ~ z_score + dj_concentration,
              family=binomial(link='logit'),
              data=play_count_norm)
 
-p <- predict(model, type="response")
+p <- predict(model_logit, type="response")
 Class<-p > 0.5
 table(Class)
 
@@ -561,6 +563,8 @@ It doesn't work. There are just too many deaths that, while the artist may have 
 
 Try another approach.  How about k-nearest neighbors? Spilt set this time.
 ```{r}
+
+set.seed(22275)
 train_sample<-sample(1:nrow(play_count_norm),nrow(play_count_norm)*0.7)
 play_train<-play_count_norm[train_sample,]
 play_train_label<-transmute(play_train,death_label=as.factor(ifelse(death==0,"NonEvent","Death")))
@@ -569,18 +573,53 @@ play_test_label<-transmute(play_test,death_label=as.factor(ifelse(death==0,"NonE
 play_train<-play_train %>% select(z_score,dj_multiple,dj_concentration)
 play_test<-play_test %>% select(z_score,dj_multiple,dj_concentration)
 
-rbind(prop.table(table(play_train_label),prop.table(table(play_train_label))))
-death.knn<-knn(play_train,play_test,play_test$death,k=3)
-summary(death.knn)
+prop.table(table(play_train_label))
+prop.table(table(play_train_label))
+model_knn<-knn(train=play_train,test=play_test,cl=play_train_label$death_label,k=5)
+summary(model_knn)
 
 ```
 We are generating positive values, at least.  Are they any good?
 ```{r}
-table(play_count_norm$death,death.knn)
-confusionMatrix(table(play_count_norm$death,death.knn))
+CrossTable(play_test_label$death_label,model_knn,dnn=c('Actual Events','Predicted Events'))
 ```
+This is terrible.  There were 234 deaths but our model only correctly flagged 5 of them.  The problem is that the number of non-events completely swamps the number of deaths.
 
 
-try another approach.  How about Baysian, where we condition a prediction of death upon the play count being an outlier?
+Let's try another approach.  How about Baysian, where we condition a prediction of death upon the play count being an outlier?
 
+Bin the data into categorical variables.  Split z_score at 5-sigma and dj_concentration at 50%.
+
+```{r}
+z_threshhold <- 6.0
+dj_threshhold <- 0.5
+
+play_count_bayes<-play_count %>% 
+  ungroup() %>% 
+  transmute(death=death_flag,
+            z_score_high=ifelse(z_score>z_threshhold,1,0),
+            dj_concentration_high=ifelse(dj_concentration>dj_threshhold,1,0)
+            )
+model_b<-naiveBayes(select(play_count_bayes,-death),play_count_bayes$death)
+model_b_predict<-predict(model_b,newdata=sample_frac(play_count_bayes,.2))
+
+```
+This isn't working.  Mabye we would get better data if we screened out death's where there are only a few DJs who ever played that artist.  Subset playlist to only artists played by more than 10 different DJs.
+
+```{r}
+dj_count_filter<-10
+dj_subset<-playlists %>% 
+  ungroup() %>%
+  filter(AirDate>as.Date("2002-01-01")) %>% 
+  group_by(ArtistToken,DJ) %>% 
+  summarise(n=n()) %>% 
+  summarise(n=n()) %>% 
+  filter(n>dj_count_filter) %>% 
+  select(ArtistToken)
+
+playlist_subset <-  left_join(dj_subset,playlists)
+play_count_subset<-left_join(dj_subset,play_count)
+
+
+```
 
