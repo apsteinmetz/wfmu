@@ -618,8 +618,56 @@ dj_subset<-playlists %>%
   select(ArtistToken)
 
 playlist_subset <-  left_join(dj_subset,playlists)
-play_count_subset<-left_join(dj_subset,play_count)
+play_count_subset<-left_join(dj_subset,play_count) %>% 
+  select(-Date) %>% 
+  unique()
 
+
+play_count_subset
+```
+
+We've cut the sample size in half.  Look at the distribution of the features.
+
+```{r}
+play_count_subset %>% 
+  ungroup() %>% 
+  select(z_score,dj_concentration,dj_multiple,death_flag) %>% 
+  ggpairs(aes(color = death_flag, alpha = 0.4))
+```
+Visually, there is much more separation between the two classifiers for each feature.  `dj_multiple` is much improved though the correlation with z_score has increased, still rendering is superfluous.  Let's get rid of it and rerun the models.
+```{r}
+play_count_subset<-play_count_subset %>% select(-dj_multiple)
+play_count_norm<-play_count_subset %>% 
+  ungroup() %>% 
+  filter(AirDate>as.yearqtr("2002-01-01")) %>% 
+  select(z_score,dj_concentration,death_flag) %>% 
+  unique() %>% 
+  mutate_if(is.double,normalize) %>% 
+  mutate(death=ifelse(death_flag=="Death",1,0)) %>% 
+  select(-death_flag)
+
+model_logit <- glm(death ~ z_score + dj_concentration,
+             family=binomial(link='logit'),
+             data=play_count_norm)
+
+p <- predict(model_logit, type="response")
+Class<-p > 0.5
+table(Class)
+
+```
+```{r}
+train_sample<-sample(1:nrow(play_count_norm),nrow(play_count_norm)*0.7)
+play_train<-play_count_norm[train_sample,]
+play_train_label<-transmute(play_train,death_label=as.factor(ifelse(death==0,"NonEvent","Death")))
+play_test<-play_count_norm[-train_sample,]
+play_test_label<-transmute(play_test,death_label=as.factor(ifelse(death==0,"NonEvent","Death")))
+play_train<-play_train %>% select(z_score,dj_concentration)
+play_test<-play_test %>% select(z_score,dj_concentration)
+
+prop.table(table(play_train_label))
+prop.table(table(play_train_label))
+model_knn<-knn(train=play_train,test=play_test,cl=play_train_label$death_label,k=5)
+CrossTable(play_test_label$death_label,model_knn,dnn=c('Actual Events','Predicted Events'))
 
 ```
 
