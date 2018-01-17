@@ -296,7 +296,6 @@ Parsing HTML is a dark art and I would not rise to the level of sorcerer's appre
 
 ```{r}
 death_page<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll")
-save(death_page,file="death_page_html.rdata")
 write_html(death_page,file="death_page.html")
 
 # read it in as a raw text file and edit the tags
@@ -309,9 +308,6 @@ death_page_text<- gsub( "</small>", "", death_page_text )
 #read it back in
 death_page<-read_html(death_page_text)
 
-#save modified html
-save(death_page,file="death_page_html.rdata")
-write_html(death_page,file="death_page.html")
 
 #get tables
 death_table_nodes<-death_page %>% html_nodes("table")
@@ -669,5 +665,73 @@ prop.table(table(play_train_label))
 model_knn<-knn(train=play_train,test=play_test,cl=play_train_label$death_label,k=5)
 CrossTable(play_test_label$death_label,model_knn,dnn=c('Actual Events','Predicted Events'))
 
+```
+
+Create "blind" data set for competition.  Scant feature engineering
+```{r}
+#find DJ play diversity
+playlist_summary<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate>as.Date("2001-12-31")) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate,DJ) %>%
+  summarise(Spins=n())
+
+blind__dj_counts<-playlist_summary %>% 
+  summarise(dj_count=n()) %>% 
+  {.}
+
+blind__spin_counts<-playlist_summary %>% 
+  #group_by(ArtistToken,AirDate)
+  summarise(Spins=sum(Spins)) %>% 
+  group_by(ArtistToken) %>% 
+  {.}
+
+# find fraction of plays in a quarter from one DJ
+blind_dj_concentration<-playlist_summary %>% 
+  mutate(spin_count=sum(Spins)) %>% 
+  top_n(1,Spins) %>% 
+  mutate(dj_concentration=Spins/spin_count) %>% 
+  ungroup() %>% 
+  select(AirDate,ArtistToken,dj_concentration) %>% 
+  unique() %>% 
+  {.}
+
+blind_features<-full_join(blind__dj_counts,blind__spin_counts) %>%       full_join(blind_dj_concentration)
+
+blind_features %>% 
+  filter(ArtistToken=="Prince") %>% 
+  ggplot(aes(AirDate,Spins))+geom_col()+
+  geom_line(aes(y=dj_count),size=2,color="red")+
+  geom_line(aes(y=dj_concentration*100),size=2,color="blue")
+
+#merge with death flag
+blind_features<-left_join(blind_features,death_tokens) %>% 
+  select(-Date) %>% 
+  mutate_cond(is.na(death_flag),death_flag="NonEvent")
+
+#anonymyize identifiers
+blind_features<-blind_features %>% 
+  mutate(time=as.integer((AirDate-as.yearqtr(as.Date("2001-12-31")))*4))
+
+blind_features<-blind_features %>% 
+  mutate(event=if_else(death_flag=="Death","event","nonevent"))
+
+blind_artists<-blind_features %>% 
+  ungroup() %>% 
+  select(ArtistToken) %>% 
+  unique() %>% 
+  bind_cols(id=index(blind_artists))
+
+blind_features<-blind_features %>% left_join(blind_artists)
+
+arts_data<-blind_features %>% 
+  ungroup() %>% 
+  select(id,
+         time,
+         feat_1=dj_count,
+         feat_2=Spins,
+         feat_3=dj_concentration,
+         event)
 ```
 
