@@ -335,9 +335,10 @@ get_playlist <- function(plURL, dj) {
       as.Date("%d %B %Y")
     
   }
+  print(airDate)
   if (airDate < most_recent_date-7) {
     print("Back Far Enough")
-    return(NULL)
+    return("stop")
   }
   plraw <- NULL
   #hand-rolled
@@ -441,7 +442,10 @@ get_playlist <- function(plURL, dj) {
   return(playlist)
 }
 
+```
 
+Main loop
+```{r include=FALSE}
 #-------------- MAIN -----------------
 
 
@@ -460,9 +464,9 @@ djList <- DJKey %>%
 
 #careful not to trash intermediate results!
 #playlists_raw = data_frame()
+load("~/R Projects/wfmu/playlists_raw.RData")
 UPDATE_ONLY =TRUE
 if (UPDATE_ONLY) {
-  print(paste("Updating ONLY last",go_back_num,"Shows"))
   #assume at most 5 shows per week
   #most shows are 1/week except the morning show
   most_recent_date<-max(playlists_raw$AirDate)
@@ -485,8 +489,14 @@ for (dj in djList) {
   for (n in 1:go_back_num){
     plURL<-plURLs[n,1]
     print(paste(dj, n, plURL,Sys.time()))
-    if (!is.na(pull(plURLs[1,1]))){
-      playlists_raw <- bind_rows(playlists_raw, get_playlist(plURL, dj))
+    if (!is.na(pull(plURLs[n,1]))){
+      new_playlist<- get_playlist(plURL, dj)
+      #end loop if we have reached most_recent_date beacuse get_playlist returns "stop" character string.
+      if (TRUE %in% (is(new_playlist)=="character")) {
+        break
+      }else{
+        playlists_raw <- bind_rows(playlists_raw,new_playlist)
+      }
     }
   }
   #save to disk after each dj
