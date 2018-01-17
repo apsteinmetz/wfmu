@@ -733,5 +733,20 @@ arts_data<-blind_features %>%
          feat_2=Spins,
          feat_3=dj_concentration,
          event)
+#separate training and test sets 70/30
+set.seed(1234)
+train_artists<-blind_artists %>% select(id) %>% sample_frac(0.70)
+test_artists<-blind_artists %>% select(id) %>% anti_join(train_artists)
+arts_data_train <- train_artists %>% left_join(arts_data) %>% arrange(id)
+arts_data_test <- test_artists %>% left_join(arts_data)
+
+arts_data_train %>% 
+  mutate(event_label=ifelse(event=="event","Event","")) %>% 
+  filter(id==(filter(blind_artists,ArtistToken=="Prince") %>% pull(id))) %>% 
+  ggplot(aes(time,feat_2,label=event_label))+geom_col()+
+  geom_line(aes(y=feat_1),size=2,color="red")+
+  geom_line(aes(y=feat_3*100),size=2,color="blue")+
+  geom_text()
+
 ```
 
