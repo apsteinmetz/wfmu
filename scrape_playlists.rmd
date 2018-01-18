@@ -482,13 +482,13 @@ for (dj in djList) {
     rowid_to_column() %>% 
     select(playlistURL)
   if (UPDATE_ONLY) {
-    print(paste("Updating ONLY last",go_back_num,"Shows"))
+    print(paste("Updating at most last",go_back_num,"Shows to",most_recent_date))
   } else{
     go_back_num<-nrow(plURLs)
   }
   for (n in 1:go_back_num){
     plURL<-plURLs[n,1]
-    print(paste(dj, n, plURL,Sys.time()))
+    print(paste(dj, n, plURL))
     if (!is.na(pull(plURLs[n,1]))){
       new_playlist<- get_playlist(plURL, dj)
       #end loop if we have reached most_recent_date beacuse get_playlist returns "stop" character string.
@@ -500,7 +500,10 @@ for (dj in djList) {
     }
   }
   #save to disk after each dj
-  save(playlists_raw,file="playlists_raw.Rdata")
+  if (!(TRUE %in% (is(new_playlist)=="character"))) {
+    print(paste("Saving playlists at",Sys.time()))
+    save(playlists_raw,file="playlists_raw.Rdata")
+  }
 }
 
 bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw)
@@ -511,12 +514,4 @@ playlists_raw<-playlists_raw %>%
 
 save(playlists_raw,file="playlists_raw.Rdata")
 
-
-
 ```
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
-
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
