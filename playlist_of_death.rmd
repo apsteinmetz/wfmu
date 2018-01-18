@@ -720,7 +720,9 @@ blind_features<-blind_features %>%
 blind_artists<-blind_features %>% 
   ungroup() %>% 
   select(ArtistToken) %>% 
-  unique() %>% 
+  unique()
+
+blind_artists<-blind_artists%>% 
   bind_cols(id=index(blind_artists))
 
 blind_features<-blind_features %>% left_join(blind_artists)
@@ -748,5 +750,39 @@ arts_data_train %>%
   geom_line(aes(y=feat_3*100),size=2,color="blue")+
   geom_text()
 
+```
+
+#now do a feature set with no engineering
+```{r}
+
+#replace ArtistToken with id
+wide_features<-playlist_summary %>% 
+  ungroup() %>% 
+  mutate(Spins=as.integer(Spins)) %>% 
+  left_join(blind_artists) %>% 
+  select(id,everything())
+
+#replace AirDate with time
+wide_features<-wide_features %>% 
+  mutate(time=as.integer((AirDate-as.yearqtr(as.Date("2001-12-31")))*4)) %>% 
+  select(time,everything())
+
+#spread it out
+wide_features<-wide_features %>% spread(DJ,Spins,fill=0,convert=TRUE)
+
+#start HERE
+#add death flag
+#merge with death flag
+
+blind_features<-left_join(blind_features,death_tokens) %>% 
+  select(-Date) %>% 
+  mutate_cond(is.na(death_flag),death_flag="NonEvent")
+
+#anonymyize identifiers
+blind_features<-blind_features %>% 
+  mutate(time=as.integer((AirDate-as.yearqtr(as.Date("2001-12-31")))*4))
+
+blind_features<-blind_features %>% 
+  mutate(event=if_else(death_flag=="Death","event","nonevent"))
 ```
 
