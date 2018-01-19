@@ -764,25 +764,41 @@ wide_features<-playlist_summary %>%
 
 #replace AirDate with time
 wide_features<-wide_features %>% 
-  mutate(time=as.integer((AirDate-as.yearqtr(as.Date("2001-12-31")))*4)) %>% 
+  mutate(time=as.integer((AirDate-as.yearqtr(as.Date("2001-12-31")))*4)) %>%
+  left_join(death_tokens) %>% 
+  mutate(event=ifelse(is.na(death_flag),"nonevent","event")) %>% 
   select(time,everything())
 
 #spread it out
 wide_features<-wide_features %>% spread(DJ,Spins,fill=0,convert=TRUE)
 
-#start HERE
-#add death flag
 #merge with death flag
-
-blind_features<-left_join(blind_features,death_tokens) %>% 
-  select(-Date) %>% 
-  mutate_cond(is.na(death_flag),death_flag="NonEvent")
+wide_features<-wide_features %>% 
+  left_join(death_tokens) %>%
+  mutate(event=if_else(is.na(death_flag),"nonevent","event"))
 
 #anonymyize identifiers
-blind_features<-blind_features %>% 
-  mutate(time=as.integer((AirDate-as.yearqtr(as.Date("2001-12-31")))*4))
+wide_features<-wide_features %>% select(-ArtistToken,-AirDate,-Date,-death_flag)
 
-blind_features<-blind_features %>% 
-  mutate(event=if_else(death_flag=="Death","event","nonevent"))
+#separate training and test sets 70/30
+set.seed(1234)
+train_artists<-blind_artists %>% select(id) %>% sample_frac(0.70)
+test_artists<-blind_artists %>% select(id) %>% anti_join(train_artists)
+arts_data_train <- train_artists %>% left_join(wide_features) %>% arrange(id)
+arts_data_test <- test_artists %>% left_join(wide_features) %>% select(-event)
+
+
+prop.table(table(arts_data_train$event))
+prop.table(table(arts_data_test$event))
+
+arts_data_train %>% 
+  mutate(event_label=ifelse(event=="event","Event","")) %>% 
+  mutate(sum_feat=rowSums(.[4:168])) %>% 
+  filter(id==(filter(blind_artists,ArtistToken=="Prince") %>% pull(id))) %>% 
+  ggplot(aes(time,sum_feat,label=event_label))+geom_col()+
+  geom_text()
+
+write_csv(arts_data_train,"arts_data_train.csv")
+write_csv(arts_data_test,"arts_data_test.csv")
 ```
 
