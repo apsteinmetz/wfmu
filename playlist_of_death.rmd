@@ -323,7 +323,12 @@ death_page<-read_html(death_page_text)
 #get tables
 death_table_nodes<-death_page %>% html_nodes("table")
 
-deaths<-death_table_nodes[[5:length(death_table_nodes)]] %>% html_table(fill=TRUE)
+#WORK HERE
+deaths<-death_table_nodes[[length(death_table_nodes)-1]] %>% 
+  html_table(fill=TRUE)
+deaths<-deaths %>% bind_rows(death_table_nodes[[length(death_table_nodes)]] %>% html_table(fill=TRUE))
+
+
 names(deaths)<-c("Name","Band","Age","Date","Location","Cause_of_Death")
 deaths <-deaths %>% as_data_frame()
 
