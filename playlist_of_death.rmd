@@ -295,9 +295,19 @@ We've taken feature engineering about as far is it can go.  We have a pretty goo
 Parsing HTML is a dark art and I would not rise to the level of sorcerer's apprentice.  Helpfully, the date we want is in tables.  Unhelpfully, if a band name is associated with an artist name it appears in the same table cell as the artist, encased in a `<small><\small>` tag.  Extracting the just the text from the cell concatates the two items without a separator.  We would like to break the person and the band into separate columns and we need to search/replace the raw html text to do it. So instead of `<td>Person<small>Band<\small><\td>` we get `<td>Person<\td>Band<\td>`.
 
 ```{r}
-death_page<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll")
+death_page1<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll")
+write_html(death_page1,file="death_page1.html")
+death_page2<-read_html("https://en.wikipedia.org/wiki/List_of_2010s_deaths_in_rock_and_roll")
+write_html(death_page2,file="death_page2.html")
+
+#join pre-2010 to post 2010
+death_page<-death_page1
+death_page_child<-death_page1 %>% xml_children() %>% .[2]
+death_page2_child<-death_page2 %>% xml_children() %>% .[2]
+xml_add_sibling(death_page_child,death_page2_child)
 write_html(death_page,file="death_page.html")
 
+#Very Crude (or clever) Hack follows
 # read it in as a raw text file and edit the tags
 # to break the artist name and band names into two columns
 # by replacing '<small>' with '</td><td>' and
@@ -305,21 +315,21 @@ write_html(death_page,file="death_page.html")
 death_page_text<-read_file("death_page.html")
 death_page_text<- gsub( "<small>", "</td><td>", death_page_text )
 death_page_text<- gsub( "</small>", "", death_page_text )
+write_file(death_page_text,"death_page.html")
 #read it back in
 death_page<-read_html(death_page_text)
 
 
 #get tables
 death_table_nodes<-death_page %>% html_nodes("table")
-deaths_2010s<-death_table_nodes[[length(death_table_nodes)]] %>% html_table(fill=TRUE) %>% .[,1:6]
-deaths_2000s<-death_table_nodes[[length(death_table_nodes)-1]] %>% html_table(fill=TRUE) %>% .[,1:6]
+
+deaths<-death_table_nodes[[5:length(death_table_nodes)]] %>% html_table(fill=TRUE)
+names(deaths)<-c("Name","Band","Age","Date","Location","Cause_of_Death")
+deaths <-deaths %>% as_data_frame()
 
 ```
 
 ```{r}
-deaths<-bind_rows(deaths_2000s,deaths_2010s) %>% .[,1:6]
-names(deaths)<-c("Name","Band","Age","Date","Location","Cause_of_Death")
-deaths<-as_data_frame(deaths)
 # shift columns where no band names exist
 temp<-deaths %>% 
   mutate(test=as.numeric(Age))
@@ -569,7 +579,6 @@ play_test_label<-transmute(play_test,death_label=as.factor(ifelse(death==0,"NonE
 play_train<-play_train %>% select(z_score,dj_multiple,dj_concentration)
 play_test<-play_test %>% select(z_score,dj_multiple,dj_concentration)
 
-prop.table(table(play_train_label))
 prop.table(table(play_train_label))
 model_knn<-knn(train=play_train,test=play_test,cl=play_train_label$death_label,k=5)
 summary(model_knn)
