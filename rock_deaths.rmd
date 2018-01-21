@@ -1,0 +1,214 @@
+---
+title: "Summarizing Deaths in Rock"
+output: html_notebook
+---
+Live fast, die young, stay pretty.  That's the stereotype for rockers, or it was.  We only need to look at Keith Richards, over 70 and going strong, to find a major counterexample.  Do rockers die young?  What do they die of?  We can use Wikipedia and [this page.](https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll) to make some generalizations.
+
+We will scrape the tables and do sum summary aggregations.  R and the xml2 package have some great functions for converting html `<table>`s into data frames.
+
+The deaths for 2010 and later are in a separate article so we need to get both.  When I started this project they were on one page. By the time you read this the Wikipedia gods may have changed it again.  Beware.
+```{r}
+library(XML)
+library(xml2)
+library(ggplot2)
+library(stringr)
+library(tidyverse)
+library(lubridate)
+library(knitr)
+library(xts)
+library(rvest)
+library(ggrepel)
+
+
+death_page1<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll")
+write_html(death_page1,file="death_page1.html")
+death_page2<-read_html("https://en.wikipedia.org/wiki/List_of_2010s_deaths_in_rock_and_roll")
+write_html(death_page2,file="death_page2.html")
+```
+`xml2` is a very powerful package but one thing I learned is that it works with pointers to the data rather than the actual data. C programmers and old geezers like me will be familiar with this.  I remember pop and push and stacks and all that stuff from the old days.  R generally doesnt pass values "by reference." It passes "by value." That's why when you modify data in the scope of a function it doesn't affect the value of the data outside unless you assign it with `return <data>`.  Using pointers means modifications to html data happen without an explicit assigment.
+
+Consider a trival example:
+```{r, eval=FALSE}
+#ususal R behavior
+my_function<- function(x){return (x+1)}
+data=3
+#this doesn't change data
+my_function(data)
+data
+#[1] 3
+#this does
+data<-my_function(data)
+data
+#[1] 4
+```
+If we were passing values "by reference" `my_function(data)` would change `data`.  That's how `xml2` works.
+
+We use this behaviour to combine them the tables in the two Wikipedia articles into one html page by extracting the tables in the second wiki article and making them xml siblings of the tables in the first.
+```{r}
+#join pre-2010 to post 2010
+death_page<-death_page1
+death_page_child<-death_page1 %>% xml_children() %>% .[2]
+death_page2_child<-death_page2 %>% xml_children() %>% .[2]
+#create one big web page by adding all the first level children from the second
+#page to the first.
+xml_add_sibling(death_page_child,death_page2_child)
+write_html(death_page,file="death_page.html")
+
+```
+Unfortunately, as is often the case, the tables are not as clean as we might like. 
+
+Here's a data wrastlin' puzzle.  The artist and the band name or names share a single cell.  This is not a problem for the anonymous summary stats we will present here but I am doing another analysis where I look at radio station playlist patterns do detect deaths.  Here we need to flag the event by band or artist, however it appears.
+
+Parsing HTML is a dark art and I would not rise to the level of sorcerer's apprentice.  The clue that will let us separate the two (or more) identifiers is that the band is encased in a `<small><\small>` tag.  Extracting the just the text from the cell concatenates the two items without a separator.  The `XML2` functions won't help this noob here.  We would like to break the person and the band into separate columns and we need to search/replace the file as raw text to do it. So instead of `<td>Person<small>Band,Band<\small><\td>` we want to have `<td>Person,Band,band***<\td>`.  This way we can separate out band names later.
+
+
+```{r}
+#Crude hack follows
+# read it in as a raw text file and edit the tags
+# to break the artist name and band names into comma-separated list
+# by replacing '<small>' with ','.
+death_page_text<-read_file("death_page.html")
+death_page_text<- gsub( "<small>", ", ", death_page_text )
+death_page_text<- gsub( "</small>", "", death_page_text )
+write_file(death_page_text,"death_page2.html")
+
+```
+A further wrinkle is some of the age-at-death numbers are given as a range like "45-46" which causes `html_table` to create a `character  ` column while it will othwise be of type `numeric`.  We want to use `bind_rows` to combine all the web page tables into one data frame but it will break on the type conflict.  Let's arbitrarily take the lowest number in age range before binding.  We can do this as part of the table extraction process.
+
+```{r}
+# omit first five tables
+deaths_raw<-read_html("death_page2.html") %>% 
+  html_nodes("table") %>% 
+  .[5:length(death_table_nodes)] %>% 
+  html_table(fill=TRUE) %>%
+  lapply(function(x){mutate(x,Age=as.integer(str_extract(as.character(Age),"[0-9]+")))}) %>% 
+  bind_rows() %>% 
+  as_data_frame() %>% 
+  {.}
+
+deaths_raw
+```
+
+
+Almost done.  Separate out the list of name and bands into, at most, four bands. Turn the date string into a POSIX-style date.  Clean up the column names. Finally, strip the footnote numbers out of the file.
+
+```{r warning=FALSE}
+#take at most three band names.
+deaths<-deaths_raw %>% 
+  separate(Name,into=c("Name","band1","band2","band3","band4"),sep=",",extra="drop")
+
+deaths<-deaths %>% 
+  mutate(Date=parse_date(Date,"%B %d, %Y")) %>% 
+  filter(!is.na(Date))
+
+#remove footnotes
+
+deaths<-deaths %>% mutate(`Cause of death`=str_replace(`Cause of death`,"\\[[0-9,]+\\]",""))
+deaths<-deaths %>% mutate_cond(is.na(`Cause of death`),`Cause of death`="Not Specified")
+deaths<-deaths %>% mutate_cond(`Cause of death`=="",`Cause of death`="Not Specified")
+
+#what are common causes of death
+cause_table<-deaths %>% 
+  group_by(`Cause of death`) %>% 
+  summarize(Cause=n()) %>% 
+  arrange(desc(Cause))
+
+cause_table
+```
+Looking through the table we see that many causes can be generalized.  Let's aggregate a bit. We are making some choices here.  For instance, I call any cause containing the words "heart" or "cardiac" as "heart disease."  I count alcohol as a drug.
+```{r}
+#add a new column "general cause"
+deaths<-deaths %>% mutate(General_Cause=`Cause of death`)
+
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),"suicide"),General_Cause="Suicide")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),
+                         "accident|fall|hit|crash"),General_Cause="Accident")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),
+                         "drug|overdose|alcohol"),General_Cause="Drugs")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),"shot|shoot|murder|stab|gun|knife"),
+              General_Cause="Murdered")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),
+                         "heart|cardi|coronary"),General_Cause="Heart Disease")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),"aids|hiv"),General_Cause="AIDS")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),
+                         "diabetes|diabetic"),General_Cause="Diabetes")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),
+                         "pneumonia|emphysema"),General_Cause="Lung Disease")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),
+                         "cirrhosis|neph|liver"),General_Cause="Liver Disease")
+
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),
+                         "stroke"),General_Cause="Stroke")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),
+                         "alzh"),General_Cause="Alzheimers")
+#Cancer is last because iting other organs and cancer counts as cancer.
+#-omas other than "stomach" and "coma" are cancer
+deaths<-deaths %>% 
+  mutate_cond(str_detect(`Cause of death`,"oma") & 
+                !str_detect(`Cause of death`,"tomach|coma"),
+              General_Cause="Cancer")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),"cancer|tumor"),General_Cause="Cancer")
+
+cause_table<-deaths %>% 
+  count(General_Cause) %>% 
+  arrange(desc(n)) %>% 
+  rename(Rockers=n)
+
+cause_table<-cause_table %>% mutate(General_Cause= as_factor(General_Cause))
+cause_table
+```
+
+```{r}
+#plot, leaving out "not specified"
+gg<-cause_table[1:11,]  %>% 
+  filter(General_Cause != "Not Specified") %>%
+  ggplot(aes(General_Cause,Rockers))+geom_col()
+gg<-gg+coord_flip()
+gg
+```
+Now we have a decent picture of how rock stars die.  Mostly from the same things that kill all of us. Heart disease and Cancer are the leading causes of death in US, followed by lung disease and accidents according to https://www.cdc.gov/nchs/fastats/deaths.htm.
+
+Heart disease: 633,842
+Cancer: 595,930
+Chronic lower respiratory diseases: 155,041
+Accidents (unintentional injuries): 146,571
+Stroke (cerebrovascular diseases): 140,323
+Alzheimer’s disease: 110,561
+Diabetes: 79,535
+Influenza and Pneumonia: 57,062
+Liver disease: 49,959
+Suicide: 44,193
+Murder: 15,696 (https://ucr.fbi.gov/crime-in-the-u.s/2015/crime-in-the-u.s.-2015/tables/table-4)
+
+Drug overdoses may count as "accidents" at the CDC.  I don't separate out Pneumonia from chronic lung problems. Alzheimer's is a big killer, nationally but is only 21st on the list of rocker deaths.  Perhaps it is underreported or was recognized as a distinct cause of death only recently.
+
+```{r}
+
+us_deaths<-data_frame(General_Cause=as_factor(c('Heart Disease','Cancer',
+                                      'Lung Disease','Accident','Stroke',
+                                      'Alzheimers','Diabetes','Liver Disease',
+                                      'Suicide','Murdered')),
+                      US=c(633842,595930,212103,146571,140323,110561,79535,49959,44193,15696))
+
+comp_deaths<-left_join(us_deaths,cause_table) %>%
+  mutate(General_Cause=as_factor(General_Cause))
+
+gg<-comp_deaths %>% ggplot(aes(US,Rockers))+geom_point()
+gg<-gg+  geom_text_repel(label=comp_deaths$General_Cause)
+gg<-gg+geom_smooth(method="lm",formula= y~0+x,se=FALSE)
+gg<-gg+labs(main="Rock Stars are Just Like the Rest of US",sub="Causes of Death",
+y='Rockers (all years)',x='US Deaths (2015)')
+gg
+```
