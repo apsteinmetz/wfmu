@@ -299,7 +299,9 @@ death_page1<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and
 write_html(death_page1,file="death_page1.html")
 death_page2<-read_html("https://en.wikipedia.org/wiki/List_of_2010s_deaths_in_rock_and_roll")
 write_html(death_page2,file="death_page2.html")
+```
 
+```{r}
 #join pre-2010 to post 2010
 death_page<-death_page1
 death_page_child<-death_page1 %>% xml_children() %>% .[2]
@@ -321,22 +323,37 @@ death_page<-read_html(death_page_text)
 
 
 #get tables
-death_table_nodes<-death_page %>% html_nodes("table")
+#mortality tables start at table 5 on the page.  COULD CHANGE!
+death_table_nodes<-death_page %>% html_nodes("table") %>% .[5:length(death_table_nodes)]
 
-#WORK HERE
-deaths<-death_table_nodes[[length(death_table_nodes)-1]] %>% 
+
+#We now have multiple tables we need to combine.  Two problems.  First, the
+#columns are not the same over all tables. Some are missing column names.
+#Second, some columns with the same name have different data types.  This seems
+#to preclude a nice apply or map solution, forcing me to iterate over the list
+#of data frames.
+
+death_tables<-death_table_nodes %>% 
   html_table(fill=TRUE)
-deaths<-deaths %>% bind_rows(death_table_nodes[[length(death_table_nodes)]] %>% html_table(fill=TRUE))
+
+#make sure they have the same number of columns. Truncate if necessary
 
 
-names(deaths)<-c("Name","Band","Age","Date","Location","Cause_of_Death")
-deaths <-deaths %>% as_data_frame()
+for (n in seq_along(death_tables)){
+  #make sure they have the same number of columns, six. Truncate if necessary.
+  death_tables[[n]]<-death_tables[[n]][,1:6]
+  names(death_tables[[n]])<-c("Name","Band","Age","Date","Location","Cause_of_Death")
+  death_tables[[n]]<-death_tables[[n]] %>% mutate_all(as.character)
+  #death_tables[[n]] %>% mutate_all(as_data_frame)
+}
+#Now can we join
+deaths<-as_data_frame(map_df(death_tables,bind_rows))
 
 ```
 
 ```{r}
 # shift columns where no band names exist
-temp<-deaths %>% 
+temp<-deaths %>% mutate()
   mutate(test=as.numeric(Age))
 
 temp1<-temp %>% 
@@ -357,12 +374,65 @@ deaths<-bind_rows(temp1,temp2)
 deaths<-deaths %>% mutate(Cause_of_Death=str_replace(Cause_of_Death,"\\[[0-9,]+\\]",""))
 deaths<-deaths %>% mutate_cond(is.na(Cause_of_Death),Cause_of_Death="Not Specified")
 deaths<-deaths %>% mutate_cond(Cause_of_Death=="",Cause_of_Death="Not Specified")
-
-
-#while we are at it, what are common causes of death?
-
-deaths %>% group_by(Cause_of_Death) %>% summarise(Count=n()) %>% arrange(desc(Count))
 ```
+
+
+```{r}
+#while we are at it, what are common causes of death?
+#add a new column "general cause"
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"suicide"),General_Cause="Suicide")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"cancer"),General_Cause="Cancer")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"tumor"),General_Cause="Cancer")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"oma"),General_Cause="Cancer")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"accident"),General_Cause="Accident")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death)," fall"),General_Cause="Accident")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"hit"),General_Cause="Accident")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"drug"),General_Cause="Drugs")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"overdose"),General_Cause="Drugs")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"shot"),General_Cause="Murdered")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"shooting"),General_Cause="Murdered")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"murder"),General_Cause="Murdered")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"stab"),General_Cause="Murdered")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"heart"),General_Cause="Heart Failure")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"cardiac"),General_Cause="Heart Failure")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"aids"),General_Cause="AIDS")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"hiv"),General_Cause="AIDS")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(Cause_of_Death),"diabetes"),General_Cause="Diabetes")
+
+cause_table<-deaths %>% 
+  count(General_Cause) %>% 
+  arrange(desc(n))
+
+cause_table<-cause_table %>% mutate(General_Cause= as_factor(General_Cause))
+cause_table
+```
+```{r}
+#plot, leaving out "not specified"
+gg<-cause_table[2:11,]  %>% 
+  ggplot(aes(General_Cause,n))+geom_col()
+gg<-gg+coord_flip()
+gg
+```
+
+
 Now we need to put the nicely formatted data into a form consistent with the data in our playlists.  To to this we need to parse the date string and put both the artist name and band name(s) into a tokenized list conforming the playlist rules.
 ```{r warning=FALSE}
 deaths<-deaths %>% mutate(Date=parse_date(Date,"%B %d, %Y")) %>% filter(!is.na(Date))
