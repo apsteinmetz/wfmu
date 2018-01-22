@@ -20,11 +20,21 @@ library(rvest)
 library(ggrepel)
 library(gapminder)
 
+# function to mutate only rows meeting a certain condition
+#most useful enhancement to dplyr ever!
+#I load this in all my projects.
+mutate_cond <- function(.data, condition, ..., envir = parent.frame()) {
+  condition <- eval(substitute(condition), .data, envir)
+  condition[is.na(condition)] = FALSE
+  .data[condition, ] <- .data[condition, ] %>% mutate(...)
+  .data
+}
 
 death_page1<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll")
 write_html(death_page1,file="death_page1.html")
 death_page2<-read_html("https://en.wikipedia.org/wiki/List_of_2010s_deaths_in_rock_and_roll")
 write_html(death_page2,file="death_page2.html")
+
 ```
 `xml2` is a very powerful package but one thing I learned is that it works with pointers to the data rather than the actual data. C programmers and old geezers like me will be familiar with this.  I remember pop and push and stacks and all that stuff from the old days.  R generally doesnt pass values "by reference." It passes "by value." That's why when you modify data in the scope of a function it doesn't affect the value of the data outside unless you assign it with `return <data>`.  Using pointers means modifications to html data happen without an explicit assigment.
 
@@ -209,10 +219,12 @@ Influenza and Pneumonia: 57,062
 Liver disease: 49,959
 Suicide: 44,193
 Murder: 15,696 (https://ucr.fbi.gov/crime-in-the-u.s/2015/crime-in-the-u.s.-2015/tables/table-4)
+Drug overdoses: 53,000 (2015,https://www.drugabuse.gov/related-topics/trends-statistics/overdose-death-rates)
+Alcohol Poisoning:2,200 (https://www.cdc.gov/vitalsigns/alcohol-poisoning-deaths/index.html)
 
-Drug overdoses may count as "accidents" at the CDC.  I don't separate out Pneumonia from chronic lung problems. Alzheimer's is a big killer, nationally but is only 21st on the list of rocker deaths.  Perhaps it is underreported or was recognized as a distinct cause of death only recently.
+Drug overdoses may count as "accidents" at the CDC.  I don't separate out Pneumonia from chronic lung problems. Alzheimer's is a big killer, nationally but is only 21st on the list of rock deaths.  Perhaps it is underreported or was recognized as a distinct cause of death only recently.
 
-There are some interesting causes in this list.  Three electrocutions, two by guitar and one my microphone. They all happened in England in the early 70s.  Presumably the codes have been tightned up a bit since.  Three people are listed who choked on their own vomit.  Boring.  Consider the hapless Steve Took of T Rex, who died from choking on a cocktail cherry.  That's why I always take my Manhattans with a lemon twist instead.
+There are some interesting causes in this list.  Three electrocutions, two by guitar and one my microphone. They all happened in England in the early 70s.  Presumably the electrical codes have been tightned up a bit since.  Three people are listed who choked on their own vomit. That's all? Consider the hapless Steve Took of T Rex, who died from choking on a cocktail cherry.  That's why I always take my Manhattans with a lemon twist instead.
 
 While the big killers are the same for both populations, is there evidence that rockers "live fast?"  Yes, it turns out.
 
@@ -237,16 +249,34 @@ gg<-comp_deaths %>% ggplot(aes(US,Rockers))+geom_point()
 gg<-gg+  geom_text_repel(label=comp_deaths$General_Cause)
 gg<-gg+geom_smooth(method="lm",formula= y~0+x,se=FALSE)
 gg<-gg+labs(title="Rock Stars are Almost Like the Rest of US",caption="Sources: Wikipedia and CDC",
-y='Rocker Music Deaths (1950-Present)',x='US Deaths (2015)')
+y='Rock Music Deaths (1950-Present)',x='US Deaths (2015)')
 gg
 ```
 This shows the preponderance of Rock musician deaths relative to the broader US population.  We can see that suicide, accidents and murder account for more relative deaths than they do in the broader population.
 
-We've scientifically proven (!) that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death won't be comprable to current US life expectancy.  To get a comparison let's pull the 
+We've <grin>scientifically proven</grin> that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death won't be comprable to current US life expectancy.  To get a comparison let's pull the data from the `gapminder` package.  This shows life expectancy at birth as opposed to average age at death, which is what we have now, so we have to get a bit tricky to make the numbers comparable.  Our year at births is much earlier than the gapminder set covers so we need to extrapolate the data, as well.
 
 ```{r}
+#add birth year column
+deaths<-deaths %>% mutate(birth_year=year(Date)-Age)
 
-#needs work
+#create extrapolation of gapminder life expectancy.
+life_exp<-gapminder %>% 
+  filter(country=="United States") %>% 
+  select(year,lifeExp) %>% rename(birth_year=year) %>% 
+  complete(birth_year=min(deaths$birth_year):year(Sys.Date())) %>% 
+  {.}
+p<-lm(life_exp$lifeExp~life_exp$birth_year)
+life_exp$US<-predict(p,life_exp)
+
+#how well does this fit the data?
+life_exp %>% ggplot(aes(birth_year,US))+geom_line()+geom_point(aes(y=lifeExp))
+
+```
+We see that the gapminder data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  Our sample sizes are pretty small at the far end of the range so any conclusions would have to be taken with a huge grain of salt anyway.  Still, lets plunge on!
+
+
+deaths<-deaths %>% mutate(birth_year=year(Date)-Age)
 
 death_age<-deaths %>% 
   group_by(Year) %>% 
@@ -263,6 +293,27 @@ approx(death_age2$Year,death_age2$US,rule=1)
 %>%
   ggplot(aes(Year,mean_age))+geom_smooth()
 
-
-```
-
+1900 2,3 . . . . . . . . . . . . . . . . 47.3 46.3 48.3 47.6 46.6 48.7 33.0 32.5 33.5
+1950 3 . . . . . . . . . . . . . . . . . 68.2 65.6 71.1 69.1 66.5 72.2 60.8 59.1 62.9
+1960 3 . . . . . . . . . . . . . . . . . 69.7 66.6 73.1 70.6 67.4 74.1 63.6 61.1 66.3
+1970 . . . . . . . . . . . . . . . . . 70.8 67.1 74.7 71.7 68.0 75.6 64.1 60.0 68.3
+1975 . . . . . . . . . . . . . . . . . 72.6 68.8 76.6 73.4 69.5 77.3 66.8 62.4 71.3
+1980 . . . . . . . . . . . . . . . . . 73.7 70.0 77.4 74.4 70.7 78.1 68.1 63.8 72.5
+1990 . . . . . . . . . . . . . . . . . 75.4 71.8 78.8 76.1 72.7 79.4 69.1 64.5 73.6
+1995 . . . . . . . . . . . . . . . . . 75.8 72.5 78.9 76.5 73.4 79.6 69.6 65.2 73.9
+2000 . . . . . . . . . . . . . . . . . 76.8 74.1 79.3 77.3 74.7 79.9 71.8 68.2 75.1
+2001 . . . . . . . . . . . . . . . . . 77.0 74.3 79.5 77.5 74.9 80.0 72.0 68.5 75.3
+2002 . . . . . . . . . . . . . . . . . 77.0 74.4 79.6 77.5 74.9 80.1 72.2 68.7 75.4
+2003 . . . . . . . . . . . . . . . . . 77.2 74.5 79.7 77.7 75.1 80.2 72.4 68.9 75.7
+2004 . . . . . . . . . . . . . . . . . 77.6 75.0 80.1 78.1 75.5 80.5 72.9 69.4 76.1
+2005 . . . . . . . . . . . . . . . . . 77.6 75.0 80.1 78.0 75.5 80.5 73.0 69.5 76.2
+2006 . . . . . . . . . . . . . . . . . 77.8 75.2 80.3 78.3 75.8 80.7 73.4 69.9 76.7
+2007 . . . . . . . . . . . . . . . . . 78.1 75.5 80.6 78.5 76.0 80.9 73.8 70.3 77.0
+2008 . . . . . . . . . . . . . . . . . 78.2 75.6 80.6 78.5 76.1 80.9 74.3 70.9 77.3
+2009 . . . . . . . . . . . . . . . . . 78.5 76.0 80.9 78.8 76.4 81.2 74.7 71.4 77.7
+2010 . . . . . . . . . . . . . . . . . 78.7 76.2 81.0 78.9 76.5 81.3 75.1 71.8 78.0
+2011 . . . . . . . . . . . . . . . . . 78.7 76.3 81.1 79.0 76.6 81.3 75.3 72.2 78.2
+2012 . . . . . . . . . . . . . . . . . 78.8 76.4 81.2 79.1 76.7 81.4 75.5 72.3 78.4
+2013 4 . . . . . . . . . . . . . . . . . 78.8 76.4 81.2 79.0 76.7 81.4 75.5 72.3 78.4
+2014 4 . . . . . . . . . . . . . . . . . 78.9 76.5 81.3 79.1 76.7 81.4 75.6 72.5 78.5
+2015 4 . . . . . . . . . . . . . . . . . 78.8 76.3 81.2 79.0 76.6 81.3 75.5 72.2 78.5 
