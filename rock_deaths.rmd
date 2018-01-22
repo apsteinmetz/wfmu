@@ -212,3 +212,14 @@ gg<-gg+labs(main="Rock Stars are Just Like the Rest of US",sub="Causes of Death"
 y='Rockers (all years)',x='US Deaths (2015)')
 gg
 ```
+
+#Age at death
+
+```{r}
+deaths %>% mutate(Year=year(Date)) %>% 
+  group_by(Year) %>% 
+  summarise(NumEntries=n()) %>%
+  ggplot(aes(Year,NumEntries))+geom_col()
+
+```
+
