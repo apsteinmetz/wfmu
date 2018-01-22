@@ -154,6 +154,10 @@ deaths<-deaths %>%
   mutate_cond(str_detect(tolower(`Cause of death`),
                          "drug|overdose|alcohol"),General_Cause="Drugs")
 deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),"asphyxiation"),
+              General_Cause="Asphyxiation")
+
+deaths<-deaths %>% 
   mutate_cond(str_detect(tolower(`Cause of death`),"shot|shoot|murder|stab|gun|knife"),
               General_Cause="Murdered")
 deaths<-deaths %>% 
@@ -206,7 +210,7 @@ gg<-cause_table[1:11,]  %>%
 gg<-gg+coord_flip()
 gg
 ```
-Now we have a decent picture of how rock stars die.  Mostly from the same things that kill all of us. Heart disease and Cancer are the leading causes of death in US, followed by lung disease and accidents according to https://www.cdc.gov/nchs/fastats/deaths.htm.
+Now we have a decent picture of how rock stars die.  Mostly from the same things that kill all of us. Heart disease and Cancer are the leading causes of death in US, followed by lung disease and accidents according to .
 
 Heart disease: 633,842
 Cancer: 595,930
@@ -242,25 +246,29 @@ comp_deaths<-cause_table %>%
   group_by(General_Cause) %>% 
   summarise(Rockers=sum(Rockers)) %>% 
   right_join(us_deaths) %>%
-  mutate(General_Cause=as_factor(General_Cause))
+  mutate(General_Cause=as_factor(General_Cause)) %>% 
+  mutate(Rockers=Rockers/sum(Rockers),US=US/sum(US))
   
 
 gg<-comp_deaths %>% ggplot(aes(US,Rockers))+geom_point()
 gg<-gg+  geom_text_repel(label=comp_deaths$General_Cause)
-gg<-gg+geom_smooth(method="lm",formula= y~0+x,se=FALSE)
-gg<-gg+labs(title="Rock Stars are Almost Like the Rest of US",caption="Sources: Wikipedia and CDC",
+gg<-gg+geom_abline(slope=1,intercept=0)
+gg<-gg+labs(title="Rock Stars are (Almost) Like the Rest of US\nProportion of all Deaths",caption="Sources: Wikipedia and CDC",
 y='Rock Music Deaths (1950-Present)',x='US Deaths (2015)')
+gg<-gg+scale_x_continuous(labels=scales::percent)
+gg<-gg+scale_y_continuous(labels=scales::percent)
 gg
 ```
-This shows the preponderance of Rock musician deaths relative to the broader US population.  We can see that suicide, accidents and murder account for more relative deaths than they do in the broader population.
+This shows the preponderance of Rock musician deaths relative to the broader US population.  We can see that suicide, murder and, especially, accidents account for more relative deaths than they do in the broader population.
 
 We've <grin>scientifically proven</grin> that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death won't be comprable to current US life expectancy.  To get a comparison let's pull the data from the `gapminder` package.  This shows life expectancy at birth as opposed to average age at death, which is what we have now, so we have to get a bit tricky to make the numbers comparable.  Our year at births is much earlier than the gapminder set covers so we need to extrapolate the data, as well.
 
 ```{r}
-#add birth year column
+#Add birth year column.
 deaths<-deaths %>% mutate(birth_year=year(Date)-Age)
 
-#create extrapolation of gapminder life expectancy.
+#Create extrapolation of gapminder life expectancy using the full range of birth
+#years from the deaths table.
 life_exp<-gapminder %>% 
   filter(country=="United States") %>% 
   select(year,lifeExp) %>% rename(birth_year=year) %>% 
@@ -270,13 +278,12 @@ p<-lm(life_exp$lifeExp~life_exp$birth_year)
 life_exp$US<-predict(p,life_exp)
 
 #how well does this fit the data?
-life_exp %>% ggplot(aes(birth_year,US))+geom_line()+geom_point(aes(y=lifeExp))
+life_exp %>% ggplot(aes(birth_year,US))+geom_line()+geom_point(aes(y=lifeExp))+
+  labs(title="Extrapolated Life Expectancy at Birth",y="Life Expectancy",x="Birth Year")
 
 ```
-We see that the gapminder data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  Our sample sizes are pretty small at the far end of the range so any conclusions would have to be taken with a huge grain of salt anyway.  Still, lets plunge on!
-
-
-deaths<-deaths %>% mutate(birth_year=year(Date)-Age)
+We see that the `gapminder` data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  Our sample sizes are pretty small at the far end of the range, anyway, so any conclusions would have to be taken with a huge grain of salt,regardless.  Still, lets plunge on!
+```{r}
 
 death_age<-deaths %>% 
   group_by(Year) %>% 
@@ -287,33 +294,38 @@ death_age2<-gapminder %>% filter(country=="United States") %>%
   right_join(death_age) %>% 
   mutate(US=na.approx(US,rule=2,na.rm = FALSE)) %>% 
   {.}
+```
+#27
 
-approx(death_age2$Year,death_age2$US,rule=1)
+"They" say 27 is particularly risky age to be a rock star.  [The "27 club" is a thing](https://en.wikipedia.org/wiki/27_Club).  Is it truly standout year for mortality, though, or is it just a meme without grounds?
 
-%>%
-  ggplot(aes(Year,mean_age))+geom_smooth()
 
-1900 2,3 . . . . . . . . . . . . . . . . 47.3 46.3 48.3 47.6 46.6 48.7 33.0 32.5 33.5
-1950 3 . . . . . . . . . . . . . . . . . 68.2 65.6 71.1 69.1 66.5 72.2 60.8 59.1 62.9
-1960 3 . . . . . . . . . . . . . . . . . 69.7 66.6 73.1 70.6 67.4 74.1 63.6 61.1 66.3
-1970 . . . . . . . . . . . . . . . . . 70.8 67.1 74.7 71.7 68.0 75.6 64.1 60.0 68.3
-1975 . . . . . . . . . . . . . . . . . 72.6 68.8 76.6 73.4 69.5 77.3 66.8 62.4 71.3
-1980 . . . . . . . . . . . . . . . . . 73.7 70.0 77.4 74.4 70.7 78.1 68.1 63.8 72.5
-1990 . . . . . . . . . . . . . . . . . 75.4 71.8 78.8 76.1 72.7 79.4 69.1 64.5 73.6
-1995 . . . . . . . . . . . . . . . . . 75.8 72.5 78.9 76.5 73.4 79.6 69.6 65.2 73.9
-2000 . . . . . . . . . . . . . . . . . 76.8 74.1 79.3 77.3 74.7 79.9 71.8 68.2 75.1
-2001 . . . . . . . . . . . . . . . . . 77.0 74.3 79.5 77.5 74.9 80.0 72.0 68.5 75.3
-2002 . . . . . . . . . . . . . . . . . 77.0 74.4 79.6 77.5 74.9 80.1 72.2 68.7 75.4
-2003 . . . . . . . . . . . . . . . . . 77.2 74.5 79.7 77.7 75.1 80.2 72.4 68.9 75.7
-2004 . . . . . . . . . . . . . . . . . 77.6 75.0 80.1 78.1 75.5 80.5 72.9 69.4 76.1
-2005 . . . . . . . . . . . . . . . . . 77.6 75.0 80.1 78.0 75.5 80.5 73.0 69.5 76.2
-2006 . . . . . . . . . . . . . . . . . 77.8 75.2 80.3 78.3 75.8 80.7 73.4 69.9 76.7
-2007 . . . . . . . . . . . . . . . . . 78.1 75.5 80.6 78.5 76.0 80.9 73.8 70.3 77.0
-2008 . . . . . . . . . . . . . . . . . 78.2 75.6 80.6 78.5 76.1 80.9 74.3 70.9 77.3
-2009 . . . . . . . . . . . . . . . . . 78.5 76.0 80.9 78.8 76.4 81.2 74.7 71.4 77.7
-2010 . . . . . . . . . . . . . . . . . 78.7 76.2 81.0 78.9 76.5 81.3 75.1 71.8 78.0
-2011 . . . . . . . . . . . . . . . . . 78.7 76.3 81.1 79.0 76.6 81.3 75.3 72.2 78.2
-2012 . . . . . . . . . . . . . . . . . 78.8 76.4 81.2 79.1 76.7 81.4 75.5 72.3 78.4
-2013 4 . . . . . . . . . . . . . . . . . 78.8 76.4 81.2 79.0 76.7 81.4 75.5 72.3 78.4
-2014 4 . . . . . . . . . . . . . . . . . 78.9 76.5 81.3 79.1 76.7 81.4 75.6 72.5 78.5
-2015 4 . . . . . . . . . . . . . . . . . 78.8 76.3 81.2 79.0 76.6 81.3 75.5 72.2 78.5 
+```{r}
+highlight=27
+
+fills<-deaths %>% 
+  select(Age) %>% 
+  unique() %>% 
+  arrange(Age) %>% 
+  mutate(color="black") %>% 
+  mutate_cond(Age==highlight,color="red") %>% 
+  pull(color) %>% 
+  {.}
+
+gg<-deaths %>% ggplot(aes(Age))+geom_bar(fill=fills)
+gg<-gg+labs(title="Rock Musician Age of Death (1950-2017)",y="Count")
+gg<-gg+annotate("text",x=27,y=45,label="Age 27",size=8)
+gg
+```
+
+Well, well, well.  It turns out that 27 IS a risky age! Optically, it looks like about double the mortality we might othwise expect.  We always have to be wary of carts leading horses, though.  Perhaps the folks who are interested in the topic are more than usually dilligent in finding examples and adding them to the Wikipedia page. Still, it's fascinating.  Why do 27-year olds die?  You already know the answer.
+
+```{r}
+deaths %>% filter(Age==highlight) %>% 
+  group_by(General_Cause) %>% 
+  summarise(Count=n()) %>%
+  arrange(desc(Count))
+
+```
+Tragic, of course.  Those of us who have achieved a certain age occasionally reflect upon all the times in our youth when we did stupid stuff that could have killed us but luck favored us at that moment.  Did I say "we?" Well maybe just me.
+
