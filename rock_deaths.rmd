@@ -18,6 +18,7 @@ library(knitr)
 library(xts)
 library(rvest)
 library(ggrepel)
+library(gapminder)
 
 
 death_page1<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll")
@@ -79,7 +80,7 @@ A further wrinkle is some of the age-at-death numbers are given as a range like 
 # omit first five tables
 deaths_raw<-read_html("death_page2.html") %>% 
   html_nodes("table") %>% 
-  .[5:length(death_table_nodes)] %>% 
+  .[5:length(.)] %>% 
   html_table(fill=TRUE) %>%
   lapply(function(x){mutate(x,Age=as.integer(str_extract(as.character(Age),"[0-9]+")))}) %>% 
   bind_rows() %>% 
@@ -90,7 +91,7 @@ deaths_raw
 ```
 
 
-Almost done.  Separate out the list of name and bands into, at most, four bands. Turn the date string into a POSIX-style date.  Clean up the column names. Finally, strip the footnote numbers out of the file.
+Almost done.  Separate out the list of name and bands into, at most, four bands. Turn the date string into a POSIX-style date. Replace the empty causes with "Not Specified." Finally, strip the footnote numbers out of the file.
 
 ```{r warning=FALSE}
 #take at most three band names.
@@ -101,12 +102,28 @@ deaths<-deaths %>%
   mutate(Date=parse_date(Date,"%B %d, %Y")) %>% 
   filter(!is.na(Date))
 
-#remove footnotes
+#remove footnotes and change empty causes to "Not Specified"
 
 deaths<-deaths %>% mutate(`Cause of death`=str_replace(`Cause of death`,"\\[[0-9,]+\\]",""))
 deaths<-deaths %>% mutate_cond(is.na(`Cause of death`),`Cause of death`="Not Specified")
 deaths<-deaths %>% mutate_cond(`Cause of death`=="",`Cause of death`="Not Specified")
+```
+#Number of reports
 
+Now we have a clean table.  Before going further we should note that reports are growing over time.  No great surprises here but this says something about the age of Wikipedia, the grownig popularity of Wikipedia and the age of Rock and Roll.  It does not say anything about the business getting more risky.
+
+```{r}
+deaths<-deaths %>% mutate(Year=year(Date))
+
+deaths %>%  
+  group_by(Year) %>% 
+  summarise(NumEntries=n()) %>%
+  ggplot(aes(Year,NumEntries))+geom_col()
+
+```
+# Common causes of Death
+
+```{r}
 #what are common causes of death
 cause_table<-deaths %>% 
   group_by(`Cause of death`) %>% 
@@ -120,8 +137,6 @@ Looking through the table we see that many causes can be generalized.  Let's agg
 #add a new column "general cause"
 deaths<-deaths %>% mutate(General_Cause=`Cause of death`)
 
-deaths<-deaths %>% 
-  mutate_cond(str_detect(tolower(`Cause of death`),"suicide"),General_Cause="Suicide")
 deaths<-deaths %>% 
   mutate_cond(str_detect(tolower(`Cause of death`),
                          "accident|fall|hit|crash"),General_Cause="Accident")
@@ -152,6 +167,9 @@ deaths<-deaths %>%
 deaths<-deaths %>% 
   mutate_cond(str_detect(tolower(`Cause of death`),
                          "alzh"),General_Cause="Alzheimers")
+deaths<-deaths %>% 
+  mutate_cond(str_detect(tolower(`Cause of death`),"suicide"),General_Cause="Suicide")
+
 #Cancer is last because iting other organs and cancer counts as cancer.
 #-omas other than "stomach" and "coma" are cancer
 deaths<-deaths %>% 
@@ -194,6 +212,10 @@ Murder: 15,696 (https://ucr.fbi.gov/crime-in-the-u.s/2015/crime-in-the-u.s.-2015
 
 Drug overdoses may count as "accidents" at the CDC.  I don't separate out Pneumonia from chronic lung problems. Alzheimer's is a big killer, nationally but is only 21st on the list of rocker deaths.  Perhaps it is underreported or was recognized as a distinct cause of death only recently.
 
+There are some interesting causes in this list.  Three electrocutions, two by guitar and one my microphone. They all happened in England in the early 70s.  Presumably the codes have been tightned up a bit since.  Three people are listed who choked on their own vomit.  Boring.  Consider the hapless Steve Took of T Rex, who died from choking on a cocktail cherry.  That's why I always take my Manhattans with a lemon twist instead.
+
+While the big killers are the same for both populations, is there evidence that rockers "live fast?"  Yes, it turns out.
+
 ```{r}
 
 us_deaths<-data_frame(General_Cause=as_factor(c('Heart Disease','Cancer',
@@ -202,24 +224,45 @@ us_deaths<-data_frame(General_Cause=as_factor(c('Heart Disease','Cancer',
                                       'Suicide','Murdered')),
                       US=c(633842,595930,212103,146571,140323,110561,79535,49959,44193,15696))
 
-comp_deaths<-left_join(us_deaths,cause_table) %>%
+# we assume the CDC calls drug overdoses an accident so we will too.
+comp_deaths<-cause_table %>% 
+  mutate_cond(General_Cause=="Drugs",General_Cause="Accident") %>% 
+  group_by(General_Cause) %>% 
+  summarise(Rockers=sum(Rockers)) %>% 
+  right_join(us_deaths) %>%
   mutate(General_Cause=as_factor(General_Cause))
+  
 
 gg<-comp_deaths %>% ggplot(aes(US,Rockers))+geom_point()
 gg<-gg+  geom_text_repel(label=comp_deaths$General_Cause)
 gg<-gg+geom_smooth(method="lm",formula= y~0+x,se=FALSE)
-gg<-gg+labs(main="Rock Stars are Just Like the Rest of US",sub="Causes of Death",
-y='Rockers (all years)',x='US Deaths (2015)')
+gg<-gg+labs(title="Rock Stars are Almost Like the Rest of US",caption="Sources: Wikipedia and CDC",
+y='Rocker Music Deaths (1950-Present)',x='US Deaths (2015)')
 gg
 ```
+This shows the preponderance of Rock musician deaths relative to the broader US population.  We can see that suicide, accidents and murder account for more relative deaths than they do in the broader population.
 
-#Age at death
+We've scientifically proven (!) that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death won't be comprable to current US life expectancy.  To get a comparison let's pull the 
 
 ```{r}
-deaths %>% mutate(Year=year(Date)) %>% 
+
+#needs work
+
+death_age<-deaths %>% 
   group_by(Year) %>% 
-  summarise(NumEntries=n()) %>%
-  ggplot(aes(Year,NumEntries))+geom_col()
+  summarise(Rockers=mean(Age))
+
+death_age2<-gapminder %>% filter(country=="United States") %>% 
+  select(year,lifeExp) %>% rename(Year=year,US=lifeExp) %>% 
+  right_join(death_age) %>% 
+  mutate(US=na.approx(US,rule=2,na.rm = FALSE)) %>% 
+  {.}
+
+approx(death_age2$Year,death_age2$US,rule=1)
+
+%>%
+  ggplot(aes(Year,mean_age))+geom_smooth()
+
 
 ```
 
