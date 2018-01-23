@@ -2,28 +2,30 @@
 title: "Summarizing Deaths in Rock"
 output: html_notebook
 ---
-Live fast, die young, stay pretty.  That's the stereotype for rockers, or it was.  We only need to look at Keith Richards, over 70 and going strong, to find a major counterexample.  Do rockers die young?  What do they die of?  We can use Wikipedia and [this page.](https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll) to make some generalizations.
+#Live fast, die young, stay pretty?
 
-We will scrape the tables and do sum summary aggregations.  R and the xml2 package have some great functions for converting html `<table>`s into data frames.
+That's the stereotype for rockers, or it was.  We only need to look at Keith Richards, over 70 and going strong, to find a major counterexample.  Do rockers die young?  What do they die of?  How does that compare to the broader population (in the U.S., anyway).
+
+Wikipedia maintains a table of [deaths in rock](https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll).  Let's scrape that list to make some generalizations.  We use the `tidyverse` dialect throughout, just so you know.
+
+#Load tables from Wikipedia
 
 The deaths for 2010 and later are in a separate article so we need to get both.  When I started this project they were on one page. By the time you read this the Wikipedia gods may have changed it again.  Beware.
 ```{r message=FALSE, warning=FALSE}
-library(XML)
-library(xml2)
 library(ggplot2)
 library(stringr)
 library(tidyverse)
 library(lubridate)
-library(knitr)
-library(xts)
 library(rvest)
 library(ggrepel)
 library(gapminder)
+library(knitr)
 
 # function to mutate only rows meeting a certain condition
-#most useful enhancement to dplyr ever!
-#I load this in all my projects.
+# most useful enhancement to dplyr ever!
+# I load this in all my projects.
 mutate_cond <- function(.data, condition, ..., envir = parent.frame()) {
+  #ref: https://stackoverflow.com/questions/34096162/dplyr-mutate-replace-on-a-subset-of-rows
   condition <- eval(substitute(condition), .data, envir)
   condition[is.na(condition)] = FALSE
   .data[condition, ] <- .data[condition, ] %>% mutate(...)
@@ -36,7 +38,8 @@ death_page2<-read_html("https://en.wikipedia.org/wiki/List_of_2010s_deaths_in_ro
 write_html(death_page2,file="death_page2.html")
 
 ```
-`xml2` is a very powerful package but one thing I learned is that it works with pointers to the data rather than the actual data. C programmers and old geezers like me will be familiar with this.  I remember pop and push and stacks and all that stuff from the old days.  R generally doesnt pass values "by reference." It passes "by value." That's why when you modify data in the scope of a function it doesn't affect the value of the data outside unless you assign it with `return <data>`.  Using pointers in `xml2` and `rvest` functions means modifications to html data happen without an explicit assigment.
+##A note on "pointers"
+R and the `rvest` package have some great functions for converting html `<table>`s into data frames. `rvest` is a very powerful package but one thing I learned is that it works with pointers to the data rather than the actual data. C programmers and old geezers like me will be familiar with this.  I remember pop and push and stacks and all that stuff from the old days.  R generally doesnt pass values "by reference." It passes "by value." That's why when you modify data in the scope of a function it doesn't affect the value of the data outside unless you assign it with `return <data>`.  Using pointers in `rvest` functions means modifications to html data happen without an explicit assigment.
 
 Consider a trival example:
 ```{r, eval=FALSE}
@@ -52,9 +55,11 @@ data<-my_function(data)
 data
 #[1] 4
 ```
-If we were passing values "by reference" `my_function(data)` would change `data`.  That's how `xml2` works.
+If we were passing values "by reference" `my_function(data)` would change `data`.  That's how `rvest` works.
 
-We use this behaviour to combine them the tables in the two Wikipedia articles into one html page by extracting the tables in the second wiki article and making them xml siblings of the tables in the first.
+We use this behaviour to combine the tables in the two Wikipedia articles into one html page by extracting the tables in the second wiki article and making them xml siblings of the tables in the first.
+
+Alternatively, we could load the two pages, extract the tables separately and combine them later but this is trickier!
 ```{r}
 #join pre-2010 to post 2010
 death_page<-death_page1
@@ -67,11 +72,12 @@ xml_add_sibling(death_page_child,death_page2_child)
 write_html(death_page,file="death_page.html")
 
 ```
-Unfortunately, as is often the case, the tables are not as clean as we might like. 
+#Clean the data
+Unfortunately, as is often the case, the raw data is not as clean as we might like. 
 
-Here's a data wrastlin' puzzle.  The artist and the band name or names share a single cell.  This is not a problem for the anonymous summary stats we will present here but I am doing another analysis where I look at radio station playlist patterns do detect deaths.  Here we need to flag the event by band or artist, however it appears.
+Here's a data wrastlin' puzzle.  The artist and the band name (or names) share a single table cell.  This is not a problem for the anonymous summary stats we will present here but I am doing another analysis where I look at radio station playlist patterns do detect deaths.  Here we need to flag the event by band or artist, however it appears.
 
-Parsing HTML is a dark art and I would not rise to the level of sorcerer's apprentice.  The clue that will let us separate the two (or more) identifiers is that the band is encased in a `<small><\small>` tag.  Extracting the just the text from the cell concatenates the two items without a separator.  The `XML2` functions won't help this noob here.  I chose do old-school raw text editing with search/replace to break the person and the band into separate columns. So instead of `<td>Person<small>Band,Band<\small><\td>` we want to have `<td>Person,Band,band<\td>`.  This way we can separate out band names later.
+Parsing HTML is a dark art and I would not rise to the level of sorcerer's apprentice.  The clue that will let us separate the two (or more) identifiers is that the band is encased in a `<small><\small>` tag.  Extracting the just the text from the cell concatenates the two items without a separator.  The `rvest` functions won't help this noob here.  I chose to do old-school raw text editing with search/replace to break the person and the band into separate columns. So instead of `<td>Person<small>Band,Band<\small><\td>` we want to have `<td>Person,Band,band<\td>`.  This way we can separate out band names later.
 
 ```{r}
 #Crude hack follows
@@ -86,7 +92,7 @@ write_file(death_page_text,"death_page2.html")
 ```
 A further wrinkle is some of the age-at-death numbers are given as a range like "45-46" which causes `html_table` to create a `character  ` column while it will otherwise be of type `numeric`.  We want to use `bind_rows` to combine all the web page tables into one data frame but it will break on the type conflict.  Let's arbitrarily take the lowest number in age range before binding.  We can do this as part of the table extraction process.  Omit the first five tables which, by inspection, we know are not the mortality tables.
 
-```{r, message=TRUE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE}
 # omit first five tables
 deaths_raw<-read_html("death_page2.html") %>% 
   html_nodes("table") %>% 
@@ -97,9 +103,9 @@ deaths_raw<-read_html("death_page2.html") %>%
   as_data_frame() %>% 
   {.}
 
-deaths_raw
+deaths_raw[1:5,] %>% kable(format.args=list(big.mark=","))
 ```
-
+...and so on.
 
 Almost done with the boring bits. Separate out the list of name and bands into, at most, four bands. Turn the date string into a POSIX-style date. Replace the empty causes with "Not Specified." Finally, strip the footnote numbers out of the file.
 
@@ -117,22 +123,24 @@ deaths<-deaths %>%
 deaths<-deaths %>% mutate(`Cause of death`=str_replace(`Cause of death`,"\\[[0-9,]+\\]",""))
 deaths<-deaths %>% mutate_cond(is.na(`Cause of death`),`Cause of death`="Not Specified")
 deaths<-deaths %>% mutate_cond(`Cause of death`=="",`Cause of death`="Not Specified")
+deaths[1:5,]%>% kable(format.args=list(big.mark=","))
 ```
-#Number of reports
+#Submitting to Wikipedia is getting more popular
 
-Now we have a clean table.  Before going further we should note that reports are growing over time.  No great surprises here but this says something about the age of Wikipedia, the grownig popularity of Wikipedia and the age of Rock and Roll.  It does not say anything about the business getting more risky.
+Now we have a clean table.  Before going further we should note that death entries are growing over time.  No great surprises here but this says something about the age of Wikipedia, the growing popularity of Wikipedia and the age of Rock and Roll.  It does not say anything about the business getting more risky.
 
 ```{r}
 deaths<-deaths %>% mutate(Year=year(Date))
 
 deaths %>%  
   group_by(Year) %>% 
-  summarise(NumEntries=n()) %>%
-  ggplot(aes(Year,NumEntries))+geom_col()
+  summarise(Entries=n()) %>%
+  ggplot(aes(Year,Entries))+geom_col()
 
 ```
 # Common causes of Death
 
+Let's do a quick exploration to see if we are satisfied with the features of our data set.
 ```{r}
 #what are common causes of death
 cause_table<-deaths %>% 
@@ -140,9 +148,9 @@ cause_table<-deaths %>%
   summarize(Cause=n()) %>% 
   arrange(desc(Cause))
 
-cause_table
+cause_table[1:11,]%>% kable(format.args=list(big.mark=","))
 ```
-Looking through the table we see that many causes can be generalized.  Let's aggregate a bit. We are making some choices here.  For instance, I call any cause containing the words "heart" or "cardiac" as "heart disease."  I count alcohol as a drug. Where multiple terms exist, drugs trump accidents.  Suicide trumps everthing but cancer. Cancer Trumps everthing.
+Looking through the table we see that many causes can be generalized.  Let's aggregate a bit. We are making some choices here.  For instance, I call any cause containing the words "heart" or "cardiac" as "heart disease."  I count alcohol as a drug. Where multiple terms exist, drugs trump accidents.  Suicide trumps everthing but cancer. Cancer trumps everthing.  Note the use of the very handy `mutate_cond` function.
 ```{r}
 #add a new column "general cause"
 deaths<-deaths %>% mutate(General_Cause=`Cause of death`)
@@ -201,35 +209,39 @@ cause_table<-deaths %>%
 
 cause_table<-cause_table %>% mutate(General_Cause= as_factor(General_Cause))
 
-#plot, leaving out "not specified"
-gg<-cause_table[1:11,]  %>% 
-  filter(General_Cause != "Not Specified") %>%
+gg<-cause_table[1:12,]  %>% 
   ggplot(aes(General_Cause,Rockers))+geom_col()
 gg<-gg+coord_flip()
 gg
 ```
 NOW, we are done with all the data wrangling and can get to the fun stuff.
 
-This gives us a decent picture of how rock stars die.  Mostly from the same things that kill all of us. Heart disease and Cancer are the leading causes of death in US, followed by lung disease and accidents according to https://www.cdc.gov/nchs/fastats/deaths.htm and shown below.
+This gives us a decent picture of how rock stars die.  Mostly from the same things that kill all of us. Heart disease and cancer are the leading causes of death in US, followed by lung disease and accidents according to https://www.cdc.gov/nchs/fastats/deaths.htm and shown below.
 
-Heart disease: 633,842
-Cancer: 595,930
-Chronic lower respiratory diseases: 155,041
-Accidents (unintentional injuries): 146,571
-Stroke (cerebrovascular diseases): 140,323
-Alzheimer’s disease: 110,561
-Diabetes: 79,535
-Influenza and Pneumonia: 57,062
-Liver disease: 49,959
-Suicide: 44,193
+```{r}
+us_deaths<-data_frame(General_Cause=as_factor(c('Heart Disease','Cancer',
+                                      'Lung Disease','Accident','Stroke',
+                                      'Alzheimers','Diabetes','Liver Disease',
+                                      'Suicide','Murdered')),
+                      US=c(633842,595930,212103,146571,140323,110561,79535,49959,44193,15696))
+us_deaths %>% kable(format.args=list(big.mark=","))
+```
+We might also note:
 Murder: 15,696 (https://ucr.fbi.gov/crime-in-the-u.s/2015/crime-in-the-u.s.-2015/tables/table-4)
+
 Drug overdoses: 53,000 (2015,https://www.drugabuse.gov/related-topics/trends-statistics/overdose-death-rates)
+
 Alcohol Poisoning:2,200 (https://www.cdc.gov/vitalsigns/alcohol-poisoning-deaths/index.html)
 
-A couple things to note. Drug overdoses may count as "accidents" at the CDC.  I don't separate out Pneumonia from chronic lung problems. Alzheimer's is a big killer, nationally but is only 21st on the list of rock deaths.  Perhaps it is underreported or was recognized as a distinct cause of death only recently. Maybe rock stars die too young to get Alzheimers.
+Drug overdoses may count as "accidents" at the CDC.  I don't separate out Pneumonia from chronic lung problems. 
+
+Alzheimer's is a big killer, nationally but is only 21st on the list of rock deaths.  Perhaps it is underreported or was recognized as a distinct cause of death only recently. Maybe rock stars die too young to get Alzheimers.
+
+# You can't make this stuff up
 
 There are some interesting causes in this list.  Three electrocutions, two by guitar and one my microphone. They all happened in England in the early 70s.  Presumably the electrical codes have been tightned up a bit since.  Three people are listed who choked on their own vomit. That's all? Consider the hapless Steve Took of T Rex, who died from choking on a cocktail cherry.  That's why I always take my Manhattans with a lemon twist instead.
 
+#Live fast?
 While the big killers are the same for both populations, is there evidence that rockers "live fast?"  Yes, it turns out.
 
 ```{r, message=FALSE, warning=FALSE}
@@ -261,7 +273,8 @@ gg
 ```
 This shows the preponderance of Rock musician deaths relative to the broader US population.  We can see that suicide, murder and, especially, accidents account for more relative deaths than they do in the broader population.
 
-We've <grin>scientifically proven</grin> that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death won't be comprable to current US life expectancy.  To get a comparison let's pull the data from the `gapminder` package.  This shows life expectancy at birth as opposed to average age at death, which is what we have now, so we have to get a bit tricky to make the numbers comparable.  Our year at births is much earlier than the gapminder set covers so we need to extrapolate the data, as well.
+#Die Young?
+We've `<grin>`scientifically proven`</grin>` that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death going back to 1950 won't be comprable to current US life expectancy.  To get a comparison let's pull the data from the `gapminder` package.  This shows life expectancy at birth as opposed to average age at death, which is what we have now, so we have to get a bit tricky to make the numbers comparable.  The earliest birth years in our data are much earlier than what the gapminder set covers so we need to extrapolate the data, as well.
 
 ```{r, warning=FALSE}
 #Add birth year column.
@@ -269,23 +282,29 @@ deaths<-deaths %>% mutate(birth_year=year(Date)-Age)
 
 #Create extrapolation of gapminder life expectancy using the full range of birth
 #years from the deaths table.
+#create a row for all years.
 life_exp<-gapminder %>% 
   filter(country=="United States") %>% 
   select(year,lifeExp) %>% rename(birth_year=year) %>% 
   complete(birth_year=min(deaths$birth_year):year(Sys.Date())) %>% 
   {.}
+#extrapolate
 p<-lm(life_exp$lifeExp~life_exp$birth_year)
 life_exp$expected_longevity<-predict(p,life_exp)
 
 #how well does this fit the data?
 life_exp %>% ggplot(aes(birth_year,expected_longevity))+geom_line()+geom_point(aes(y=lifeExp))+
-  labs(title="Gapminder US Data:Extrapolated Life Expectancy at Birth",y="Life Expectancy",x="Birth Year")
+  labs(title="Gapminder U.S. Life Expectancy at Birth:Data:Extrapolated",y="Life Expectancy",x="Birth Year")
 
 ```
-We see that the `gapminder` data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  Our sample sizes are pretty small at the far end of the range, anyway, so any conclusions would have to be taken with a huge grain of salt,regardless.  Still, lets plunge on!
+We see that the `gapminder` data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  I saw some sources that indicate the line should bend downward in the 1800s.  I am not controlling for demographics, either.  Our sample sizes are pretty small at the far end of the range, anyway, so any conclusions would have to be taken with a huge grain of salt,regardless.  Still, lets plunge on!
 
 We need to apply the expected longevity for each musician for the year they were born and compare that to the age they were at death.  We then summarize that data for each year of deaths.  To put it another way, in any given year, how did the rock musicians who died compare to the life expectancy for all people born in the US the same year each rock musician did?
-```{r}
+
+The series for rock musicians in the chart below is very unstable early on because the sample size is so small.
+
+Plotting note:  I am not using "tidy"" data here so I roll some intersting g-g-jitsu to get the legends nice.
+```{r, message=FALSE, warning=FALSE}
 #merge deaths with life expectancy for the relevant birth year.  Determine
 #whether they died "young"  or outlived expectations.
 deaths <- deaths %>% 
@@ -307,14 +326,14 @@ gg<-gg+labs(title="Rock Stars Don't Die Young Anymore\nRocker Death Age vs. U.S.
             y="Average Age At Death",
             x="Year of Death",
             caption="Source:Wikipedia, gapminder.org")
-gg<-gg+ scale_colour_manual(name = 'Life Exp.', 
-         values =c('black'='black','red'='red'), labels = c('US Pop.',"Rockers"))
-gg<-gg+ scale_fill_identity(name = 'Gap', guide = 'legend',labels = c(''))
+gg<-gg+ scale_colour_manual(name = 'Lines', 
+         values =c('black'='black','red'='red'), labels = c('US Pop.(expected)',"Rockers (actual)"))
+gg<-gg+ scale_fill_identity(name = 'Bars', guide = 'legend',labels = c('Gap'))
 gg
 ```
 This really surprised me.  Rock stars used to die young, but not any more!  They have completely closed the gap with the U.S. population at large (We can discount the early years in this chart since there are so few observations).  Again, Keith Richards, stick with the yoga, dude!
 
-#27
+#The "27 Club"
 
 "They" say 27 is particularly risky age to be a rock star.  [The "27 club" is a thing](https://en.wikipedia.org/wiki/27_Club).  Is it truly standout year for mortality, or is it just a meme without grounds?
 
@@ -337,20 +356,21 @@ gg<-gg+annotate("text",x=27,y=45,label="Age 27",size=8)
 gg
 ```
 
-Well, well, well.  It turns out that 27 IS a risky age! Optically, it looks like about double the mortality we might othwise expect.  We always have to be wary of carts leading horses, though.  Perhaps the folks who are interested in the topic are more than usually dilligent in finding examples and adding them to the Wikipedia page. Still, it's fascinating.  Why do 27-year olds die?  You already know the answer.
+Well, well, well.  It turns out that 27 IS a risky age! Optically, it looks like about double the mortality we might otherwise expect.  We always have to be wary of carts leading horses, though.  Perhaps the folks who are interested in the topic are more than usually dilligent in finding examples and adding them to the Wikipedia page. Still, it's fascinating.  Why do 27-year olds die?  You already know the answer.
 
 ```{r}
 deaths %>% filter(Age==highlight) %>% 
   group_by(General_Cause) %>% 
   summarise(Count=n()) %>%
-  arrange(desc(Count))
+  arrange(desc(Count))%>% 
+  kable(format.args=list(big.mark=","))
 
 ```
 Tragic, of course.  Those of us who have achieved a certain age occasionally reflect upon all the times in our youth when we did stupid stuff that could have killed us but luck favored us at that moment.  Did I say "we?" Well maybe just me.
 
 #Conclusion
 
-This project started out as part of a separate project but I went down an intersting rabbit hole and realized there was something to say about the Wikipedia data set.  I learned some more tricks about web scraping and found some surprising things in the data.  Win-win!
+This project started out as part of a separate project but I went down an intersting rabbit hole and realized there was something to say about the Wikipedia data set.  Alas, the 80/20 rule applies. Most of the time on this project was spent iterating and tweaking the data cleaning part.  The HTML manipulation was a pain.  Once I had a clean data set, I breezed through the exploration and discovery part...and that was very fun. Still, I learned some more tricks about web scraping and found some surprising things in the data.  Win-win!  
 
 Stay off the dope, kids!
 
