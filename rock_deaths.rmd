@@ -333,7 +333,7 @@ gg
 ```
 This really surprised me.  Rock stars used to die young, but not any more!  They have completely closed the gap with the U.S. population at large (We can discount the early years in this chart since there are so few observations).  Again, Keith Richards, stick with the yoga, dude!
 
-#The "27 Club"
+#Stay pretty. The "27 Club."
 
 "They" say 27 is particularly risky age to be a rock star.  [The "27 club" is a thing](https://en.wikipedia.org/wiki/27_Club).  Is it truly standout year for mortality, or is it just a meme without grounds?
 
@@ -367,6 +367,40 @@ deaths %>% filter(Age==highlight) %>%
 
 ```
 Tragic, of course.  Those of us who have achieved a certain age occasionally reflect upon all the times in our youth when we did stupid stuff that could have killed us but luck favored us at that moment.  Did I say "we?" Well maybe just me.
+
+#Bonus analysis.  Where did they die?
+```{r}
+deaths3<-deaths %>% 
+  separate(Location,c("neighborhood","city","state","country"),
+           remove=FALSE,
+           sep=", ",
+           fill="left",
+           extra="merge")
+
+deaths3<-deaths3 %>% mutate_cond(country=="",country="Not Specified")
+deaths3<-deaths3 %>% mutate_cond(is.na(city),city="Not Specified")
+deaths3<-deaths3 %>% mutate_cond(country=="U.S.",country="USA")
+deaths3<-deaths3 %>% mutate_cond(country=="U.K.",country="England")
+deaths3 %>% group_by(country) %>% 
+  summarise(count=n()) %>% 
+  arrange(desc(count)) %>%
+  .[1:12,] %>% 
+  kable(format.args=list(big.mark=","))
+
+```
+
+This doesn't reveal any surprises.  Again, it says something about the home of rock and the location of people who submit entries to Wikipedia.  We could go further and compare these numbers to population but we wouldn't learn anything not already obvious.
+
+What about cities?
+
+```{r}
+deaths3 %>% group_by(city) %>% 
+  summarise(count=n()) %>% 
+  arrange(desc(count))%>% 
+  .[1:12,] %>% 
+  kable(format.args=list(big.mark=","))
+```
+If we looked at city populations, we'd find that L.A.,Nashville and Memphis have more rock musicians than population would suggest. Again, not a surprise.
 
 #Conclusion
 
