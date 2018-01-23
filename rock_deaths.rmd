@@ -279,7 +279,7 @@ life_exp$US<-predict(p,life_exp)
 
 #how well does this fit the data?
 life_exp %>% ggplot(aes(birth_year,US))+geom_line()+geom_point(aes(y=lifeExp))+
-  labs(title="Extrapolated Life Expectancy at Birth",y="Life Expectancy",x="Birth Year")
+  labs(title="Gapminder US Data:Extrapolated Life Expectancy at Birth",y="Life Expectancy",x="Birth Year")
 
 ```
 We see that the `gapminder` data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  Our sample sizes are pretty small at the far end of the range, anyway, so any conclusions would have to be taken with a huge grain of salt,regardless.  Still, lets plunge on!
@@ -303,17 +303,17 @@ death_age<-deaths %>%
 
 gg<-death_age %>% ggplot(aes(Year,rock_mean,color="red"))+geom_line()
 gg<-gg+geom_line(aes(y=us_mean,color="black"))
-gg<-gg+geom_col(aes(y=relative_mortality,fill="darkgrey"),color="darkgrey")
+gg<-gg+geom_col(aes(y=relative_mortality,fill="darkgrey"),color="lightgrey")
 gg<-gg+labs(title="Rock Stars Don't Die Young Anymore\nRocker Death Age vs. U.S. Population",
             y="Average Age At Death",
             x="Year of Death",
             caption="Source:Wikipedia, gapminder.org")
-gg<-gg+ scale_fill_identity(name = 'Gap', guide = 'legend',labels = c('')) +
-    scale_colour_manual(name = 'Life Exp.', 
+gg<-gg+ scale_colour_manual(name = 'Life Exp.', 
          values =c('black'='black','red'='red'), labels = c('US Pop.',"Rockers"))
+gg<-gg+ scale_fill_identity(name = 'Gap', guide = 'legend',labels = c(''))
 gg
 ```
-This really surprised me.  Rock stars used to die young, but not any more!  They have completely closed the gap with the U.S. population at large.  Again, Keith Richards, stick with the yoga, dude!
+This really surprised me.  Rock stars used to die young, but not any more!  They have completely closed the gap with the U.S. population at large (We can discount the early years in this chart since there are so few observations).  Again, Keith Richards, stick with the yoga, dude!
 
 #27
 
