@@ -203,13 +203,29 @@ deaths<-deaths %>%
               General_Cause="Cancer")
 deaths<-deaths %>% 
   mutate_cond(str_detect(tolower(`Cause of death`),"cancer|tumor"),General_Cause="Cancer")
-
+```
+Further aggregate causes.
+```{r}
 cause_table<-deaths %>% 
   count(General_Cause) %>% 
   arrange(desc(n)) %>% 
   rename(Rockers=n)
 
+cause_table<-cause_table %>% 
+  mutate_cond(!(General_Cause %in% cause_table$General_Cause[1:15]),General_Cause="Other")
+cause_table<-cause_table %>% 
+  mutate_cond(General_Cause =="Natural causes",General_Cause="Other")
+#re-aggregate
+cause_table<-cause_table %>%
+  group_by(General_Cause) %>% 
+  summarize(Rockers=sum(Rockers)) %>% 
+  arrange(desc(Rockers))
+
 cause_table<-cause_table %>% mutate(General_Cause= as_factor(General_Cause))
+#map it back to the deaths table
+deaths<-deaths %>% mutate_cond(!(General_Cause %in% cause_table$General_Cause[1:15]),General_Cause="Other")
+deaths<-deaths %>% mutate_cond(General_Cause =="Natural causes",General_Cause="Other")
+
 
 gg<-cause_table[1:12,]  %>% 
   ggplot(aes(General_Cause,Rockers))+geom_col()
@@ -224,8 +240,8 @@ This gives us a decent picture of how rock stars die.  Mostly from the same thin
 us_deaths<-data_frame(General_Cause=as_factor(c('Heart Disease','Cancer',
                                       'Lung Disease','Accident','Stroke',
                                       'Alzheimers','Diabetes','Liver Disease',
-                                      'Suicide','Murdered')),
-                      US=c(633842,595930,212103,146571,140323,110561,79535,49959,44193,15696))
+                                      'Suicide','Murdered','Other')),
+                      US=c(633842,595930,212103,146571,140323,110561,79535,49959,44193,15696,683917))
 us_deaths %>% kable(format.args=list(big.mark=","))
 ```
 We might also note:
@@ -255,7 +271,9 @@ comp_deaths<-cause_table %>%
   summarise(Rockers=sum(Rockers)) %>% 
   right_join(us_deaths) %>%
   mutate(General_Cause=as_factor(General_Cause)) %>% 
-  mutate(Rockers=Rockers/sum(Rockers),US=US/sum(US))
+  na.omit() %>% 
+  mutate(Rockers=Rockers/sum(Rockers),US=US/sum(US)) %>% 
+  {.}
   
 
 gg<-comp_deaths %>% ggplot(aes(US,Rockers))+geom_point()
@@ -378,7 +396,7 @@ cause_by_age<-deaths %>%
   group_by(bin) %>%
   mutate(prop=Count/sum(Count)) %>% 
   arrange(bin,desc(Count)) %>% 
-  top_n(n=5,wt=Count) %>% 
+  #top_n(n=5,wt=Count) %>% 
   {.}
 
 #restore continuous age variable
@@ -391,11 +409,42 @@ cause_by_age<-cause_by_age %>%
 gg<-cause_by_age %>% 
   ggplot(aes(Age,prop,fill=General_Cause,color=General_Cause))+geom_col(width=5)
 gg<-gg+scale_y_continuous(labels=scales::percent,limits=c(0,1.00))
+gg<-gg+labs(title="Top Causes of Rock Musician Deaths by Age of Death",
+            y="Relative Frequency")
+
 gg
 ```
-I think this is very interesting.  The bars don't sum to 100% because we are picking just the top five causes in each age cohort.  "Other" brings it to 100%.  This way we see that the diversity of causes peaks at 45 years of age.
 
 If you make it into your 40s as a rocker you are out of the  woods for suicide murder and accidents. Cancer supplants accidents as the leading cause after age 40.  Heart disease is prevalent starting at 40 and onward.  "Not Specified" rise substantially with age.  I suspect it's because rock stars who die in their prime are more reported upon.
+
+Let's visualize the same data as a smoothed density plot, just to experiment with another view.  Which do you prefer?  It's certainly accomplished with fewer lines of code!
+
+```{r}
+#filter top causes to reduce clutter
+#cause_by_age<-deaths %>% filter(General_Cause %in% cause_table$General_Cause[1:15])
+cause_by_age<-deaths %>% mutate_cond(!(General_Cause %in% cause_table$General_Cause[1:15]),General_Cause="Other")
+gg<-cause_by_age %>% 
+  ggplot(aes(Age,..count..))+geom_density(aes(fill=General_Cause),color="grey",position="fill")
+gg<-gg+labs(title="Top Causes of Rock Musician Deaths by Age of Death",
+            y="Relative Frequency")
+gg<-gg+scale_y_continuous(labels=scales::percent,limits=c(0,1.00))
+gg
+```
+If we assume "Not Specified" deaths are in proportion to the reported causes, we can filter it it out get a clearer picture.
+
+```{r}
+#filter top causes to reduce clutter
+#cause_by_age<-deaths %>% filter(General_Cause %in% cause_table$General_Cause[1:15])
+cause_by_age<-deaths %>% 
+  mutate_cond(!(General_Cause %in% cause_table$General_Cause[1:15]),General_Cause="Other") %>% 
+  filter(General_Cause != "Not Specified")
+gg<-cause_by_age %>% 
+  ggplot(aes(Age,..count..))+geom_density(aes(fill=General_Cause),color="grey",position="fill")
+gg<-gg+labs(title="Top Causes of Rock Musician Deaths by Age of Death",
+            y="Relative Frequency")
+gg<-gg+scale_y_continuous(labels=scales::percent,limits=c(0,1.00))
+gg
+```
 
 
 #Bonus analysis.  Where did they die?
