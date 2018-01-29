@@ -180,7 +180,7 @@ deaths<-deaths %>%
                          "diabetes|diabetic"),General_Cause="Diabetes")
 deaths<-deaths %>% 
   mutate_cond(str_detect(tolower(`Cause of death`),
-                         "pneumonia|emphysema"),General_Cause="Lung Disease")
+                         "pneumonia|emphysema|respiratory"),General_Cause="Lung Disease")
 deaths<-deaths %>% 
   mutate_cond(str_detect(tolower(`Cause of death`),
                          "cirrhosis|neph|liver"),General_Cause="Liver Disease")
@@ -204,7 +204,7 @@ deaths<-deaths %>%
 deaths<-deaths %>% 
   mutate_cond(str_detect(tolower(`Cause of death`),"cancer|tumor"),General_Cause="Cancer")
 ```
-Further aggregate causes.
+Further aggregate causes.  Arbitrarily, label the general cause of any cause below the top 15 as "Other."
 ```{r}
 cause_table<-deaths %>% 
   count(General_Cause) %>% 
@@ -387,6 +387,7 @@ How do causes of death change as rock musicians age?
 
 
 ```{r}
+#cut off below 21 and above 85 because the data gets pretty thin
 gg<-deaths %>% filter(Age >21,Age<86) %>%  
   ggplot(aes(Age,..count..))+geom_density(aes(fill=General_Cause),color="grey",position="fill")
 gg<-gg+labs(title="Top Causes of Rock Musician Deaths by Age of Death",
@@ -408,14 +409,20 @@ gg
 ```
 If you make it into your 40s as a rocker you are out of the  woods for suicide murder and accidents. Cancer supplants accidents as the leading cause after age 40.  Heart disease is prevalent starting at 40 and onward.  "Not Specified" rises substantially with age.  I suspect it's because rock stars who die in their prime are more reported upon.
 
-We know deaths from all causes rise with age.  Do the number of deaths from accidents merely shrink relative to other causes with age? a reality check, let's ask if the absolute number changes with age.
+Let's use this data to question our "live fast" assertion from above.  We know deaths from all causes rise with age.  So is dimunition of deaths by accident as age increases just a reflection of other categories growing in relation? As a reality check, let's ask if the absolute number changes with age.
 
 ```{r}
-deaths %>% filter(General_Cause=="Accident") %>% 
-  ggplot(Age)+geom_histogram(bins=10)
+gg<-deaths %>% filter(General_Cause=="Accident") %>% 
+  ggplot(aes(Age,fill="red"))+geom_histogram(bins=10)
+gg<-gg+labs(title='Number of Reported Deaths by "Accident" by Age',
+            x='Age at Death',
+            y="Count")
+gg<-gg+geom_histogram(data=deaths,aes(Age,fill="black"),bins=10,alpha=0.2)
+gg<-gg+ scale_fill_manual(name = 'Lines', 
+         values =c('black'='black','red'='red'), labels = c('Accident','Everything'))
+gg
 ```
-
-
+So, yes, rock musicians do get more careful as they age.
 
 
 #Bonus analysis.  Where did they die?
