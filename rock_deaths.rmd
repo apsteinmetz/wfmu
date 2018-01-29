@@ -383,47 +383,11 @@ deaths %>% filter(Age==highlight) %>%
 ```
 Tragic, of course.  Those of us who have achieved a certain age occasionally reflect upon all the times in our youth when we did stupid stuff that could have killed us but luck favored us at that moment.  Did I say "we?" Well maybe just me.
 
-How do causes of death change as rock musicians age?  Again, we have to deal with small sample sizes so let's aggregate in 5-year buckets.
-```{r}
-# bin by 5 year groups
-breaks<-c(0,25,30,35,40,45,50,55,60,65,70,75,80,85)
+How do causes of death change as rock musicians age?
 
-cause_by_age<-deaths %>% 
-  filter(Age>19,Age<86) %>% 
-  transform(bin=cut(Age,breaks=breaks)) %>% 
-  group_by(bin,General_Cause) %>% 
-  summarise(Count=n()) %>% 
-  group_by(bin) %>%
-  mutate(prop=Count/sum(Count)) %>% 
-  arrange(bin,desc(Count)) %>% 
-  #top_n(n=5,wt=Count) %>% 
-  {.}
-
-#restore continuous age variable
-cause_by_age<-cause_by_age %>% 
-  select(bin) %>% 
-  unique() %>% 
-  bind_cols(data_frame(Age=breaks[2:14])) %>% 
-  right_join(cause_by_age)
-
-gg<-cause_by_age %>% 
-  ggplot(aes(Age,prop,fill=General_Cause,color=General_Cause))+geom_col(width=5)
-gg<-gg+scale_y_continuous(labels=scales::percent,limits=c(0,1.00))
-gg<-gg+labs(title="Top Causes of Rock Musician Deaths by Age of Death",
-            y="Relative Frequency")
-
-gg
-```
-
-If you make it into your 40s as a rocker you are out of the  woods for suicide murder and accidents. Cancer supplants accidents as the leading cause after age 40.  Heart disease is prevalent starting at 40 and onward.  "Not Specified" rise substantially with age.  I suspect it's because rock stars who die in their prime are more reported upon.
-
-Let's visualize the same data as a smoothed density plot, just to experiment with another view.  Which do you prefer?  It's certainly accomplished with fewer lines of code!
 
 ```{r}
-#filter top causes to reduce clutter
-#cause_by_age<-deaths %>% filter(General_Cause %in% cause_table$General_Cause[1:15])
-cause_by_age<-deaths %>% mutate_cond(!(General_Cause %in% cause_table$General_Cause[1:15]),General_Cause="Other")
-gg<-cause_by_age %>% 
+gg<-deaths %>% filter(Age >21,Age<86) %>%  
   ggplot(aes(Age,..count..))+geom_density(aes(fill=General_Cause),color="grey",position="fill")
 gg<-gg+labs(title="Top Causes of Rock Musician Deaths by Age of Death",
             y="Relative Frequency")
@@ -433,18 +397,25 @@ gg
 If we assume "Not Specified" deaths are in proportion to the reported causes, we can filter it it out get a clearer picture.
 
 ```{r}
-#filter top causes to reduce clutter
-#cause_by_age<-deaths %>% filter(General_Cause %in% cause_table$General_Cause[1:15])
-cause_by_age<-deaths %>% 
-  mutate_cond(!(General_Cause %in% cause_table$General_Cause[1:15]),General_Cause="Other") %>% 
-  filter(General_Cause != "Not Specified")
-gg<-cause_by_age %>% 
+gg<-deaths %>%  
+  filter(General_Cause != "Not Specified") %>% 
+  filter(Age >21,Age<86) %>% 
   ggplot(aes(Age,..count..))+geom_density(aes(fill=General_Cause),color="grey",position="fill")
 gg<-gg+labs(title="Top Causes of Rock Musician Deaths by Age of Death",
             y="Relative Frequency")
 gg<-gg+scale_y_continuous(labels=scales::percent,limits=c(0,1.00))
 gg
 ```
+If you make it into your 40s as a rocker you are out of the  woods for suicide murder and accidents. Cancer supplants accidents as the leading cause after age 40.  Heart disease is prevalent starting at 40 and onward.  "Not Specified" rises substantially with age.  I suspect it's because rock stars who die in their prime are more reported upon.
+
+We know deaths from all causes rise with age.  Do the number of deaths from accidents merely shrink relative to other causes with age? a reality check, let's ask if the absolute number changes with age.
+
+```{r}
+deaths %>% filter(General_Cause=="Accident") %>% 
+  ggplot(Age)+geom_histogram(bins=10)
+```
+
+
 
 
 #Bonus analysis.  Where did they die?
