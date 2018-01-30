@@ -4,14 +4,11 @@ output: html_notebook
 ---
 #Live fast, die young, stay pretty?
 
-That's the stereotype for rockers, or it was.  We only need to look at Keith Richards, over 70 and going strong, to find a major counterexample.  Do rockers die young?  What do they die of?  How does that compare to the broader population (in the U.S., anyway).
+That's the stereotype for rockers, or it was.  We only need to look at Keith Richards, over 70 and going strong, to find a major counterexample.  Do rockers die young?  What do they die of?  How does that compare to the broader population (in the U.S., anyway).  It turns out there are some suprising answers to those questions.
 
-Wikipedia maintains a table of [deaths in rock](https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll).  Let's scrape that list to make some generalizations.  We use the `tidyverse` dialect throughout, just so you know.
+Along the way we'll learn something about web scraping, html parsing and some `ggplot2` tricks.  We use the `tidyverse` dialect throughout, just so you know.
 
-#Load tables from Wikipedia
-
-The deaths for 2010 and later are in a separate article so we need to get both.  When I started this project they were on one page. By the time you read this the Wikipedia gods may have changed it again.  Beware.
-
+#Load libraries and do some setup
 Note the `mutate_cond` function in the chunk below.  We'll use it later.
 ```{r message=FALSE, warning=FALSE}
 library(ggplot2)
@@ -33,29 +30,39 @@ mutate_cond <- function(.data, condition, ..., envir = parent.frame()) {
   .data[condition, ] <- .data[condition, ] %>% mutate(...)
   .data
 }
+```
 
+#Load tables from Wikipedia
+
+Wikipedia maintains a table of [deaths in rock](https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll) which will be our primary source.  All the usual Wikipedia caveats apply.
+
+The deaths for 2010 and later are in a separate article so we need to get both.  When I started this project they were on one page. By the time you read this the Wikipedia gods may have changed it again.  Beware.
+
+```{r}
 death_page1<-read_html("https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll")
 write_html(death_page1,file="death_page1.html")
 death_page2<-read_html("https://en.wikipedia.org/wiki/List_of_2010s_deaths_in_rock_and_roll")
 write_html(death_page2,file="death_page2.html")
-
 ```
+
 ##A note on "pointers"
 R and the `rvest` package have some great functions for converting html `<table>`s into data frames. `rvest` is a very powerful package but one thing I learned is that it works with pointers to the data rather than the actual data. C programmers and old geezers like me will be familiar with this.  I remember pop and push and stacks and all that stuff from the old days.  R generally doesn't pass values "by reference." It passes "by value." That's why when you modify data in the scope of a function it doesn't affect the value of the data outside unless you assign it with `return <data>`.  Using pointers in `rvest` functions means modifications to html data happen without an explicit assigment.
 
 Consider a trival example:
 ```{r, eval=FALSE}
-#ususal R behavior
+#usual R behavior
 my_function<- function(x){return (x+1)}
 data=3
-#this doesn't change data
+#this doesn't change data but it would if data was passed by reference
 my_function(data)
+# [1] 4
 data
-#[1] 3
-#this does
+# [1] 3
+#this does change data in the usual R way
 data<-my_function(data)
 data
-#[1] 4
+# [1] 4
+
 ```
 If we were passing values "by reference" `my_function(data)` would change `data` without the need to assign it back to `data`. That's how `rvest` works.
 
@@ -92,7 +99,9 @@ death_page_text<- gsub( "</small>", "", death_page_text )
 write_file(death_page_text,"death_page2.html")
 
 ```
-A further wrinkle is some of the age-at-death numbers are given as a range like "45-46" which causes `html_table` to create a `character` column while it will otherwise be of type `numeric` if it doesn't see it.  We want to use `bind_rows` to combine all the web page tables into one data frame but it will break on the type conflict.  Let's arbitrarily take the lowest number in age range before binding.  We can do this as part of the table extraction process.  Also, omit the first five tables which, by inspection, we know are not the mortality tables.
+A further wrinkle is some of the age-at-death numbers are given as a range like "45-46" which causes `html_table` to create a `character` column for `Age`.  Tables that don't have any ranges, just single numbers, will be extracted as `numeric` columns.  We have many tables so We want to use `bind_rows` to combine all the web page tables into one data frame. Alas, `bind_rows` will balk at chaining columns of diferent types.  To avoid this, let's arbitrarily take the lowest number in any age range we find before binding.  We can do this as part of the table extraction process.  
+
+Also omit the first five tables which, by inspection, we know are not the mortality tables.
 
 ```{r, message=FALSE, warning=FALSE}
 # omit first five tables
@@ -234,7 +243,7 @@ gg
 ```
 NOW, we are done with all the data wrangling and can get to the fun stuff.
 
-This gives us a decent picture of how rock stars die.  Mostly from the same things that kill all of us. Heart disease and cancer are the leading causes of death in US, followed by lung disease and accidents according to https://www.cdc.gov/nchs/fastats/deaths.htm and shown below.
+This gives us a decent picture of how rock stars die.  Mostly from the same things that kill all of us. Heart disease and cancer were the leading causes of death in US in 2015, followed by lung disease and accidents according to https://www.cdc.gov/nchs/fastats/deaths.htm and shown below.
 
 ```{r}
 us_deaths<-data_frame(General_Cause=as_factor(c('Heart Disease','Cancer',
@@ -255,9 +264,11 @@ Drug overdoses may count as "accidents" at the CDC.  I don't separate out Pneumo
 
 Alzheimer's is a big killer, nationally but is only 21st on the list of rock deaths.  Perhaps it is underreported or was recognized as a distinct cause of death only recently. Maybe rock stars die too young to get Alzheimers.
 
+I am guilty of some statistical sloppiness from here on since I will be comparing deaths in the U.S. in 2015 to deaths of rock musicians worldwide over all years.  As the pinball machines used to say, "For Amusement Only." 
+
 # You can't make this stuff up
 
-There are some interesting causes in this list.  Three electrocutions, two by guitar and one my microphone. They all happened in England in the early 70s.  Presumably the electrical codes have been tightned up a bit since.  Three people are listed who choked on their own vomit. That's all? Consider the hapless Steve Took of T Rex, who died from choking on a cocktail cherry.  That's why I always take my Manhattans with a lemon twist instead.
+There are some interesting causes in this Wikipedia tables.  Three electrocutions, two by guitar and one my microphone. They all happened in England in the early 70s.  Presumably the electrical codes have been tightned up a bit since.  Three people are listed who choked on their own vomit. That's all? Consider the hapless Steve Took of T-Rex, who died from choking on a cocktail cherry.  That's why I always take my Manhattans with a lemon twist instead. I'd choke on those red glowing balls of wax, too!
 
 #Live fast?
 While the big killers are the same for both populations, is there evidence that rockers "live fast?"  Yes, it turns out.
@@ -288,7 +299,7 @@ gg
 This scatter plot shows the preponderance of Rock musician deaths relative to the broader US population.  Where the points lie above the line it means rock musicians die of that cause more often than the overall US population.  We can see that suicide, murder and, especially, accidents account for more relative deaths than they do in the broader population.  Cancer seems more prevalent, too.  We can't know, but might suspect, this due to behavioural factors like smoking.
 
 #Die Young?
-We've `<grin>`scientifically proven`</grin>` that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death going back to 1950 won't be comprable to current US life expectancy.  To get a comparison let's pull the data from the `gapminder` package.  This shows life expectancy at birth as opposed to average age at death, which is what our data set has now.  We have to get a bit tricky to make the numbers comparable by taking `date` minus `Age` to get `birth_year`.  We take the gapminder life expectancy for `birth_year` and compare that to `Age` at death.  The earliest birth years in our data are much earlier than what the gapminder set covers so we need to extrapolate the data, as well.
+We've `<grin>`scientifically proven`</grin>` that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death going back to 1950 won't be comprable to current US life expectancy.  To get a comparison let's pull the data from the `gapminder` package.  This shows life expectancy at birth as opposed to average age at death, which is what our data set has now.  We have to get a bit tricky to make the numbers comparable by taking `date` minus `Age` to get `birth_year`.  We take the gapminder life expectancy for `birth_year` and compare that to `Age` at death.  The earliest birth years in our data are much earlier than what the gapminder set covers so we need to extrapolate the data, as well.  If we were doing REAL data science we would find a better mortality data set, but this is OUTSIDER data science!  We keep it simple.
 
 ```{r, warning=FALSE}
 #Add birth year column.
@@ -351,7 +362,7 @@ This really surprised me.  Rock stars used to die young, but not any more!  They
 
 "They" say 27 is particularly risky age to be a rock star.  [The "27 club" is a thing](https://en.wikipedia.org/wiki/27_Club).  Is it truly standout year for mortality, or is it just a meme without grounds?
 
-
+We'll plot the number of deaths by age and highlight 27.  Create the highlight by making a vector, `fills`, that specifies the color of each bar in advance. It's slightly tricky since not all ages have deaths so a consecutive series won't work.
 ```{r}
 highlight=27
 # the code below creates the list of colors for plot bars, making just one red.
