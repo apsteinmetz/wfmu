@@ -285,10 +285,10 @@ gg<-gg+scale_x_continuous(labels=scales::percent)
 gg<-gg+scale_y_continuous(labels=scales::percent)
 gg
 ```
-This shows the preponderance of Rock musician deaths relative to the broader US population.  We can see that suicide, murder and, especially, accidents account for more relative deaths than they do in the broader population.
+This scatter plot shows the preponderance of Rock musician deaths relative to the broader US population.  Where the points lie above the line it means rock musicians die of that cause more often than the overall US population.  We can see that suicide, murder and, especially, accidents account for more relative deaths than they do in the broader population.  Cancer seems more prevalent, too.  We can't know, but might suspect, this due to behavioural factors like smoking.
 
 #Die Young?
-We've `<grin>`scientifically proven`</grin>` that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death going back to 1950 won't be comprable to current US life expectancy.  To get a comparison let's pull the data from the `gapminder` package.  This shows life expectancy at birth as opposed to average age at death, which is what we have now, so we have to get a bit tricky to make the numbers comparable.  The earliest birth years in our data are much earlier than what the gapminder set covers so we need to extrapolate the data, as well.
+We've `<grin>`scientifically proven`</grin>` that rock stars "live fast."  Do they die young?  Life expectancies have grown over the years so taking an aggregate average age at death going back to 1950 won't be comprable to current US life expectancy.  To get a comparison let's pull the data from the `gapminder` package.  This shows life expectancy at birth as opposed to average age at death, which is what our data set has now.  We have to get a bit tricky to make the numbers comparable by taking `date` minus `Age` to get `birth_year`.  We take the gapminder life expectancy for `birth_year` and compare that to `Age` at death.  The earliest birth years in our data are much earlier than what the gapminder set covers so we need to extrapolate the data, as well.
 
 ```{r, warning=FALSE}
 #Add birth year column.
@@ -311,11 +311,11 @@ life_exp %>% ggplot(aes(birth_year,expected_longevity))+geom_line()+geom_point(a
   labs(title="Gapminder U.S. Life Expectancy at Birth, Extrapolated",y="Life Expectancy",x="Birth Year")
 
 ```
-We see that the `gapminder` data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  I saw some sources that indicate the line should bend downward in the 1800s.  I am not controlling for demographics, either.  Our sample sizes are pretty small at the far end of the range, anyway, so any conclusions would have to be taken with a huge grain of salt,regardless.  Still, lets plunge on!
+We see that the `gapminder` data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  This is generally bad practice and was a contributing factor in the Challenger Space Shuttle disaster (that, and Powerpoint).  I saw some sources that indicate the line should bend downward in the 1800s.  I am not controlling for demographics, either.  Our sample sizes are pretty small at the far end of the range, anyway, so any conclusions would have to be taken with a huge grain of salt,regardless.  Still, lets plunge on!
 
 We need to apply the expected longevity for each musician for the year they were born and compare that to the age they were at death.  We then summarize that data for each year of deaths.  To put it another way, in any given year, how did the rock musicians who died compare to the life expectancy for all people born in the US the same year each rock musician did?
 
-The series for rock musicians in the chart below is very unstable early on because the sample size is so small.
+The plot below shows how the average age at death has changed over the years for rock musicians and the population as a whole. The series for rock musicians in the chart is very unstable early on because the sample size is so small.  Despite this caveat and the warning about extrapolation
 
 Plotting note:  I am not using "tidy"" data here so I roll some intersting g-g-jitsu to get the legends nice.
 ```{r, message=FALSE, warning=FALSE}
@@ -369,6 +369,7 @@ gg<-deaths %>% ggplot(aes(Age))+geom_bar(fill=fills)
 gg<-gg+labs(title="Rock Musician Age of Death (1950-2017)",y="Count")
 gg<-gg+annotate("text",x=27,y=45,label="Age 27",size=8)
 gg
+
 ```
 
 Well, well, well.  It turns out that 27 IS a risky age! Optically, it looks like about double the mortality we might otherwise expect.  We always have to be wary of carts leading horses, though.  Perhaps the folks who are interested in the topic are more than usually dilligent in finding examples and adding them to the Wikipedia page. Still, it's fascinating.  Why do 27-year olds die?  You already know the answer.
@@ -401,28 +402,32 @@ If we assume "Not Specified" deaths are in proportion to the reported causes, we
 gg<-deaths %>%  
   filter(General_Cause != "Not Specified") %>% 
   filter(Age >21,Age<86) %>% 
-  ggplot(aes(Age,..count..))+geom_density(aes(fill=General_Cause),color="grey",position="fill")
+  ggplot(aes(Age,..count..))+geom_density(aes(fill=General_Cause),color="grey",alpha=0.9,position="fill")
 gg<-gg+labs(title="Top Causes of Rock Musician Deaths by Age of Death",
             y="Relative Frequency")
 gg<-gg+scale_y_continuous(labels=scales::percent,limits=c(0,1.00))
+gg<-gg+theme(panel.background = element_blank(),
+             panel.grid.major.x = element_line(color="black"))
 gg
 ```
-If you make it into your 40s as a rocker you are out of the  woods for suicide murder and accidents. Cancer supplants accidents as the leading cause after age 40.  Heart disease is prevalent starting at 40 and onward.  "Not Specified" rises substantially with age.  I suspect it's because rock stars who die in their prime are more reported upon.
+If you make it into your 50s as a rocker you are out of the  woods for suicide, murder and accidents. Cancer supplants accidents as the leading cause after age 40.  Heart disease is prevalent starting at 40 and onward.  "Not Specified" rises substantially with age.  I suspect it's because rock stars who die in their prime are more reported upon.
 
-Let's use this data to question our "live fast" assertion from above.  We know deaths from all causes rise with age.  So is dimunition of deaths by accident as age increases just a reflection of other categories growing in relation? As a reality check, let's ask if the absolute number changes with age.
+Let's use this data to question our "live fast" assertion from above.  We know deaths from all causes rise with age.  Maybe the asbsolute number of accidental deaths stays the same (or even rises) but just goes down relative to other causes common to all geezers. As a reality check, let's ask if the absolute number changes with age.
 
 ```{r}
-gg<-deaths %>% filter(General_Cause=="Accident") %>% 
-  ggplot(aes(Age,fill="red"))+geom_histogram(bins=10)
-gg<-gg+labs(title='Number of Reported Deaths by "Accident" by Age',
+gg<-deaths  %>% 
+  ggplot(aes(Age,fill="grey"))+geom_histogram(bins=10)
+gg<-gg+labs(title='Number of Reported Deaths by Accident, by Age',
             x='Age at Death',
             y="Count")
-gg<-gg+geom_histogram(data=deaths,aes(Age,fill="black"),bins=10,alpha=0.2)
+gg<-gg+geom_histogram(data=filter(deaths,General_Cause=="Accident"),
+                      aes(Age,fill="black"),
+                      bins=10)
 gg<-gg+ scale_fill_manual(name = 'Lines', 
-         values =c('black'='black','red'='red'), labels = c('Accident','Everything'))
+         values =c('grey'='grey','black'='black'), labels = c('Accident','All Causes'))
 gg
 ```
-So, yes, rock musicians do get more careful as they age.
+The absolute number of accidental deaths fall as people age, even as total deaths rise. So, yes, rock musicians, like the rest of us, do get more careful as they age!
 
 
 #Bonus analysis.  Where did they die?
