@@ -8,7 +8,7 @@ That's the stereotype for rockers, or it was.  We only need to look at Keith Ric
 
 Along the way we'll learn something about web scraping, html parsing and some `ggplot2` tricks.  We use the `tidyverse` dialect throughout, just so you know.
 
-#Load libraries and do some setup
+#Load libraries and do some setup.
 Note the `mutate_cond` function in the chunk below.  We'll use it later.
 ```{r message=FALSE, warning=FALSE}
 library(ggplot2)
@@ -32,7 +32,7 @@ mutate_cond <- function(.data, condition, ..., envir = parent.frame()) {
 }
 ```
 
-#Load tables from Wikipedia
+#Load tables from Wikipedia.
 
 Wikipedia maintains a table of [deaths in rock](https://en.wikipedia.org/wiki/List_of_deaths_in_rock_and_roll) which will be our primary source.  All the usual Wikipedia caveats apply.
 
@@ -45,7 +45,7 @@ death_page2<-read_html("https://en.wikipedia.org/wiki/List_of_2010s_deaths_in_ro
 write_html(death_page2,file="death_page2.html")
 ```
 
-##A note on "pointers"
+##A note on "pointers."
 R and the `rvest` package have some great functions for converting html `<table>`s into data frames. `rvest` is a very powerful package but one thing I learned is that it works with pointers to the data rather than the actual data. C programmers and old geezers like me will be familiar with this.  I remember pop and push and stacks and all that stuff from the old days.  R generally doesn't pass values "by reference." It passes "by value." That's why when you modify data in the scope of a function it doesn't affect the value of the data outside unless you assign it with `return <data>`.  Using pointers in `rvest` functions means modifications to html data happen without an explicit assigment.
 
 Consider a trival example:
@@ -81,7 +81,7 @@ xml_add_sibling(death_page_child,death_page2_child)
 write_html(death_page,file="death_page.html")
 
 ```
-#Clean the data
+#Clean the data.
 Unfortunately, as is often the case, the raw data is not as clean as we might like. 
 
 Here's a data wrastlin' puzzle.  The artist and the band name (or names) share a single table cell.  This is not a problem for the anonymous summary stats we will present here but I am also doing another analysis where I look at radio station playlist patterns do detect deaths (the subject of a future post).  For that we need to flag the event by band or artist, however it appears.  Let's tackle it now.
@@ -138,8 +138,7 @@ deaths<-deaths %>% mutate_cond(is.na(`Cause of death`),`Cause of death`="Not Spe
 deaths<-deaths %>% mutate_cond(`Cause of death`=="",`Cause of death`="Not Specified")
 deaths[1:5,]%>% kable(format.args=list(big.mark=","))
 ```
-#Submitting to Wikipedia is getting more popular
-
+#Submitting to Wikipedia is getting more popular.
 Now we have a clean table.  Before going further we should note that death entries are growing over time.  No great surprises here but this says something about the age of Wikipedia, the growing popularity of Wikipedia and the age of Rock and Roll.  It does not say anything about the business getting more risky.
 
 ```{r}
@@ -237,6 +236,9 @@ cause_table<-cause_table %>% mutate(General_Cause= as_factor(General_Cause))
 deaths<-deaths %>% mutate_cond(!(General_Cause %in% cause_table$General_Cause[1:15]),General_Cause="Other")
 deaths<-deaths %>% mutate_cond(General_Cause =="Natural causes",General_Cause="Other")
 
+#We've done all the messing with deaths we need to do so lets save it for later.
+save(deaths,file='deaths.rdata')
+
 
 gg<-cause_table[1:12,]  %>% 
   ggplot(aes(General_Cause,Rockers))+geom_col()
@@ -324,7 +326,7 @@ life_exp %>% ggplot(aes(birth_year,expected_longevity))+geom_line()+geom_point(a
   labs(title="Gapminder U.S. Life Expectancy at Birth, Extrapolated",y="Life Expectancy",x="Birth Year")
 
 ```
-We see that the `gapminder` data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  This is generally bad practice and was a contributing factor in the Challenger Space Shuttle disaster (that, and Powerpoint).  I saw some sources that indicate the line should bend downward in the 1800s.  I am not controlling for demographics, either.  Our sample sizes are pretty small at the far end of the range, anyway, so any conclusions would have to be taken with a huge grain of salt,regardless.  Still, lets plunge on!
+We see that the `gapminder` data is pretty linear so we should be okay to extrapolate.  That said, we are going way beyond the observed range.  This is generally bad practice and, [according to Edward Tufte](https://www.edwardtufte.com/bboard/q-and-a-fetch-msg?msg_id=0001yB), was a contributing factor in the Columbia Space Shuttle disaster (that, and Powerpoint).  I saw some sources that indicate the line should bend downward in the 1800s.  I am not controlling for demographics, either.  Our sample sizes are pretty small at the far end of the range, anyway, so any conclusions would have to be taken with a huge grain of salt,regardless.  Still, lets plunge on!
 
 We need to apply the expected longevity for each musician for the year they were born and compare that to the age they were at death.  We then summarize that data for each year of deaths.  To put it another way, in any given year, how did the rock musicians who died compare to the life expectancy for all people born in the US the same year each rock musician did?
 
@@ -339,9 +341,6 @@ deaths <- deaths %>%
   select(-lifeExp) %>% 
   mutate(relative_mortality=Age-expected_longevity) %>% 
   {.}
-
-#We've done all the messing with deaths we need to do so lets save it for later.
-save(deaths,file='deaths.rdata')
 
 death_age<-deaths %>% 
   group_by(Year) %>% 
@@ -380,7 +379,7 @@ gg
 This is much simpler, at the expense of losing the bar `geom` for `Gap`.  The first example is a complicated mix of mapping `color`, `fill` and legend labels.  The second is far more clear to me. But...if we want to mix `geom_line` and `geom_bar` we are back to a more complicated treatment.
 
 
-#Stay pretty. The "27 Club."
+#Stay pretty? The "27 Club."
 
 "They" say 27 is particularly risky age to be a rock star.  [The "27 club" is a thing](https://en.wikipedia.org/wiki/27_Club).  Is it truly standout year for mortality, or is it just a meme without grounds?
 
@@ -456,7 +455,7 @@ Note the emergence and dissapearce of AIDS as a cause of death from people in th
 ```{r}
 deaths %>% filter(General_Cause=="AIDS") %>% ggplot(aes(Year))+geom_bar()
 ```
-There are so few instances of AIDS deaths that we can't be confident of our hypothesis. Still, it is consistent with the dissapearance of AIDS as a cause after 2001 for many years - until 2017.  The last case is Michael Freidman.  I quesion his inclusion on this list as he was known as a Broadway artist.  Still he was a tragic case.  His disease progressed rapidly but neither he nor his friends believed it was possible that HIV was causing his symptoms.  By the time he sought medical attention it was too late.  The theatre community was stunned that, in this place and time, AIDS could still kill someone.
+There are so few instances of AIDS deaths that we can't be confident of our hypothesis. Still, it is consistent with the dissapearance of AIDS as a cause after 2001 for many years - until 2017.  The last case is Michael Freidman.  I quesion his inclusion on this list as he was known as a Broadway song writer.  Still he was a tragic case.  His disease progressed rapidly but neither he nor his friends believed it was possible that HIV was causing his symptoms.  By the time he sought medical attention it was too late.  [The theatre community was stunned](https://www.nytimes.com/2017/10/11/theater/michael-friedman-aids-death-theater.html) that, in this place and time, AIDS could still kill someone.
 
 Finally, let's use this data to question our "live fast" assertion from above.  We know deaths from all causes rise with age.  Maybe the asbsolute number of accidental deaths stays the same (or even rises) but just goes down relative to other causes common to all geezers. As a reality check, let's ask if the absolute number changes with age.
 
