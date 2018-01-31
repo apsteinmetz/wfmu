@@ -123,7 +123,9 @@ Almost done with the boring bits. Separate out the list of name and bands into, 
 ```{r warning=FALSE}
 #take at most three band names.
 deaths<-deaths_raw %>% 
-  separate(Name,into=c("Name","band1","band2","band3","band4"),sep=",",extra="drop")
+  separate(Name,into=c("Name","band1","band2","band3","band4"),sep=",",extra="drop") %>% 
+  unique()
+
 
 deaths<-deaths %>% 
   mutate(Date=parse_date(Date,"%B %d, %Y")) %>% 
@@ -262,7 +264,7 @@ Alcohol Poisoning:2,200 (https://www.cdc.gov/vitalsigns/alcohol-poisoning-deaths
 
 Drug overdoses may count as "accidents" at the CDC.  I don't separate out Pneumonia from chronic lung problems. 
 
-Alzheimer's is a big killer, nationally but is only 21st on the list of rock deaths.  Perhaps it is underreported or was recognized as a distinct cause of death only recently. Maybe rock stars die too young to get Alzheimers.
+Alzheimer's is a big killer, nationally, but is only 21st on the list of rock deaths.  Perhaps it is underreported or was recognized as a distinct cause of death only recently. Maybe rock stars die too young to get Alzheimers.
 
 I am guilty of some statistical sloppiness from here on since I will be comparing deaths in the U.S. in 2015 to deaths of rock musicians worldwide over all years.  As the pinball machines used to say, "For Amusement Only." 
 
@@ -328,7 +330,7 @@ We need to apply the expected longevity for each musician for the year they were
 
 The plot below shows how the average age at death has changed over the years for rock musicians and the population as a whole. The series for rock musicians in the chart is very unstable early on because the sample size is so small.  Despite this caveat and the warning about extrapolation
 
-Plotting note:  I am not using "tidy"" data here so I roll some intersting g-g-jitsu to get the legends nice.
+Plotting note:  I am not using "tidy"" data here so I roll some intersting g-g-jitsu to get the legends nice. The musician data and the U.S. population data are in separate columns so they get plotted with separate `geom_line` aesthetics.  We could use `gather` to make the data tidy but that would complicate taking the difference to show the `gap` series.  
 ```{r, message=FALSE, warning=FALSE}
 #merge deaths with life expectancy for the relevant birth year.  Determine
 #whether they died "young"  or outlived expectations.
@@ -338,15 +340,18 @@ deaths <- deaths %>%
   mutate(relative_mortality=Age-expected_longevity) %>% 
   {.}
 
+#We've done all the messing with deaths we need to do so lets save it for later.
+save(deaths,file='deaths.rdata')
+
 death_age<-deaths %>% 
   group_by(Year) %>% 
   summarise(rock_mean=as.integer(mean(Age)),
             us_mean=mean(expected_longevity),
-            relative_mortality=mean(relative_mortality))
+            gap=mean(relative_mortality))
 
 gg<-death_age %>% ggplot(aes(Year,rock_mean,color="red"))+geom_line()
 gg<-gg+geom_line(aes(y=us_mean,color="black"))
-gg<-gg+geom_col(aes(y=relative_mortality,fill="darkgrey"),color="lightgrey")
+gg<-gg+geom_col(aes(y=gap,fill="darkgrey"),color="lightgrey")
 gg<-gg+labs(title="Rock Stars Don't Die Young Anymore\nRocker Death Age vs. U.S. Population",
             y="Average Age At Death",
             x="Year of Death",
@@ -356,13 +361,30 @@ gg<-gg+ scale_colour_manual(name = 'Lines',
 gg<-gg+ scale_fill_identity(name = 'Bars', guide = 'legend',labels = c('Gap'))
 gg
 ```
-This really surprised me.  Rock stars used to die young, but not any more!  They have completely closed the gap with the U.S. population at large (We can discount the early years in this chart since there are so few observations).  Again, Keith Richards, stick with the yoga, dude!
+This really surprised me.  Rock stars used to die young, but not any more!  They have completely closed the gap with the U.S. population at large (We can discount the early years in this chart since there are so few observations).  Again, Keith Richards, stick with the whatever you're doing, dude!
+
+Aww, heck with it.  Let's show the tidyverse way to roll this.  Start from the `death_age` table we created above.  Tidyfy it with `gather`, then plot.
+
+```{r}
+gg<-death_age %>% gather(key="cohort",value="death_age",-Year) %>% 
+  ggplot(aes(Year,death_age,color=cohort))+geom_line()+geom_hline(yintercept = 0)
+gg<-gg+labs(title="Rock Stars Don't Die Young Anymore\nRocker Death Age vs. U.S. Population",
+            y="Average Age At Death",
+            x="Year of Death",
+            caption="Source:Wikipedia, gapminder.org")
+gg<-gg+ scale_colour_manual(name="",
+                            values =c('blue','red',"black"),
+                            labels = c('Gap',"Rockers",'US Pop.(expected)'))
+gg
+```
+This is much simpler, at the expense of losing the bar `geom` for `Gap`.  The first example is a complicated mix of mapping `color`, `fill` and legend labels.  The second is far more clear to me. But...if we want to mix `geom_line` and `geom_bar` we are back to a more complicated treatment.
+
 
 #Stay pretty. The "27 Club."
 
 "They" say 27 is particularly risky age to be a rock star.  [The "27 club" is a thing](https://en.wikipedia.org/wiki/27_Club).  Is it truly standout year for mortality, or is it just a meme without grounds?
 
-We'll plot the number of deaths by age and highlight 27.  Create the highlight by making a vector, `fills`, that specifies the color of each bar in advance. It's slightly tricky since not all ages have deaths so a consecutive series won't work.
+We'll plot the number of deaths by age and highlight 27.  Create the highlight by making a vector, `fills`, that specifies the color of each bar in advance. At first glance, creating `fills` seems overly complicated.  It's slightly tricky since not all ages have deaths so a consecutive series won't work.
 ```{r}
 highlight=27
 # the code below creates the list of colors for plot bars, making just one red.
@@ -378,7 +400,7 @@ fills<-deaths %>%
 
 gg<-deaths %>% ggplot(aes(Age))+geom_bar(fill=fills)
 gg<-gg+labs(title="Rock Musician Age of Death (1950-2017)",y="Count")
-gg<-gg+annotate("text",x=27,y=45,label="Age 27",size=8)
+gg<-gg+annotate("text",x=27,y=55,label="Age 27",size=8)
 gg
 
 ```
@@ -395,16 +417,20 @@ deaths %>% filter(Age==highlight) %>%
 ```
 Tragic, of course.  Those of us who have achieved a certain age occasionally reflect upon all the times in our youth when we did stupid stuff that could have killed us but luck favored us at that moment.  Did I say "we?" Well maybe just me.
 
-How do causes of death change as rock musicians age?
+How do causes of death change as rock musicians age?  For this we'll use a `geom_density` plot to get smooth progressions over time in a stacked format.  Using `position="fill"` is the way to get the stack of causes to reach 100% for all age cohorts.  I mention this because I was scratching my head over how to do this.  I was confusing the use of the argument `"fill"` in this context with the use of `fill` to create a different series for each categories of a variable.  We use `fill` in both senses here:
+`geom_density(aes(fill=General_Cause),color="grey",position="fill")`
 
 
 ```{r}
 #cut off below 21 and above 85 because the data gets pretty thin
-gg<-deaths %>% filter(Age >21,Age<86) %>%  
-  ggplot(aes(Age,..count..))+geom_density(aes(fill=General_Cause),color="grey",position="fill")
+gg<-deaths %>%  
+  filter(Age >21,Age<86) %>% 
+  ggplot(aes(Age,..count..))+geom_density(aes(fill=General_Cause),color="grey",alpha=0.9,position="fill")
 gg<-gg+labs(title="Top Causes of Rock Musician Deaths by Age of Death",
             y="Relative Frequency")
 gg<-gg+scale_y_continuous(labels=scales::percent,limits=c(0,1.00))
+gg<-gg+theme(panel.background = element_blank(),
+             panel.grid.major.x = element_line(color="black"))
 gg
 ```
 If we assume "Not Specified" deaths are in proportion to the reported causes, we can filter it it out get a clearer picture.
@@ -423,7 +449,16 @@ gg
 ```
 If you make it into your 50s as a rocker you are out of the  woods for suicide, murder and accidents. Cancer supplants accidents as the leading cause after age 40.  Heart disease is prevalent starting at 40 and onward.  "Not Specified" rises substantially with age.  I suspect it's because rock stars who die in their prime are more reported upon.
 
-Let's use this data to question our "live fast" assertion from above.  We know deaths from all causes rise with age.  Maybe the asbsolute number of accidental deaths stays the same (or even rises) but just goes down relative to other causes common to all geezers. As a reality check, let's ask if the absolute number changes with age.
+#A couple more questions suggested by our discoveries.
+
+Note the emergence and dissapearce of AIDS as a cause of death from people in their late 20s to 50.  Is this a function of a certain number of years when AIDS was a particular scourge?  Is it a chronic, manageable, condition now so that it won't be a frequent cause of death any more? Let's look at the number of reported AIDS deaths by year.
+
+```{r}
+deaths %>% filter(General_Cause=="AIDS") %>% ggplot(aes(Year))+geom_bar()
+```
+There are so few instances of AIDS deaths that we can't be confident of our hypothesis. Still, it is consistent with the dissapearance of AIDS as a cause after 2001 for many years - until 2017.  The last case is Michael Freidman.  I quesion his inclusion on this list as he was known as a Broadway artist.  Still he was a tragic case.  His disease progressed rapidly but neither he nor his friends believed it was possible that HIV was causing his symptoms.  By the time he sought medical attention it was too late.  The theatre community was stunned that, in this place and time, AIDS could still kill someone.
+
+Finally, let's use this data to question our "live fast" assertion from above.  We know deaths from all causes rise with age.  Maybe the asbsolute number of accidental deaths stays the same (or even rises) but just goes down relative to other causes common to all geezers. As a reality check, let's ask if the absolute number changes with age.
 
 ```{r}
 gg<-deaths  %>% 
@@ -434,50 +469,15 @@ gg<-gg+labs(title='Number of Reported Deaths by Accident, by Age',
 gg<-gg+geom_histogram(data=filter(deaths,General_Cause=="Accident"),
                       aes(Age,fill="black"),
                       bins=10)
-gg<-gg+ scale_fill_manual(name = 'Lines', 
-         values =c('grey'='grey','black'='black'), labels = c('Accident','All Causes'))
+gg<-gg+ scale_fill_manual(name='',
+                          values =c('grey'='grey','black'='black'),
+                          labels = c('Accident','All Causes'))
 gg
 ```
 The absolute number of accidental deaths fall as people age, even as total deaths rise. So, yes, rock musicians, like the rest of us, do get more careful as they age!
 
-
-#Bonus analysis.  Where did they die?
-```{r}
-deaths3<-deaths %>% 
-  separate(Location,c("neighborhood","city","state","country"),
-           remove=FALSE,
-           sep=", ",
-           fill="left",
-           extra="merge")
-
-deaths3<-deaths3 %>% mutate_cond(country=="",country="Not Specified")
-deaths3<-deaths3 %>% mutate_cond(is.na(city),city="Not Specified")
-deaths3<-deaths3 %>% mutate_cond(country=="U.S.",country="USA")
-deaths3<-deaths3 %>% mutate_cond(country=="U.K.",country="England")
-deaths3 %>% group_by(country) %>% 
-  summarise(count=n()) %>% 
-  arrange(desc(count)) %>%
-  .[1:12,] %>% 
-  kable(format.args=list(big.mark=","))
-
-```
-
-This doesn't reveal any surprises.  Again, it says something about the home of rock and the location of people who submit entries to Wikipedia.  We could go further and compare these numbers to population but we wouldn't learn anything not already obvious.
-
-What about cities?
-
-```{r}
-deaths3 %>% group_by(city) %>% 
-  summarise(count=n()) %>% 
-  arrange(desc(count))%>% 
-  .[1:12,] %>% 
-  kable(format.args=list(big.mark=","))
-```
-If we looked at city populations, we'd find that L.A., Nashville and Memphis have more rock musicians than population would suggest. Again, not a surprise.  It's a bit surprising to me that London is not on the list. On second thought, every English rock star I can think of moved to the U.S.  I occasionally walk by the flowers outside David Bowie's house in Manhattan.
-
 #Conclusion
 
-This project started out as part of a separate project but I went down an intersting rabbit hole and realized there was something to say about the Wikipedia data set.  Alas, the 80/20 rule applies. Most of the time on this project was spent iterating and tweaking the data cleaning part.  The HTML manipulation was a pain.  Once I had a clean data set, I breezed through the exploration and discovery part...and that was very fun. Still, I learned some more tricks about web scraping and found some surprising things in the data.  Win-win!  
+This project started out as part of a separate project but I went down an interesting rabbit hole and realized there was something to say about the Wikipedia data set.  Alas, the 80/20 rule applies. Most of the time on this project was spent iterating and tweaking the data cleaning part.  The HTML manipulation was a pain.  Once I had a clean data set, I breezed through the exploration and discovery part...and that was very fun. Still, I learned some more tricks about web scraping and found some surprising things in the data.  Win-win!  
 
 Stay off the dope, kids!
-
