@@ -10,14 +10,26 @@ library(tidyverse)
 library(lubridate)
 library(rvest)
 library(gender)
+library(ggrepel)
 
 ```
 
-How many of the people in this list are women?  We'll try to determine gender by first name.  First we have to separate the name into pieces.  BUT, where there are three or more words in the name, which is the first name?  Joe Harmonica Watson and Wild Bill Williams both have nicknames but different positions for the first name. This is what I chose:
-1.Separate name into, at most, 3 parts, starting from the left side.
-2.Where the right side (first piece) is blank, take the middle piece as the first name.
-3.Where the first piece has an entry, test if it is a likely name, if so, use it as the first name.
+We assume most rock musicians are male. How many of the people in this list are women?  We'll try to determine gender by first name.  How?  As always, there is an R package for that.  The `gender` package and the associated `genderdata` data set have, not just a list of gender assignments for first names, but the preponderance of gender for these names going back in time. This recognizes that there is some gender fluidity to names over time.
 
+
+First we have to separate the name into pieces.  BUT, where there are three or more words in the name, which is the first name?  Joe Harmonica Watson and Wild Bill Williams both have nicknames but different positions for the first name.
+
+
+
+This is what I chose:
+
+1. Separate name into, at most, 3 parts, starting from the left side.  This will create most of the first names in the `middle` column and a much smaller number of names in the `first` column.
+
+2. Scan both columns to assign a gender for each column entry. This will create columns `gender.x` and `gender.y`. Most of the `gender.x` entries will be `NA`.
+
+3. Use the gender assigned to `middle`.  If it is `NA` see if we have a gender for `first` and use that.
+
+4. Set any remaining `NA`s to "Undetermined."
 
 
 ```{r}
@@ -36,13 +48,63 @@ deaths<-deaths %>% left_join(sex) %>%
   select(-First) %>% 
   rename(First=Middle) %>% 
   left_join(sex,by=c("First","birth")) %>% 
-  mutate_cond(is.na(gender.x),gender.x=gender.y) %>%
-  select(-gender.y) %>% 
-  rename(gender=gender.x)
+  mutate(gender=ifelse(!is.na(gender.x),gender.x,gender.y)) %>%
+  mutate(gender=ifelse(!is.na(gender),gender,"undetermined")) %>%
+  select(-First,-Last,-gender.y,-gender.x) %>% 
+  {.}
 
-table(deaths$gender)
+
+prop.table(table(deaths$gender))
+
+
+genderdata::ssa_national %>% filter(name %in% c("ashley","madison")) %>%
+  mutate(gender=ifelse(male<female,"female","male")) %>% 
+  group_by(name,gender) %>% 
+  summarise(each=n())
+```
+So only 10% of the entries are assumed to be female.  This precludes running the same detailed analysis we did earlier by gender.  Just so it isn't a wasted trip let's look at the aggregate proportions of general causes.
+
+The code below shows an efficient way to do a 1-way proportional crosstab using `dplyr`.
+
+```{r}
+deaths <- deaths %>% filter(gender != "undetermined")
+xt<- deaths %>% count(General_Cause,gender) %>% 
+  spread(gender,n,fill=0) %>% 
+  mutate_if(is.numeric,funs(./sum(.))) %>% 
+  arrange(male)
+
+xt$General_Cause<-as_factor(xt$General_Cause)
+xt
 ```
 
+We need to visualize this in a chart form. The chart below is the kind of thing I typically see in presentations in my organization.
+```{r}
+xt %>% gather(gender,proportion,-General_Cause) %>% ggplot(aes(General_Cause,proportion,fill=gender))+geom_col(position = "dodge")+coord_flip()
+```
+Yes, you can tease out comparisons but the differences are only apparent upon very close scrutiny.
+
+An even less legible version is below.  Very pretty artwork, though.
+
+```{r}
+xt %>% gather(gender,proportion,-General_Cause) %>% ggplot(aes(gender,proportion,fill=General_Cause))+geom_col(position="dodge")
+```
+These candy jars are unusable.  I include them because I see this sort of plot all the time in my organization.  People don't naturally gravitate to the far more useful scatter plot.
+```{r}
+gg<-xt %>% ggplot(aes(male,female))+geom_point()
+gg<-gg+  geom_text_repel(label=xt$General_Cause)
+gg<-gg+geom_abline(slope=1,intercept=0)
+#gg<-gg+labs(title="Rock Stars are (Almost) Like the Rest of US\nProportion of all 
+#Deaths",caption="Sources: Wikipedia and CDC",
+#y='Rock Music Deaths (1950-Present)',x='US Deaths (2015)')
+#gg<-gg+scale_x_continuous(labels=scales::percent)
+#gg<-gg+scale_y_continuous(labels=scales::percent)
+gg
+
+
+```
+People are so ingrained to seeing categorial variables or time series on the horizontal axis that scatter plots throw them off for a second.  But it doesn't throw you, dear reader, I am sure.  We know that points above the line mean that females are proportionately more like to die of that cause and vice-versa.  Outliers are immediately visible.
+
+This chart shows that males were more likely to die of heart disease than females and, for drugs, less. Beyond that there were no significant differnces.  Again, the scatter plot brings this very clearly to light.
 
 #Bonus analysis.  Where did they die?
 ```{r}
