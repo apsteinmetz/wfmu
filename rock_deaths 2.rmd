@@ -86,17 +86,6 @@ deaths<-deaths %>% left_join(sex) %>%
 
 
 prop.table(table(deaths$gender))
-
-
-temp<-genderdata::ssa_national %>% 
-  #filter(name %in% c("adam","ashley","madison")) %>%
-  mutate(gender=ifelse(male<female,"female","male")) %>% 
-  select(name,gender) %>% 
-  group_by(name,gender) %>% 
-  summarise(count=n()) %>% 
-  spread(gender,count,fill=0) %>% 
-  mutate(switch=female*male) %>% 
-  filter(switch>0)
 ```
 So only 10% of the entries are assumed to be female.  This precludes running the same detailed analysis we did earlier by gender.  Just so it isn't a wasted trip let's look at the aggregate proportions of general causes.
 
@@ -116,7 +105,7 @@ xt$General_Cause<-as_factor(xt$General_Cause)
 xt
 ```
 
-We need to visualize this in a chart form. Let's show some bad, but typical, versions.  The chart below is the kind of thing I often see in presentations in my organization.
+We need to visualize this in a chart form. For fun, let's show some bad, but typical, versions.  The chart below is the kind of thing I often see in presentations in my organization.
 ```{r}
 xt %>% gather(gender,proportion,-General_Cause) %>% ggplot(aes(General_Cause,proportion,fill=gender))+geom_col(position = "dodge")+coord_flip()
 ```
@@ -128,7 +117,7 @@ An even less legible version is below.  Very pretty artwork, though.  Yes, I see
 ```{r}
 xt %>% gather(gender,proportion,-General_Cause) %>% ggplot(aes(gender,proportion,fill=General_Cause))+geom_col(position="dodge")
 ```
-Ugh! These candy jars are unusable.  I include them because I see this sort of plot all the time. People don't naturally gravitate to the far more useful scatter plot.
+Ugh! These candy jars are unusable.  I include them because I see this sort of plot all the time. People don't naturally gravitate to the far more useful scatter plot.  It should be the go-to visualization when comparing two populations of categorical variables.
 ```{r}
 gg<-xt %>% ggplot(aes(male,female))+geom_point()
 gg<-gg+  geom_text_repel(label=xt$General_Cause)
@@ -146,7 +135,8 @@ People are so ingrained to seeing categorical variables or time series on the ho
 
 This chart shows that males were more likely to die of heart disease than females and, for drugs, less. Beyond that there were no significant differnces.  Again, the scatter plot brings this very clearly to light.
 
-#Bonus analysis.  Where did they die?
+#Where did they die?
+
 ```{r}
 deaths3<-deaths %>% 
   separate(Location,c("neighborhood","city","state","country"),
