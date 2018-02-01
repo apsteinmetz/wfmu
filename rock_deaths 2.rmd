@@ -2,7 +2,7 @@
 title: "Rock Deaths 2"
 output: html_notebook
 ---
-
+In my last post I explored some very interesting facts about rock musician mortality.  In the interest of space I omitted a couple less interesting observations.  They are still useful beacuse they taught me how to use some interesting analytical tools. Perhaps other "outsider data scientists" might enjoy seeing them.  Consider this the "B-Side" of the single.
 ```{r}
 library(ggplot2)
 library(stringr)
@@ -11,15 +11,46 @@ library(lubridate)
 library(rvest)
 library(gender)
 library(ggrepel)
+library(knitr)
 
 ```
 
-We assume most rock musicians are male. How many of the people in this list are women?  We'll try to determine gender by first name.  How?  As always, there is an R package for that.  The `gender` package and the associated `genderdata` data set have, not just a list of gender assignments for first names, but the preponderance of gender for these names going back in time. This recognizes that there is some gender fluidity to names over time.
+We assume most rock musicians are male. How many of the people in this list are women?  We'll try to determine gender by first name.  How?  As always, there is an R package for that.  The `gender` package and the associated `genderdata` data set have, not just a list of gender assignments for first names, but the preponderance of gender for these names going back in time. This recognizes that there is some gender fluidity to names over time. That makes perfect sense, but I hadn't considered it.
 
+It's worth exploring this for a moment. How many unique names are we dealing with?  We'll use one of the data sets, the U.S. Social Security data base.
+```{r}
+genderdata::ssa_national %>% select(name) %>% unique() %>% nrow() %>% format(big.mark=",")
+```
+And how many of names switch one or more times in predominance?
+```{r}
+switch_names<-genderdata::ssa_national %>% 
+  mutate(gender=ifelse(male<female,"female","male")) %>% 
+  select(name,gender) %>% 
+  group_by(name,gender) %>% 
+  summarise(count=n()) %>% 
+  spread(gender,count,fill=0) %>% 
+  mutate(switch=female*male) %>% 
+  filter(switch>0)
 
-First we have to separate the name into pieces.  BUT, where there are three or more words in the name, which is the first name?  Joe Harmonica Watson and Wild Bill Williams both have nicknames but different positions for the first name.
+switch_names %>% nrow() %>% format(big.mark=",")
+```
+Quite a few.  I should add I don't have much confidence that the `dplyr` chain I used above is an efficient way to get this answer.  You, the experienced R user, might have a better approach.  Remember Ashley Madison, the hookup site for cheaters that was hacked?  Itturns out that "Ashley" and "Madison" are both highly fluid in gender assignment.  Was that deliberate?
 
+```{r}
+ashley_madison<-genderdata::ssa_national %>% 
+  filter(name %in% c("ashley","madison")) %>% 
+  mutate(female=female/(male+female),male=1-female) %>% 
+  gather("gender","proportion",-name,-year)
 
+ashley_madison %>% filter(gender=="male") %>% 
+  ggplot(aes(year,proportion,color=name))+geom_line()+
+  labs(title="Fraction of Men with Given Name") +scale_y_continuous(labels=scales::percent)
+```
+So in 1950, both names were almost certainly male but almost all were female by 1990.
+
+You can learn more about this cool package [here](https://ropensci.org/tutorials/gender_tutorial/).
+
+Now back to our rock musician problem.  First we have to separate the name into pieces.  BUT, where there are three or more words in the name, which is the first name?  Joe Harmonica Watson and Wild Bill Williams both have nicknames but different positions for the first name.
 
 This is what I chose:
 
@@ -57,10 +88,15 @@ deaths<-deaths %>% left_join(sex) %>%
 prop.table(table(deaths$gender))
 
 
-genderdata::ssa_national %>% filter(name %in% c("ashley","madison")) %>%
+temp<-genderdata::ssa_national %>% 
+  #filter(name %in% c("adam","ashley","madison")) %>%
   mutate(gender=ifelse(male<female,"female","male")) %>% 
+  select(name,gender) %>% 
   group_by(name,gender) %>% 
-  summarise(each=n())
+  summarise(count=n()) %>% 
+  spread(gender,count,fill=0) %>% 
+  mutate(switch=female*male) %>% 
+  filter(switch>0)
 ```
 So only 10% of the entries are assumed to be female.  This precludes running the same detailed analysis we did earlier by gender.  Just so it isn't a wasted trip let's look at the aggregate proportions of general causes.
 
@@ -73,22 +109,26 @@ xt<- deaths %>% count(General_Cause,gender) %>%
   mutate_if(is.numeric,funs(./sum(.))) %>% 
   arrange(male)
 
+#now that the causes are arranged in order of male mortality, change causes to a
+#factor ordered the same way.
 xt$General_Cause<-as_factor(xt$General_Cause)
+
 xt
 ```
 
-We need to visualize this in a chart form. The chart below is the kind of thing I typically see in presentations in my organization.
+We need to visualize this in a chart form. Let's show some bad, but typical, versions.  The chart below is the kind of thing I often see in presentations in my organization.
 ```{r}
 xt %>% gather(gender,proportion,-General_Cause) %>% ggplot(aes(General_Cause,proportion,fill=gender))+geom_col(position = "dodge")+coord_flip()
 ```
-Yes, you can tease out comparisons but the differences are only apparent upon very close scrutiny.
+Yes, you can tease out comparisons but the differences are only apparent upon very close scrutiny.  
 
-An even less legible version is below.  Very pretty artwork, though.
+Could be worse. The categories could be in alphabetical order.  There are LOTS of [questions and answers on this topic](https://stackoverflow.com/questions/3253641/change-the-order-of-a-discrete-x-scale) on Github.com.  For my money, `as_factor` from the `forcats` package (loaded as part of the `tidyverse`) is the simplest way to address this, as shown above.
 
+An even less legible version is below.  Very pretty artwork, though.  Yes, I see charts like this sometimes. Sometimes from paid consultants!
 ```{r}
 xt %>% gather(gender,proportion,-General_Cause) %>% ggplot(aes(gender,proportion,fill=General_Cause))+geom_col(position="dodge")
 ```
-These candy jars are unusable.  I include them because I see this sort of plot all the time in my organization.  People don't naturally gravitate to the far more useful scatter plot.
+Ugh! These candy jars are unusable.  I include them because I see this sort of plot all the time. People don't naturally gravitate to the far more useful scatter plot.
 ```{r}
 gg<-xt %>% ggplot(aes(male,female))+geom_point()
 gg<-gg+  geom_text_repel(label=xt$General_Cause)
@@ -102,7 +142,7 @@ gg
 
 
 ```
-People are so ingrained to seeing categorial variables or time series on the horizontal axis that scatter plots throw them off for a second.  But it doesn't throw you, dear reader, I am sure.  We know that points above the line mean that females are proportionately more like to die of that cause and vice-versa.  Outliers are immediately visible.
+People are so ingrained to seeing categorical variables or time series on the horizontal axis that scatter plots throw them off for a second.  But it doesn't throw you, dear reader, I am sure.  We know that points above the line mean that females are proportionately more like to die of that cause and vice-versa.  Outliers are immediately visible.
 
 This chart shows that males were more likely to die of heart disease than females and, for drugs, less. Beyond that there were no significant differnces.  Again, the scatter plot brings this very clearly to light.
 
