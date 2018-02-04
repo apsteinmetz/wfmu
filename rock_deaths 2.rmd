@@ -199,15 +199,26 @@ When I first started looking a using maps and census data in R the tidyverse was
 
 Let's look at the city list on a per capita basis using tidycensus data.  Do L.A., Nashville and Memphis have more rock musicians than population would suggest?
 ```{r}
-library(tidycensus)
+library(censusapi)
 
 #I've stored my API key as an environment variable
+apis <- listCensusApis()
+View(apis)
+
 census_api_key(Sys.getenv("CENSUSAPI"))
 v2010<-load_variables(2010,"sf1",cache=TRUE)
 m90 <- get_decennial(geography = "state", variables = "P0010001", year = 2010)
 PEPANNRES
 
-pop <- get_acs(geography="county",variables = c("PEPANNRES"))
+texas_pop <- get_acs(geography = "county", 
+                     variables = "B01003_001", 
+                     state = "TX") 
+
+pop <- get_acs(geography="tract",table = c("PEPANNCHIP"),state="OH")
+
+https://api.census.gov/data/2013/acs3?get=NAME,B01001_001E&for=urban%20area:*&key=0647341fe44d048f5aec1d2f7b1ddff73eee2554
+
+city_pop<-getCensus(name="acs3",vintage=2012,vars=c("NAME","B01001_001E"),region="urban area")
 ```
 
 
