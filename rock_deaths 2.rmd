@@ -163,23 +163,21 @@ This chart shows that males were more likely to die of heart disease than female
 #Where did they die?
 
 ```{r}
-deaths3<-deaths %>% 
+deaths_loc<-deaths %>% 
   separate(Location,c("neighborhood","city","state","country"),
            remove=FALSE,
            sep=", ",
            fill="left",
-           extra="merge")
+           extra="merge") %>% 
+  select(Name,Date,city,state,country)
 
-deaths3<-deaths3 %>% mutate_cond(country=="",country="Not Specified")
-deaths3<-deaths3 %>% mutate_cond(is.na(city),city="Not Specified")
-deaths3<-deaths3 %>% mutate_cond(country=="U.S.",country="USA")
-deaths3<-deaths3 %>% mutate_cond(country=="U.K.",country="England")
-deaths3 %>% group_by(country) %>% 
+deaths_loc<-deaths_loc %>% mutate_cond(country=="",country="Not Specified")
+deaths_loc<-deaths_loc %>% mutate_cond(is.na(city),city="Not Specified")
+deaths_loc<-deaths_loc %>% mutate_cond(country=="U.S.",country="USA")
+deaths_loc<-deaths_loc %>% mutate_cond(country=="U.K.",country="England")
+deaths_loc %>% group_by(country) %>% 
   summarise(count=n()) %>% 
-  arrange(desc(count)) %>%
-  .[1:12,] %>% 
-  kable(format.args=list(big.mark=","))
-
+  arrange(desc(count))
 ```
 
 This doesn't reveal any surprises.  Again, it says something about the home of rock and the location of people who submit entries to Wikipedia.  We could go further and compare these numbers to population but we wouldn't learn anything not already obvious.
@@ -187,7 +185,7 @@ This doesn't reveal any surprises.  Again, it says something about the home of r
 What about cities?
 
 ```{r}
-deaths3 %>% group_by(city) %>% 
+deaths_loc %>% group_by(city) %>% 
   summarise(count=n()) %>% 
   arrange(desc(count))%>% 
   .[1:12,]
@@ -198,21 +196,35 @@ When I first started looking a using maps and census data in R the tidyverse was
 
 Let's look at the city list on a per capita basis using tidycensus data.  Do L.A., Nashville and Memphis have more rock musicians than population would suggest?
 
-I got inspired to look at this while reading about the`tidycensus` package.  Try as I might, though, I could not get the national city-level population data.  I conclude that the functionality of this package is too limited, for now.  I reverted to the excellent `censusapi` package.  This still took a lot of trial and error before I could craft a query that returned what I needed.  
+I got inspired to look at this while reading about the`tidycensus` package.  Try as I might, though, I could not get the national city-level population data.  I concluded that the functionality of this package is too limited, for now.  I reverted to the excellent `censusapi` package (which the author of `tidycensus` suggested).  This still took a lot of trial and error before I could craft a query that returned what I needed.  Key breakthrough: "place" means "city."
+
 ```{r}
 library(censusapi)
 #I've stored my API key as an environment variable
-city_pop<-as_data_frame(getCensus(name="acs3",
+city_pop_raw<-as_data_frame(getCensus(name="acs3",
                                   vintage=2012,
                                   vars=c("NAME","B01001_001E"),
                                   region="place"))
 
-city_pop %>% select(-state,-place) %>% separate(NAME,into=c("city","state"),sep=",",remove=FALSE)
-
+#remove numeric IDs, rename column and strip place signifier
+city_pop<-city_pop_raw %>% 
+  select(-state,-place) %>% 
+  separate(NAME,into=c("city","state"),sep=",") %>% 
+  rename(population=B01001_001E) %>% 
+  mutate(city=str_replace(city,"([A-Za-z -]+) city|town|municipality|CDP|village|borough","\\1")) %>%
+  mutate(city=str_trim(city),state=str_trim(state))
 ```
 
+Now we have a clean list of cities and populations.  Let's merge it with our death locations to get a per-capita number.
+
 ```{r}
-genderdata::ssa_national %>% filter(name %in% c("maxfield","ethan","luca","wesley")) %>% filter(year>2006,year<2009) %>% group_by(name) %>% summarise(total=sum(male)) %>% arrange(total)
+deaths_loc %>% left_join(city_pop)
+
+```
+Not so good. There is a bit of work to be done to make sure the city names in this data set match up with the city names in our deaths data set.
+```{r}
+deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"New York City","New York"))
+city_pop<- city_pop %>%   mutate(city=str_replace(city,"([A-Za-z ]+)-(.)+","\\1"))
 
 ```
 
