@@ -198,6 +198,8 @@ Let's look at the city list on a per capita basis using tidycensus data.  Do L.A
 
 I got inspired to look at this while reading about the`tidycensus` package.  Try as I might, though, I could not get the national city-level population data.  I concluded that the functionality of this package is too limited, for now.  I reverted to the excellent `censusapi` package (which the author of `tidycensus` suggested).  This still took a lot of trial and error before I could craft a query that returned what I needed.  Key breakthrough: "place" means "city."
 
+Grab the data from [census.gov](https:census.gov).  Visually inspecting the city names in both data sets gives is some ideas about how to clean up both data sets.
+
 ```{r}
 library(censusapi)
 #I've stored my API key as an environment variable
@@ -213,31 +215,61 @@ city_pop<-city_pop_raw %>%
   rename(population=B01001_001E) %>% 
   mutate(city=str_replace(city,"([A-Za-z -]+) city|town|municipality|CDP|village|borough","\\1")) %>%
   mutate(city=str_trim(city),state=str_trim(state))
-```
 
-Now we have a clean list of cities and populations.  Let's merge it with our death locations to get a per-capita number. How did we do?
-```{r}
-temp<- deaths_loc%>% group_by(city) %>% 
-  filter(country=="USA",city != "Not Specified") %>%
-  summarise(count=n()) %>% 
-  arrange(desc(count))%>% 
-  left_join(city_pop)
-temp
-```
-Not so good. There is a bit of work to be done to make sure the city names in this data set match up with the city names in our deaths data set.
-```{r}
+#do some clean up to help the city names in both data sets line up.
 deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"New York City","New York"))
+deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Brooklyn","New York"))
+deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Queens","New York"))
+deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Bronx","New York"))
+deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Burbank","Los Angeles"))
+deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Sherman Oaks","Los Angeles"))
+deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Oakland","San Franciso"))
+
 #take just first part of hyphenated cities
 city_pop<- city_pop %>%   mutate(city=str_replace(city,"([A-Za-z ]+)-(.)+","\\1"))
+```
+
+Now we have a clean list of cities and populations.  Let's merge it with our death locations to get a per-capita number.  We arbitrarily limit our cities to those with populations greater than 200k to avoid skewed results.
+```{r}
+
 deaths_city<- deaths_loc%>% group_by(city) %>% 
   filter(country=="USA",city != "Not Specified") %>%
   summarise(count=n()) %>% 
   arrange(desc(count))%>% 
   left_join(city_pop) %>% 
+  filter(population>200000) %>% 
   mutate(per100k=count*100000/population) %>% 
-  select(-population) %>% 
   arrange(desc(per100k))
 deaths_city
 ```
+This does give us some idea of where musicians congregate.  The only big surprise is how low New York city is on the list.  The music scene is obviously nationally significant.  It's just that the city is sooo big. It may also be that musicians don't die in New York. They move to L.A. if they succeed in the business or back to their hometowns when they leave the business.  This is just speculation on my part.
 
+Finally let's do a city map showing the counts.
+```{r}
+library(ggmap)
+#library(RCurl)
+# read in the data
+uri <- "https://en.wikipedia.org/wiki/List_of_United_States_cities_by_crime_rate"
+# we want the second table: which=2
+citiesCR <- read_html(uri,stringsAsFactors = FALSE) %>% html_table(fill=TRUE)[[1]]
+# clean up (with mutate_each function from dplyr): 
+# remove the comma in 1,000 and above and convert numbers from strings to numeric
+citiesCRclean <- mutate_each(citiesCR, funs(as.numeric(gsub(",", "", .))),  -(State:City))
+ 
+# geocode loations
+latlon <- geocode(paste(citiesCRclean$City, citiesCRclean$State, sep=", "))
+# combine into a new dataframe
+citiesCRll <- data.frame(citiesCRclean, latlon)
+#get basmap
+map_us <- get_map (location='United States', zoom=4, color="bw")
+# plot
+ggmap(map_us, legend='bottomright', extent='device') +
+  geom_point(data=citiesCRll,
+            aes(x=lon, y=lat, 
+            color=Violent.Crime, 
+            size=Population),
+            na.rm=T) +
+  scale_colour_gradient(low="white", high="red") +
+  scale_size_continuous(range = c(4,12))
+```
 
