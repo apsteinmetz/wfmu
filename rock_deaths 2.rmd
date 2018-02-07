@@ -185,10 +185,10 @@ This doesn't reveal any surprises.  Again, it says something about the home of r
 What about cities?
 
 ```{r}
-deaths_loc %>% group_by(city) %>% 
+deaths_city<-deaths_loc %>% group_by(city) %>% 
   summarise(count=n()) %>% 
-  arrange(desc(count))%>% 
-  .[1:12,]
+  arrange(desc(count))
+deaths_city
 ```
 Again, not a surprise.  It's a bit surprising to me that London is not on the list. On second thought, every English rock star I can think of moved to the U.S.  I occasionally walk by the flowers outside David Bowie's house in Manhattan.
 
@@ -215,16 +215,29 @@ city_pop<-city_pop_raw %>%
   mutate(city=str_trim(city),state=str_trim(state))
 ```
 
-Now we have a clean list of cities and populations.  Let's merge it with our death locations to get a per-capita number.
-
+Now we have a clean list of cities and populations.  Let's merge it with our death locations to get a per-capita number. How did we do?
 ```{r}
-deaths_loc %>% left_join(city_pop)
-
+temp<- deaths_loc%>% group_by(city) %>% 
+  filter(country=="USA",city != "Not Specified") %>%
+  summarise(count=n()) %>% 
+  arrange(desc(count))%>% 
+  left_join(city_pop)
+temp
 ```
 Not so good. There is a bit of work to be done to make sure the city names in this data set match up with the city names in our deaths data set.
 ```{r}
 deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"New York City","New York"))
+#take just first part of hyphenated cities
 city_pop<- city_pop %>%   mutate(city=str_replace(city,"([A-Za-z ]+)-(.)+","\\1"))
-
+deaths_city<- deaths_loc%>% group_by(city) %>% 
+  filter(country=="USA",city != "Not Specified") %>%
+  summarise(count=n()) %>% 
+  arrange(desc(count))%>% 
+  left_join(city_pop) %>% 
+  mutate(per100k=count*100000/population) %>% 
+  select(-population) %>% 
+  arrange(desc(per100k))
+deaths_city
 ```
+
 
