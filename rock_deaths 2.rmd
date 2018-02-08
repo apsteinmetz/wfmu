@@ -254,7 +254,24 @@ library(tigris)
 #geocode lat/lon from city names.  Source is "dsk."  Google API didn't handle list
 #of cities without claimng data limit reached.  Seems there is a limit
 #on queries per second as well as absolute number.
-latlon_d<-geocode(paste(deaths_city$city,deaths_city$state,sep=", "),source="dsk")
+#does not seem to be vectorized
+
+get_lat_lon<-function(city,state){
+  return(geocode(paste(city,state,sep=","),
+                  source="google",output="latlona"))
+
+}
+
+mytest<-function(city,state){
+  return(data_frame(lon=str_length(city),lat=str_length(state)))
+}
+
+lapply(deaths_city, function(x) print(x$city))
+
+latlon_d<-geocode(paste(deaths_city$city,deaths_city$state,sep=","),
+                  source="dsk",output="latlona")
+latlon_d<-latlon_d %>% separate(address,into = c("city","state"),sep=",")
+
 deaths_city<-bind_cols(deaths_city,latlon_d)
 #get basmap
 #us_states_map<-states() %>% as_data_frame()
