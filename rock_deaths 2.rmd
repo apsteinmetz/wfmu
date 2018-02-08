@@ -247,29 +247,33 @@ This does give us some idea of where musicians congregate.  The only big surpris
 Finally let's do a city map showing the counts.
 ```{r}
 library(ggmap)
-#library(RCurl)
-# read in the data
-uri <- "https://en.wikipedia.org/wiki/List_of_United_States_cities_by_crime_rate"
-# we want the second table: which=2
-citiesCR <- read_html(uri,stringsAsFactors = FALSE) %>% html_table(fill=TRUE)[[1]]
-# clean up (with mutate_each function from dplyr): 
-# remove the comma in 1,000 and above and convert numbers from strings to numeric
-citiesCRclean <- mutate_each(citiesCR, funs(as.numeric(gsub(",", "", .))),  -(State:City))
- 
-# geocode loations
-latlon <- geocode(paste(citiesCRclean$City, citiesCRclean$State, sep=", "))
-# combine into a new dataframe
-citiesCRll <- data.frame(citiesCRclean, latlon)
+library(tigris)
+
+
+
+#geocode lat/lon from city names.  Source is "dsk."  Google API didn't handle list
+#of cities without claimng data limit reached.  Seems there is a limit
+#on queries per second as well as absolute number.
+latlon_d<-geocode(paste(deaths_city$city,deaths_city$state,sep=", "),source="dsk")
+deaths_city<-bind_cols(deaths_city,latlon_d)
 #get basmap
-map_us <- get_map (location='United States', zoom=4, color="bw")
+#us_states_map<-states() %>% as_data_frame()
+map_g <- get_map(location='United States', zoom=4, color="bw")
 # plot
-ggmap(map_us, legend='bottomright', extent='device') +
-  geom_point(data=citiesCRll,
-            aes(x=lon, y=lat, 
-            color=Violent.Crime, 
-            size=Population),
+gg<-ggmap(map_g, legend='bottomright', extent='panel') +
+  geom_point(data=filter(deaths_city,count>4),
+            aes(x=lon, y=lat,
+                color=per100k, 
+                size=count
+                ),alpha=0.7,
             na.rm=T) +
   scale_colour_gradient(low="white", high="red") +
-  scale_size_continuous(range = c(4,12))
+  scale_size_continuous(range = c(2,12))
+
+gg<-gg+theme(axis.text = element_blank(),
+             axis.ticks = element_blank(),
+             axis.title = element_blank())
+
+gg
 ```
 
