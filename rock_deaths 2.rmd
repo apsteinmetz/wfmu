@@ -213,7 +213,9 @@ city_pop<-city_pop_raw %>%
   select(-state,-place) %>% 
   separate(NAME,into=c("city","state"),sep=",") %>% 
   rename(population=B01001_001E) %>% 
-  mutate(city=str_replace(city,"([A-Za-z -]+) city|town|municipality|CDP|village|borough","\\1")) %>%
+  mutate(city=str_replace(city,
+                          "([A-Za-z -]+) city|town|municipality|CDP|village|borough",
+                          "\\1")) %>%
   mutate(city=str_trim(city),state=str_trim(state))
 
 #do some clean up to help the city names in both data sets line up.
@@ -222,6 +224,7 @@ deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Brooklyn","New York"))
 deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Queens","New York"))
 deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Bronx","New York"))
 deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Burbank","Los Angeles"))
+deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Anaheim","Los Angeles"))
 deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Sherman Oaks","Los Angeles"))
 deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Oakland","San Franciso"))
 
@@ -249,33 +252,43 @@ Finally let's do a city map showing the counts.
 library(ggmap)
 library(tigris)
 
+#get basemap
+us_states_map<-states() %>% as_data_frame()
 
+#get pretty map image
+map_g <- get_map(location='United States', zoom=4, color="bw")
+
+#a source of lat/lon data for US cities.  There are many.  I was frustrated with geocode functions becuase of api limits or bad data.
+geo_data<-read_csv("http://notebook.gaslampmedia.com/wp-content/uploads/2013/08/zip_codes_states.csv")
+
+#geo data uses state abbreviations but our data uses full names.  Fix. Use just
+#one location per city
+city_loc<-geo_data %>% rename(STUSPS=state) %>% 
+  left_join(us_states_map) %>%
+  transmute(city=city,st=STUSPS,state=NAME,lat=latitude,lon=longitude) %>% 
+  group_by(city,state) %>% 
+  top_n(1,lat)%>% 
+  top_n(1,lon) %>% 
+  distinct()
 
 #geocode lat/lon from city names.  Source is "dsk."  Google API didn't handle list
 #of cities without claimng data limit reached.  Seems there is a limit
 #on queries per second as well as absolute number.
-#does not seem to be vectorized
 
-get_lat_lon<-function(city,state){
-  return(geocode(paste(city,state,sep=","),
-                  source="google",output="latlona"))
+# get_lat_lon<-function(city,state){
+#   return(bind_cols(city=city,
+#                    state=state,
+#                    geocode(paste(city,state,sep=","),
+#                            source="dsk",output="latlon")))
+# 
+# }
+# 
+# latlon_d<-deaths_city  %>% 
+#   split(.$city) %>% 
+#   map(function(x)get_lat_lon(x$city,x$state)) %>% 
+#   bind_rows()
 
-}
-
-mytest<-function(city,state){
-  return(data_frame(lon=str_length(city),lat=str_length(state)))
-}
-
-lapply(deaths_city, function(x) print(x$city))
-
-latlon_d<-geocode(paste(deaths_city$city,deaths_city$state,sep=","),
-                  source="dsk",output="latlona")
-latlon_d<-latlon_d %>% separate(address,into = c("city","state"),sep=",")
-
-deaths_city<-bind_cols(deaths_city,latlon_d)
-#get basmap
-#us_states_map<-states() %>% as_data_frame()
-map_g <- get_map(location='United States', zoom=4, color="bw")
+deaths_city<-left_join(deaths_city,city_loc)
 # plot
 gg<-ggmap(map_g, legend='bottomright', extent='panel') +
   geom_point(data=filter(deaths_city,count>4),
@@ -291,6 +304,8 @@ gg<-gg+theme(axis.text = element_blank(),
              axis.ticks = element_blank(),
              axis.title = element_blank())
 
+gg<-gg+labs(title="Where Do Rock Musicians Die?",
+            subtitle="Circle size is count. Circle color is count relative to population.")
 gg
 ```
 
