@@ -108,8 +108,9 @@ deaths<-deaths %>% left_join(sex) %>%
   mutate(gender=ifelse(!is.na(gender),gender,"undetermined")) %>%
   select(-First,-Last,-gender.y,-gender.x) %>% 
   {.}
+```
 
-
+```{r}
 prop.table(table(deaths$gender))
 ```
 So only 10% of the entries are assumed to be female.  This precludes running the same detailed analysis we did earlier by gender.  Just so it isn't a wasted trip let's look at the aggregate proportions of general causes.
