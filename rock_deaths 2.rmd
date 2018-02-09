@@ -2,7 +2,7 @@
 title: "Rock Deaths 2"
 output: html_notebook
 ---
-In my last post I explored some very interesting facts about rock musician mortality.  In the interest of space I omitted a couple less interesting observations.  They are still useful beacuse they taught me how to use some interesting analytical tools. Perhaps other "outsider data scientists" might enjoy seeing them.  Consider this the "B-Side" of the single.
+In my last post I explored some very interesting facts about rock musician mortality.  In the interest of space I omitted a couple less interesting observations.  They are still useful beacuse they helped my advance my analytical chops. Specifically, I'll be working with the U.S. census API and gender identification.  Perhaps other "outsider data scientists" might enjoy seeing them.  Consider this the "B-Side" of the single.
 ```{r}
 library(ggplot2)
 library(stringr)
@@ -88,7 +88,7 @@ This is what I chose:
 4. Set any remaining `NA`s to "Undetermined."
 
 
-```{r}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 load("deaths.rdata")
 deaths<-deaths %>% separate(Name,into=c("First","Middle","Last"),fill="left",extra="merge",remove=FALSE) %>% 
   mutate(birth=as.integer(year(Date)-Age)) %>% filter(birth>1880,birth<2012)
@@ -171,10 +171,10 @@ deaths_loc<-deaths %>%
            extra="merge") %>% 
   select(Name,Date,city,state,country)
 
-deaths_loc<-deaths_loc %>% mutate_cond(country=="",country="Not Specified")
-deaths_loc<-deaths_loc %>% mutate_cond(is.na(city),city="Not Specified")
-deaths_loc<-deaths_loc %>% mutate_cond(country=="U.S.",country="USA")
-deaths_loc<-deaths_loc %>% mutate_cond(country=="U.K.",country="England")
+deaths_loc<-deaths_loc %>% mutate(country=ifelse(country=="","Not Specified",country))
+deaths_loc<-deaths_loc %>% mutate(city=ifelse(is.na(city),"Not Specified",city))
+deaths_loc<-deaths_loc %>% mutate(country=ifelse(country=="U.S.","USA",country))
+deaths_loc<-deaths_loc %>% mutate(country=ifelse(country=="U.K.","England",country))
 deaths_loc %>% group_by(country) %>% 
   summarise(count=n()) %>% 
   arrange(desc(count))
@@ -203,6 +203,7 @@ Grab the data from [census.gov](https:census.gov).  Visually inspecting the city
 ```{r}
 library(censusapi)
 #I've stored my API key as an environment variable
+#with sys.setenv(CENSUS_KEY="<my key")
 city_pop_raw<-as_data_frame(getCensus(name="acs3",
                                   vintage=2012,
                                   vars=c("NAME","B01001_001E"),
@@ -232,7 +233,7 @@ deaths_loc<-deaths_loc %>% mutate(city=str_replace(city,"Oakland","San Franciso"
 city_pop<- city_pop %>%   mutate(city=str_replace(city,"([A-Za-z ]+)-(.)+","\\1"))
 ```
 
-Now we have a clean list of cities and populations.  Let's merge it with our death locations to get a per-capita number.  We arbitrarily limit our cities to those with populations greater than 200k to avoid skewed results.
+Now we have a clean list of cities and populations.  Let's merge it with our death locations to get a per-capita number.  We arbitrarily limit our cities to those with populations greater than 200k to avoid skewed results.  Now we can see what cities have the highest number of musician deaths relative to population.
 ```{r}
 
 deaths_city<- deaths_loc%>% group_by(city) %>% 
@@ -252,8 +253,6 @@ Finally let's do a city map showing the counts.
 library(ggmap)
 library(tigris)
 
-#get basemap
-us_states_map<-states() %>% as_data_frame()
 
 #get pretty map image
 map_g <- get_map(location='United States', zoom=4, color="bw")
@@ -261,32 +260,20 @@ map_g <- get_map(location='United States', zoom=4, color="bw")
 #a source of lat/lon data for US cities.  There are many.  I was frustrated with geocode functions becuase of api limits or bad data.
 geo_data<-read_csv("http://notebook.gaslampmedia.com/wp-content/uploads/2013/08/zip_codes_states.csv")
 
+#make a table toconvert postal state appreviations to long names,
+state.convert<-data_frame(st=state.abb,state=state.name)
 #geo data uses state abbreviations but our data uses full names.  Fix. Use just
 #one location per city
-city_loc<-geo_data %>% rename(STUSPS=state) %>% 
-  left_join(us_states_map) %>%
-  transmute(city=city,st=STUSPS,state=NAME,lat=latitude,lon=longitude) %>% 
+city_loc<-geo_data %>% rename(st=state) %>% 
+  left_join(state.convert) %>%
+  transmute(city=city,st=st,state=state,lat=latitude,lon=longitude) %>% 
   group_by(city,state) %>% 
   top_n(1,lat)%>% 
   top_n(1,lon) %>% 
-  distinct()
-
-#geocode lat/lon from city names.  Source is "dsk."  Google API didn't handle list
-#of cities without claimng data limit reached.  Seems there is a limit
-#on queries per second as well as absolute number.
-
-# get_lat_lon<-function(city,state){
-#   return(bind_cols(city=city,
-#                    state=state,
-#                    geocode(paste(city,state,sep=","),
-#                            source="dsk",output="latlon")))
-# 
-# }
-# 
-# latlon_d<-deaths_city  %>% 
-#   split(.$city) %>% 
-#   map(function(x)get_lat_lon(x$city,x$state)) %>% 
-#   bind_rows()
+  distinct() %>% 
+  ungroup %>% 
+  mutate(state=ifelse(st=="PR","Puerto Rico",state)) %>% 
+  {.}
 
 deaths_city<-left_join(deaths_city,city_loc)
 # plot
