@@ -99,7 +99,8 @@ gg_play_freq<-function(artists,cutoff_date=Sys.Date()-(365*5)){
     mutate(AirDate=as.yearqtr(AirDate))  %>% 
     group_by(DJ,ArtistToken,AirDate) %>% 
     summarise(Spins=n()) %>% 
-    arrange(AirDate)
+    arrange(AirDate) %>% 
+    {.}
   gg<-artist_plays %>% ggplot(aes(x=AirDate,y=Spins))
   gg<-gg+geom_col()+facet_wrap(~ArtistToken) 
   gg<-gg+scale_x_continuous(breaks=seq(year(cutoff_date),year(Sys.Date()),by=2))
@@ -109,7 +110,7 @@ gg_play_freq<-function(artists,cutoff_date=Sys.Date()-(365*5)){
 }
 
 cutoff_date<-as.Date("2008-01-01")
-dead_artists=c('Bowie','Prince','ChuckBerry','LesleyGore')
+dead_artists=c('David Bowie','Prince','Chuck Berry','Lesley Gore')
 gg_play_freq(dead_artists,cutoff_date)
 ```
 
@@ -435,11 +436,9 @@ gg
 
 Now we need to put the nicely formatted data into a form consistent with the data in our playlists.  To to this we need to parse the date string and put both the artist name and band name(s) into a tokenized list conforming the playlist rules.
 ```{r warning=FALSE}
-deaths<-deaths %>% mutate(Date=parse_date(Date,"%B %d, %Y")) %>% filter(!is.na(Date))
+load("deaths.rdata")
 #playlist count uses yearqtr as airdate
 deaths<-deaths %>% mutate(AirDate=as.yearqtr(Date))
-#take at most three band names.
-deaths<-deaths %>% separate(Band,into=c("band1","band2","band3"),sep=", ",extra="drop")
 ```
 
 Create list of name/band tokens for each row.  This data wrangling is identical to the process by which the `ArtistToken`s were created in the playlist data set.
@@ -449,7 +448,7 @@ Create list of name/band tokens for each row.  This data wrangling is identical 
 #and a yearqtr variable for each.
 #use tidyr to gather the tokens
 death_tokens<-deaths %>% 
-  select(-Age,-Location,-Cause_of_Death) %>% 
+  select(-Age,-Location,-General_Cause) %>% 
   gather(key="key",value="ArtistToken",-AirDate,-Date) %>% 
   select(-key) %>% 
   filter(!is.na(ArtistToken)) %>% 
@@ -885,4 +884,13 @@ arts_data_train %>%
 write_csv(arts_data_train,"arts_data_train.csv")
 write_csv(arts_data_test,"arts_data_test.csv")
 ```
+#A Different Approach: Deep Learning with Keras
 
+```{r}
+temp<-playlists %>% ungroup() %>% filter(ArtistToken!="") %>%
+  group_by(ArtistToken,AirDate,DJ) %>%summarise(n=n()) %>% 
+  spread(DJ,n,fill=0)
+
+load("deaths.rdata")
+
+```
