@@ -475,8 +475,10 @@ if (UPDATE_ONLY) {
 } else{
   go_back_num<-as.Date("1900-01-01") #arbitrarily far back so it's not a binding constraint
 }
-  
-for (dj in djList) {
+
+# if this breaks at a certain dj, correct and start with that DJ, in this case "TW".
+#djList<-djList[match("TW",djList):length(djList)]
+for (dj in djList_temp) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
     rowid_to_column() %>% 

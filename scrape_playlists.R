@@ -410,7 +410,6 @@ djList <- DJKey %>%
 #playlists_raw = data_frame()
 UPDATE_ONLY =TRUE
 if (UPDATE_ONLY) {
-  print(paste("Updating ONLY last",go_back_num,"Shows"))
   #assume at most 5 shows per week
   #most shows are 1/week except the morning show
   most_recent_date<-max(playlists_raw$AirDate)
