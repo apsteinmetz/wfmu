@@ -324,6 +324,7 @@ death_page<-read_html(death_page_text)
 
 
 #get tables
+death_table_nodes<-death_page %>% html_nodes("table")
 #mortality tables start at table 5 on the page.  COULD CHANGE!
 death_table_nodes<-death_page %>% html_nodes("table") %>% .[5:length(death_table_nodes)]
 
@@ -341,11 +342,17 @@ death_tables<-death_table_nodes %>%
 
 
 for (n in seq_along(death_tables)){
+  if (n > length(death_tables)) break
   #make sure they have the same number of columns, six. Truncate if necessary.
-  death_tables[[n]]<-death_tables[[n]][,1:6]
-  names(death_tables[[n]])<-c("Name","Band","Age","Date","Location","Cause_of_Death")
+  if (ncol(death_tables[[n]])>5){
+    death_tables[[n]]<-death_tables[[n]][,1:6]
+    names(death_tables[[n]])<-c("Name","Band","Age",
+                                "Date","Location","Cause_of_Death")
   death_tables[[n]]<-death_tables[[n]] %>% mutate_all(as.character)
   #death_tables[[n]] %>% mutate_all(as_data_frame)
+  } else {
+    death_tables[[n]]<-NULL
+  }
 }
 #Now can we join
 deaths<-as_data_frame(map_df(death_tables,bind_rows))
