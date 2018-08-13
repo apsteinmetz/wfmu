@@ -343,15 +343,15 @@ plotStuff<-function(djtdm=djdtm,j=j,DJKey=DJkey){
 # --------------------------------------------------------------------------- MAIN --------------
 load("allDJArtists.RData")
 
-# allDJArtists<-cleanUpArtists(allDJArtists)
+allDJArtists<-cleanUpArtists(allDJArtists)
 # 
 # #combine first numWords words in artist name into a single token
-# artistTokens<-combineArtistWords(allDJArtists,numWords=2)
+artistTokens<-combineArtistWords(allDJArtists,numWords=2)
 # 
 # 
-# load("DJKey.RData")
+load("DJKey.RData")
 # 
-#DJKey<-addArtistCount(DJKey,artistTokens)
+DJKey<-addArtistCount(DJKey,artistTokens)
 # #save(DJKey,file="DJKey.RData")
 # 
 # #get rid of DJs with less than 100 artists, ever.  Probably not a music show
