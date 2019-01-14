@@ -71,7 +71,7 @@ getShowNames<-function(DJURLs) {
     DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
     print(showName)
   }
-  # now identifty those DJs which are currently ON MIC
+  # now identifty those DJs which are currently on the schedule
   DJKey$onSched <- 'YES'
   DJKey$onSched[which(DJKey$DJ %in% getDJsOffSched())]<-'NO'
   #strip "WFMU" and "Playlists and Archives" and some punctuation
@@ -89,7 +89,7 @@ DJKey<-getShowNames(DJURLs)
 save(DJKey,file="DJKey.RData")
 
 ```
-Eliminate non-music DJ's from the DJKey table.
+Eliminate non-music DJ's from the DJKey table.  This list is created by hand and was last updated at the end of 2017.
 ```{r}
 excludeDJs <-
   c('SD',
@@ -445,6 +445,8 @@ get_playlist <- function(plURL, dj) {
 ```
 
 Main loop
+
+I don't like this much.  It makes an assumption that DJs have just one show per week in determining how far back to go when updating and existing playlist file.  A better approach would be to go by each DJ.  Find the latest date for each dj in the existing file, extract the show number for that date, then reject all URLs with lower show numbers. We still have to start with every creating every URL. 
 ```{r include=FALSE}
 #-------------- MAIN -----------------
 
@@ -476,9 +478,11 @@ if (UPDATE_ONLY) {
   go_back_num<-as.Date("1900-01-01") #arbitrarily far back so it's not a binding constraint
 }
 
-# if this breaks at a certain dj, correct and start with that DJ, in this case "TW".
+# if this breaks at a certain dj, correct and start with that DJ, in this case "TW."
+# line below will process all djs after the matched DJ
+#ideally not needed
 #djList<-djList[match("TW",djList):length(djList)]
-for (dj in djList_temp) {
+for (dj in djList) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
     rowid_to_column() %>% 
