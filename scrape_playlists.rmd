@@ -2,7 +2,7 @@
 title: "R Notebook"
 output: html_notebook
 ---
-
+#DEPRICATED. scrape_playlists.r is current version
 Setup environment
 ```{r}
 # scrape playlists

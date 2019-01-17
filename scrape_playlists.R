@@ -113,7 +113,7 @@ getDJPlaylistURLs<-function(music_djs) {
       playlistURL<-pl %>% as.character()
       #omit shows without valid playlists.  Talk shows?
       if (length(playlistURL)>0) {
-        DJ_playlists = bind_rows(DJ_playlists, data_frame(DJ=dj,playlistURL = playlistURL))
+        DJ_playlists = bind_rows(DJ_playlists, tibble(DJ=dj,playlistURL = playlistURL))
       } else { 
         print("DUD")
         dudList<-c(dudList,dj) }
@@ -281,7 +281,7 @@ get_playlist <- function(plURL, dj) {
           break
         }
         if (n == nrow(plraw)) {
-          print("DUD. Can't find header")
+          print("DUD. Cand't find header")
           plraw <- NULL
         }
       }
@@ -390,7 +390,7 @@ excludeDJs <-
     'VC')
 music_djs<-DJKey %>% 
   select(DJ) %>% 
-  anti_join(data_frame(DJ=excludeDJs)) %>% 
+  anti_join(tibble(DJ=excludeDJs)) %>% 
   pull(DJ)
 playlistURLs<-getDJPlaylistURLs(music_djs)
 showCounts<-playlistURLs %>% 
@@ -400,41 +400,55 @@ showCounts<-playlistURLs %>%
 DJKey<-left_join(DJKey,showCounts)
 #limit analysis to DJs with at least numShows shows.
 # This also excludes DJs where we couldn't extract valid playlist URLs.
-numShows <- 50
+numShows <- 10
 # non-music shows
 djList <- DJKey %>% 
   filter(showCount > numShows, !(DJ %in% excludeDJs)) %>%
   pull(DJ)
 
 #careful not to trash intermediate results!
-#playlists_raw = data_frame()
+load("playlists_raw.rdata")
 UPDATE_ONLY =TRUE
 if (UPDATE_ONLY) {
   #assume at most 5 shows per week
   #most shows are 1/week except the morning show
+  most_recent_dates<-playlists_raw %>% 
+    arrange(AirDate) %>% 
+    group_by(DJ) %>% 
+    summarise(most_recent = max(AirDate))
   most_recent_date<-max(playlists_raw$AirDate)
-  go_back_num<- as.integer(round ((Sys.Date() - most_recent_date) * 5/7))
-  print(paste("Updating ONLY last",go_back_num,"Shows"))
+  #go_back_num<- as.integer(round ((Sys.Date() - most_recent_date) * 5/7))
+  #print(paste("Updating ONLY last",go_back_num,"Shows"))
 } else{
-  go_back_num<-as.Date("1900-01-01") #arbitrarily far back so it's not a binding constraint
+  go_back_num<- Sys.Date() - as.Date("1900-01-01") #arbitrarily far back so it's not a binding constraint
 }
-  
-for (dj in djList) {
+ 
+djList_temp<-djList
+#example way to restart if failure occurs in middle of list
+#djList_temp<-djList[match("VR",djList):length(djList)]
+for (dj in djList_temp) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
     rowid_to_column() %>% 
     select(playlistURL)
   if (UPDATE_ONLY) {
+    go_back_num<- round(as.integer(Sys.Date() - filter(most_recent_dates,DJ==dj)$most_recent) * 5/7)
+    if (length(go_back_num) == 0) {
+      #this means dJ is not in playlist_raw so initiate an new DJ
+      go_back_num <- 100
+    }
     print(paste("Updating ONLY last",go_back_num,"Shows"))
   } else{
     go_back_num<-nrow(plURLs)
   }
   for (n in 1:go_back_num){
-    plURL<-plURLs[n,1]
+    plURL<-plURLs[min(n,nrow(plURLs)),1]
     print(paste(dj, n, plURL,Sys.time()))
     if (!is.na(pull(plURLs[1,1]))){
-      playlists_raw <- bind_rows(playlists_raw, get_playlist(plURL, dj))
+      playlist<-get_playlist(plURL, dj)
+      playlists_raw <- bind_rows(playlists_raw, playlist)
     }
+    if (is.null(playlist)) break #done with this DJ
   }
   #save to disk after each dj
   save(playlists_raw,file="playlists_raw.Rdata")
