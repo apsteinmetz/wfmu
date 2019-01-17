@@ -92,7 +92,7 @@ print("Trying to make sense of artist names")
 #does this break if numWords> number of words?
 playlists$ArtistToken<-playlists$ArtistToken %>% str_to_title()
 t<-str_split_fixed(playlists$ArtistToken,pattern="[ ]+",n=numWords+1)[,1:numWords]
-playlists$ArtistToken<-apply(t,MARGIN=1,FUN=paste,collapse="")
+playlists$ArtistToken<-apply(t,MARGIN=1,FUN=paste,collapse=" ")
 
 # There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
 playlists<- playlists %>%   
@@ -109,12 +109,13 @@ playlists<- playlists %>%
 
 
 print("Combining iconic 2-name artists into one name to save space in wordcloud")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"RollingStones","Stones")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"EnnioMorricone","Morricone") #only on WFMU!
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"DavidBowie","Bowie")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"BobDylan","Dylan")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Yola","YoLaTengo")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"ElvisPresley","Elvis")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Rolling Stones","Stones")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Ennio Morricone","Morricone") #only on WFMU!
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"David Bowie","Bowie")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Bob Dylan","Dylan")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Yo La","Yo La Tengo")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Elvis Presley","Elvis")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Guided By","Guided By Voices")
 
 playlists<-playlists %>% 
   filter(ArtistToken !="") %>% 
