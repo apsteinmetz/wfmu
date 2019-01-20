@@ -6,7 +6,7 @@ library(dplyr)
 library(tidyverse)
 library(lubridate)
 library(vegan) #similarity measures
-load("playlists.Rdata")
+load("playlists.rdata")
 
 #Analyze similarity 
 #-------------------------------------------------------------  
@@ -41,7 +41,7 @@ SPARSE<- 0.95 #sparsity of term document matrices
 
 # now create Document Term Matrix where DJs are the column
 djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(SPARSE)
-save(djdtm,file="djdtm.RData")
+save(djdtm,file="djdtm.rdata")
 #-----------------------------------------------------------
 
 dj_similarity<-djdtm %>%
@@ -59,4 +59,4 @@ mutate(Similarity=1-Similarity) %>%
 filter(DJ1 != DJ2) %>%  #remove diagonals
 group_by(DJ1) %>% 
 arrange(desc(Similarity))
-save(dj_similarity_tidy,file='djsimilarity.RData')
+save(dj_similarity_tidy,file='djsimilarity.rdata')

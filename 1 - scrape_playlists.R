@@ -64,7 +64,7 @@ getShowNames<-function(DJURLs) {
   
 
   return (DJKey)  
-  #save(DJKey,file="DJKey.RData")
+  #save(DJKey,file="DJKey.rdata")
 }
 
 # -------------get the URLs of the playlist pages for a DJ ----------
@@ -143,7 +143,7 @@ getDJArtistNames<-function(DJURLs) {
     DJArtists<-data.frame(DJ,artistRaw=unlist(artistList))
     if (nrow(DJArtists) >0) allDJArtists = rbind(allDJArtists,DJArtists)
     #remove factor level of DJs with no artists
-    save(allDJArtists,file="allDJArtists.RData")
+    save(allDJArtists,file="allDJArtists.rdata")
   }
   return(allDJArtists)
 }  
@@ -359,7 +359,7 @@ get_playlist <- function(plURL, dj) {
 #-------------- MAIN -----------------
 DJURLs<-getDJURLs()
 DJKey<-getShowNames(DJURLs)
-save(DJKey,file="DJKey.RData")
+save(DJKey,file="DJKey.rdata")
 #load(file='djkey.rdata')
 
 excludeDJs <-
@@ -451,7 +451,7 @@ for (dj in djList_temp) {
     if (is.null(playlist)) break #done with this DJ
   }
   #save to disk after each dj
-  save(playlists_raw,file="playlists_raw.Rdata")
+  save(playlists_raw,file="playlists_raw.rdata")
 }
 
 bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw)
@@ -460,6 +460,6 @@ playlists_raw<-playlists_raw %>%
   filter(Artist != Title) %>% #single column span across table.  Not a song.
   distinct()
 
-save(playlists_raw,file="playlists_raw.Rdata")
+save(playlists_raw,file="playlists_raw.rdata")
 
 

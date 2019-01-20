@@ -4,12 +4,12 @@ library(xts)
 
 #clean up raw playlists
 
-load("playlists_raw.Rdata")
-load("djkey.Rdata")
+load("playlists_raw.rdata")
+load("djkey.rdata")
 
 #Clean up inconsistant artist names
 
-playlists<-playlists_raw
+playlists<-as_tibble(playlists_raw)
 
 #filter out squirrelly dates
 #only Diane "Kamikaze" has archived playlists stretching back to the '80s.  Yay, Diane!
@@ -51,8 +51,8 @@ playlists$Title<-str_replace_all(playlists$Title,"[^A-Z^a-z^ ^0-9]","")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"(interview w|interview)","")
 
 # get rid of unspecified artists
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"unknown artist(s| )|unknown","")
-playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"various artists|various","")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"unknown artist(s| )|unknown","Unknown")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"various artists|various","Unknown")
 
 #get rid of the marathon finale
 playlists<-playlists%>%filter(!str_detect(Artist,"hoof[a-zA-Z ]+sinfonia"))
@@ -115,7 +115,11 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Yo La","Yo La Teng
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Elvis Presley","Elvis")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Guided By","Guided By Voices")
 
-playlists<-playlists %>% 
+#make some empty cases uniform
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Unkown","Unknown")
+#str_replace can't handle empty string pattern, so work around
+playlists<-playlists %>% mutate(Title=ifelse(Title=="","Unknown",Title))
+
   filter(ArtistToken !="") %>% 
   filter(ArtistToken !="Your Dj") %>% 
   filter(ArtistToken !="Hoof Mouth") %>% 
@@ -129,7 +133,7 @@ playlists <- playlists %>% mutate_if(is.character,str_squish)
 playlists_full<-playlists
 
 
-save(playlists_full,file="playlists_full.Rdata")
+save(playlists_full,file="playlists_full.rdata")
 write_csv(playlists,path="playlists_full.csv")
 
 # ------------------------------------------------------------
@@ -214,12 +218,12 @@ playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 # save the results
 playlists<-playlists %>% select(-artist_song) # remove before saving. much smaller file
 
-save(playlists,file="playlists.Rdata")
+save(playlists,file="playlists.rdata")
 
 #get a better show count tally
 show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise()%>% summarise(showCount=n())
 DJKey<-DJKey %>% select(-showCount) %>% left_join(show_count)
-save(DJKey,file="DJKey.RData")
+save(DJKey,file="DJKey.rdata")
 
 
 #use artisttoken to select the most common version of the artist name and make that the token.
@@ -243,5 +247,5 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"[^A-Z^a-z^ ^0-9]",
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^The ","")
 # strip leading/trailing whitespace
 playlists <- playlists %>% mutate_if(is.character,str_squish)
-save(playlists,file="playlists.Rdata")
+save(playlists,file="playlists.rdata")
 #write_csv(playlists,path="playlists.csv")
