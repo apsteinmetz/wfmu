@@ -5,7 +5,7 @@ library(xts)
 #clean up raw playlists
 
 load("playlists_raw.Rdata")
-#load("djkey.Rdata")
+load("djkey.Rdata")
 
 #Clean up inconsistant artist names
 
