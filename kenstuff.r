@@ -6,9 +6,10 @@ library(tidyverse)
 library(ggplot2)
 library(ggthemes)
 library(lubridate)
+library(xts)
 load(file='playlists.RData')
 
-artist_troika<-c("OhSees","Funkadelic","JohnnyCash")
+artist_troika<-c("Oh Sees","Funkadelic","Johnny Cash")
 
 troika<-playlists %>% 
   ungroup() %>% 
@@ -33,3 +34,19 @@ gg
 gg+geom_col(position='dodge')
 
 gg+facet_wrap(~ArtistToken) + theme(axis.text.x = element_text(angle = 90))
+
+# Clay pigeon reports
+
+claylists <- playlists %>% filter(DJ=="WA") %>% mutate(artist_song = paste(ArtistToken,Title,sep=" - "))
+
+write_csv(claylists,"claylists.csv")
+claylists <- ungroup(claylists)
+claylists <- claylists %>% 
+#  mutate(year_month=ceiling_date(AirDate,unit="months")-1) %>% 
+  mutate(year_month=as.yearmon(AirDate)) %>% 
+  group_by(year_month,ArtistToken,artist_song) 
+
+claylists %>% group_by(year_month,artist_song) %>% 
+  summarise(top_songs=n()) %>% 
+  arrange(year_month,desc(top_songs)) %>% top_n(10) %>% 
+

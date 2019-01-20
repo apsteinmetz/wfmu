@@ -1,0 +1,53 @@
+---
+title: "Claylists Summary"
+author: "Art Steinmetz"
+date: "January 20, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(lubridate)
+library(xts)
+library(knitr)
+library(remotes)
+library(gt)
+
+remotes::install_github("https://github.com/rstudio/gt.git")
+load(file='playlists.rdata')
+claylists <- playlists %>% filter(DJ=="WA") %>% mutate(artist_song = paste(ArtistToken,Title,sep=" - "))
+
+write_csv(claylists,"claylists.csv")
+claylists <- ungroup(claylists)
+claylists <- claylists %>% 
+#  mutate(year_month=ceiling_date(AirDate,unit="months")-1) %>% 
+  mutate(year_month=as.yearmon(AirDate)) %>% 
+  group_by(year_month,ArtistToken,artist_song) 
+
+claylists %>% group_by(year_month,artist_song) %>% 
+  summarise(top_songs=n()) %>% 
+  arrange(year_month,desc(top_songs)) %>% top_n(10) %>% 
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
