@@ -1,8 +1,6 @@
 #update doc term matrix and dj similarity table for saving to server
 
-library(stringr)
 library(tm)
-library(dplyr)
 library(tidyverse)
 library(lubridate)
 library(vegan) #similarity measures

@@ -11,6 +11,7 @@ load("djkey.rdata")
 
 playlists<-as_tibble(playlists_raw)
 
+playlists_raw <- playlists_raw %>% distinct()
 #filter out squirrelly dates
 #only Diane "Kamikaze" has archived playlists stretching back to the '80s.  Yay, Diane!
 # Charlie Lewis has playlists going back to 1997 but for some reason the dates I scraped
@@ -119,8 +120,9 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Guided By","Guided
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Unkown","Unknown")
 #str_replace can't handle empty string pattern, so work around
 playlists<-playlists %>% mutate(Title=ifelse(Title=="","Unknown",Title))
+playlists<-playlists %>% mutate(ArtistToken=ifelse(ArtistToken=="","Unknown",ArtistToken))
 
-  filter(ArtistToken !="") %>% 
+playlists <- playlists %>% 
   filter(ArtistToken !="Your Dj") %>% 
   filter(ArtistToken !="Hoof Mouth") %>% 
   filter(ArtistToken !="Tom Wilson") %>%  #not songs
@@ -249,3 +251,4 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^The ","")
 playlists <- playlists %>% mutate_if(is.character,str_squish)
 save(playlists,file="playlists.rdata")
 #write_csv(playlists,path="playlists.csv")
+
