@@ -424,7 +424,7 @@ if (UPDATE_ONLY) {
 }
  
 djList_temp<-djList
-#example way to restart if failure occurs in middle of list
+#example way to restart if failure occurs in middle of list at,say dj "VR"
 #djList_temp<-djList[match("VR",djList):length(djList)]
 for (dj in djList_temp) {
   plURLs <- playlistURLs %>%
