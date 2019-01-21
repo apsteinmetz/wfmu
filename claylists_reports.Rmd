@@ -3,8 +3,8 @@ title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
 date: "January 20, 2019"
 output:
-  word_document: default
-
+  word_document: 
+    toc: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -35,7 +35,8 @@ claylists <- claylists %>%
 claylists %>% group_by(year_month,artist_song) %>% 
   summarise(top_songs=n()) %>% 
   arrange(desc(year_month),desc(top_songs)) %>% top_n(10) %>% 
-  gt::gt() %>% cols_merge(vars(artist_song),vars(top_songs),pattern="{1} - {2}") %>% cols_label(artist_song= "Artist - Song - Play Count")
+  gt::gt() %>% cols_merge(vars(artist_song),vars(top_songs),pattern="{1} - {2}") %>% 
+  cols_label(artist_song= md("**Artist - Song - Play Count**"))
 
 ```
 
@@ -45,7 +46,7 @@ claylists %>% group_by(year_month,Artist) %>%
   summarise(top_artists=n()) %>% 
   arrange(desc(year_month),desc(top_artists)) %>% top_n(10) %>% 
   gt::gt() %>% cols_merge(vars(Artist),vars(top_artists),pattern="{1} - {2}") %>% 
-  cols_label(Artist= "Artist - Play Count")
+  cols_label(Artist= md("**Artist - Play Count**"))
 
 ```
 
@@ -56,7 +57,7 @@ claylists %>% group_by(artist_song) %>%
   summarise(top_songs=n()) %>% 
   arrange(desc(top_songs)) %>% top_n(40) %>% 
   gt::gt() %>% cols_merge(vars(artist_song),vars(top_songs),pattern="{1} - {2}") %>% 
-  cols_label(artist_song= "Artist - Song - Play Count")
+  cols_label(artist_song= md("**Artist - Song - Play Count**"))
 
 ```
 
@@ -68,7 +69,7 @@ claylists %>% group_by(Artist) %>%
   summarise(top_songs=n()) %>% 
   arrange(desc(top_songs)) %>% top_n(40) %>% 
   gt::gt() %>% cols_merge(vars(Artist),vars(top_songs),pattern="{1} - {2}") %>% 
-  cols_label(Artist= "Artist - Play Count")
+  cols_label(Artist= md("**Artist - Play Count**"))
 
 ```
 
