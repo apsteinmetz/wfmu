@@ -109,9 +109,12 @@ deaths_raw<-read_html("death_page2.html") %>%
   html_nodes("table") %>% 
   .[5:length(.)] %>% 
   html_table(fill=TRUE) %>%
-  lapply(function(x){mutate(x,Age=as.integer(str_extract(as.character(Age),"[0-9]+")))}) %>% 
+  map(mutate_all,as.character) %>% 
   bind_rows() %>% 
-  as_data_frame() %>% 
+  as_tibble() %>%
+  mutate(Age = as.integer(str_extract(Age,"[0-9]+"))) %>% 
+  select(Name,Age,Date,Location,`Cause of death`) %>% 
+  na.omit() %>% 
   {.}
 
 deaths_raw[1:5,] %>% kable(format.args=list(big.mark=","))
