@@ -1,0 +1,76 @@
+---
+title: "WFMU Umlaut Incidence"
+output: html_notebook
+---
+
+### What fraction of playlists have umlauts either in the band or song name?
+```{r message=FALSE}
+#find umlauts in raw playlist
+library(tidyverse)
+library(knitr)
+umlauts <-"[öüËÄä]"
+load("~/R Projects/wfmu/playlists_raw.RData")
+load("~/R Projects/wfmu/djKey.RData")
+
+
+# count distinct playlists
+all_playlists <- playlists_raw %>% 
+  group_by(DJ,AirDate) %>% 
+  summarize(count=n())  %>% 
+  nrow() %>% 
+  {.}
+# detect those with umlauts
+yes_umlauts <- playlists_raw %>% 
+  group_by(DJ,AirDate) %>% 
+  filter(str_detect(paste0(Title,Artist),umlauts)) %>% 
+  summarize(count=n())  %>% 
+  nrow() %>% 
+  {.}
+paste0(yes_umlauts," playlists out of ",
+       all_playlists,", or ",
+       round(yes_umlauts/all_playlists*100),"% of playlists have umlauts")
+
+```       
+### Most umlaut-y DJs?
+  
+```{r message=FALSE, warning=FALSE}
+# Who are the most umlaut-y DJs?
+umlauts_DJs <- playlists_raw %>% 
+  group_by(DJ) %>% 
+  filter(str_detect(paste0(Title,Artist),umlauts)) %>% 
+  summarize(umlaut_songs= n()) %>% 
+  left_join(DJKey) %>% 
+  transmute(ShowName,umlaut_songs,
+            avg_umlauts_per_show=round(umlaut_songs/showCount,2)) %>%
+  arrange(desc(avg_umlauts_per_show))
+
+umlauts_DJs[1:20,] %>% kable()
+```
+### Most popular umlaut songs
+```{r}
+# most popular umlaut songs
+umlaut_songs <- playlists_raw %>% 
+  ungroup() %>% 
+  filter(str_detect(Title,umlauts)) %>% 
+  group_by(Title) %>% 
+  summarize(plays=n()) %>% 
+  arrange(desc(plays))
+
+umlaut_songs[1:20,] %>% kable()  
+```
+
+### Most popular umlaut bands
+```{r}
+# most popular umlaut bands
+umlaut_bands <- playlists_raw %>% 
+  ungroup() %>% 
+  filter(str_detect(Artist,umlauts)) %>% 
+  group_by(Artist) %>% 
+  summarize(plays=n()) %>% 
+  arrange(desc(plays))
+
+umlaut_bands[1:20,] %>% kable()
+
+```
+
+
