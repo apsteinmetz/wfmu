@@ -1,7 +1,7 @@
 ---
 title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
-date: "January 20, 2019"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output:
   word_document: 
     toc: yes
@@ -28,15 +28,19 @@ claylists <- playlists %>% filter(DJ=="WA") %>% mutate(artist_song = paste(Artis
 write_csv(claylists,"claylists.csv")
 claylists <- ungroup(claylists)
 claylists <- claylists %>% 
-#  mutate(year_month=ceiling_date(AirDate,unit="months")-1) %>% 
+  # limit to whole months
+  filter(AirDate<floor_date(Sys.Date(),unit="months")) %>% 
   mutate(year_month=as.yearmon(AirDate)) %>% 
   group_by(year_month,ArtistToken,artist_song) 
 
-claylists %>% group_by(year_month,artist_song) %>% 
+claylists %>% 
+  group_by(year_month,artist_song) %>% 
   summarise(top_songs=n()) %>% 
   arrange(desc(year_month),desc(top_songs)) %>% top_n(10) %>% 
   gt::gt() %>% cols_merge(vars(artist_song),vars(top_songs),pattern="{1} - {2}") %>% 
-  cols_label(artist_song= md("**Artist - Song - Play Count**"))
+  cols_label(artist_song= md("**Artist - Song - Play Count**")) %>% 
+  tab_style(cells_styles(text_weight = "bold"),locations=cells_group(groups="year_month"))
+  
 
 ```
 
@@ -45,8 +49,9 @@ claylists %>% group_by(year_month,artist_song) %>%
 claylists %>% group_by(year_month,Artist) %>% 
   summarise(top_artists=n()) %>% 
   arrange(desc(year_month),desc(top_artists)) %>% top_n(10) %>% 
-  gt::gt() %>% cols_merge(vars(Artist),vars(top_artists),pattern="{1} - {2}") %>% 
-  cols_label(Artist= md("**Artist - Play Count**"))
+  gt::gt() %>% cols_merge(vars(Artist),vars(top_artists),pattern="{1} - {2}") %>%
+  cols_label(Artist= md("**Artist - Play Count**")) %>% 
+  tab_options(stub_group.background.color = "lightblue",stub_group.font.size = 20)
 
 ```
 
