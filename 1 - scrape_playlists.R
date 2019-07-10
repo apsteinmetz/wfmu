@@ -398,6 +398,8 @@ showCounts<-playlistURLs %>%
   summarise(showCount=n()) %>% 
   arrange(desc(showCount))
 DJKey<-left_join(DJKey,showCounts)
+save(DJKey,file="DJKey.rdata")
+
 #limit analysis to DJs with at least numShows shows.
 # This also excludes DJs where we couldn't extract valid playlist URLs.
 numShows <- 10
