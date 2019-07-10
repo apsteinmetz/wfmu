@@ -99,7 +99,7 @@ death_page_text<- gsub( "</small>", "", death_page_text )
 write_file(death_page_text,"death_page2.html")
 
 ```
-A further wrinkle is some of the age-at-death numbers are given as a range like "45-46" which causes `html_table` to create a `character` column for `Age`.  Tables that don't have any ranges, just single numbers, will be extracted as `numeric` columns.  We have many tables so We want to use `bind_rows` to combine all the web page tables into one data frame. Alas, `bind_rows` will balk at chaining columns of diferent types.  To avoid this, let's arbitrarily take the lowest number in any age range we find before binding.  We can do this as part of the table extraction process.  
+A further wrinkle is some of the age-at-death numbers are given as a range like "45-46" which causes `html_table` to create a `character` column for `Age`.  Tables that don't have any ranges, just single numbers, will be extracted as `numeric` columns.  We have many tables so We want to use `bind_rows` to combine all the web page tables into one data frame. Alas, `bind_rows` will balk at chaining columns of diferent types.  To avoid this, let's convert everything to character before splicing and then arbitrarily take the lowest number in any age range we find.  We can do this as part of the table extraction process.  
 
 Also omit the first five tables which, by inspection, we know are not the mortality tables.
 
@@ -129,6 +129,10 @@ deaths<-deaths_raw %>%
   separate(Name,into=c("Name","band1","band2","band3","band4"),sep=",",extra="drop") %>% 
   unique()
 
+deaths <- deaths_raw %>% 
+  separate(Name,into = c("Name","Bands"),sep=", ",extra = "merge") %>% 
+  separate_rows(Bands,sep=", ") %>% 
+  nest(Bands,.key="bands")
 
 deaths<-deaths %>% 
   mutate(Date=parse_date(Date,"%B %d, %Y")) %>% 
@@ -253,7 +257,7 @@ NOW, we are done with all the data wrangling and can get to the fun stuff.
 This gives us a decent picture of how rock stars die.  Mostly from the same things that kill all of us. Heart disease and cancer were the leading causes of death in US in 2015, followed by lung disease and accidents according to https://www.cdc.gov/nchs/fastats/deaths.htm and shown below.
 
 ```{r}
-us_deaths<-data_frame(General_Cause=as_factor(c('Heart Disease','Cancer',
+us_deaths<-tibble(General_Cause=as_factor(c('Heart Disease','Cancer',
                                       'Lung Disease','Accident','Stroke',
                                       'Alzheimers','Diabetes','Liver Disease',
                                       'Suicide','Murdered','Other')),
