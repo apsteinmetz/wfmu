@@ -9,14 +9,14 @@ load("playlists.rdata")
 #Analyze similarity 
 #-------------------------------------------------------------  
 #combineAllArtists
-concat_artists<- data_frame()
+concat_artists<- tibble()
 #make sure there aren't extra levels
 playlists$DJ<-factor(playlists$DJ,as.character(unique(playlists$DJ)))
 for (dj in levels(playlists$DJ)){
   print(dj)
   #put all words in string for each DJ
   concat_artists<-bind_rows(concat_artists,
-                            data_frame(
+                            tibble(
                               DJ=dj,
                               Artists= playlists%>%
                                 filter(DJ==dj)%>%
