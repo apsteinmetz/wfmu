@@ -252,3 +252,26 @@ playlists <- playlists %>% mutate_if(is.character,str_squish)
 save(playlists,file="playlists.rdata")
 #write_csv(playlists,path="playlists.csv")
 
+# add first show and last show to djkey
+FirstShow<-playlists %>% 
+  group_by(DJ) %>% 
+  select(DJ,AirDate) %>% 
+  distinct() %>% 
+  top_n(-1) %>% rename(FirstShow=AirDate)
+
+LastShow<-playlists %>% 
+  group_by(DJ) %>% 
+  select(DJ,AirDate) %>% 
+  distinct() %>% 
+  top_n(1) %>% rename(LastShow=AirDate)
+
+DJKey <- DJKey %>% 
+  left_join(FirstShow,by=c("DJ","FirstShow")) %>% 
+  left_join(LastShow,by=c("DJ","LastShow"))
+
+#all_artisttokens<-all_artisttokens[100:200]
+#cleanup
+rm(LastShow,FirstShow)
+save(DJKey, file = "DJKey.RData")
+
+

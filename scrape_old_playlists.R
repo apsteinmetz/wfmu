@@ -500,4 +500,24 @@ playlistURLs <- get_playlist_page_URLs_old_Hova()
 playlists_raw <- bind_rows(playlists_raw,playlists_DJ)  
 save(playlists_raw,file="playlists_raw.rdata")
 
+# Add first show and last show to DJKey
+FirstShow<-playlists %>% 
+  group_by(DJ) %>% 
+  select(DJ,AirDate) %>% 
+  distinct() %>% 
+  top_n(-1) %>% rename(FirstShow=AirDate)
+
+LastShow<-playlists %>% 
+  group_by(DJ) %>% 
+  select(DJ,AirDate) %>% 
+  distinct() %>% 
+  top_n(1) %>% rename(LastShow=AirDate)
+
+DJKey <- DJKey %>% 
+  left_join(FirstShow,by="DJ") %>% 
+  left_join(LastShow,by="DJ")
+
+#cleanup
+rm(LastShow,FirstShow)
+
 
