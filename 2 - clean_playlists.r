@@ -266,8 +266,8 @@ LastShow<-playlists %>%
   top_n(1) %>% rename(LastShow=AirDate)
 
 DJKey <- DJKey %>% 
-  left_join(FirstShow,by=c("DJ","FirstShow")) %>% 
-  left_join(LastShow,by=c("DJ","LastShow"))
+  left_join(FirstShow,by=c("DJ")) %>% 
+  left_join(LastShow,by=c("DJ"))
 
 #all_artisttokens<-all_artisttokens[100:200]
 #cleanup

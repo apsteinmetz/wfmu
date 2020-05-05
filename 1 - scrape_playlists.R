@@ -233,7 +233,7 @@ fixHeaders <- function(pl) {
 }
 
 #--------------------------------------------------------------------
-get_playlist <- function(plURL, dj) {
+get_playlist <- function(plURL="/playlists/shows/93065", dj = "WA") {
   
   wholepage <- read_html(paste0(ROOT_URL, plURL))
   #try to pull out the show date.  assume first date in text on page is the show date
@@ -356,7 +356,12 @@ get_playlist <- function(plURL, dj) {
       ) %>% 
       filter(Artist != '') %>% 
       filter(!is.na(Artist))
-    print(playlist[1:5, ])
+    # just to track progress
+    if (is.null(playlist)){
+      print("No Playlist")
+    } else {
+      print(playlist[1:5, ]) 
+    }
     
   }
   
