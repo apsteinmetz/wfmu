@@ -17,12 +17,15 @@ library(xml2)
 # xml_find_all(".//body") %>% 
 #   xml_serialize(NULL)
 
-wholepage <- xml_unserialize(wholepage_new)
+# parsing artist and title is dependent on <br> tag being between songs and EITHER
+# the artist is in bold face with the <b> tag or the artist is in ALL CAPS.
+# the <b> tag is used here and the case is detected later in the routine.
+wholepage <- xml_unserialize(wholepage_old)
 wholepage %>% xml_find_all(".//br") %>%
    xml_add_sibling("p", "\n song_delimiter \n") %>%
    {.}
  wholepage %>% xml_find_all(".//b") %>%
-   xml_add_sibling("p", "\n arist_title_divide \n") %>%
+   xml_add_sibling("p", "\n artist_title_divide \n") %>%
    {.}
 
 
@@ -42,6 +45,7 @@ if (is.na(AirDate)) {
 print(AirDate)
 text <- wholepage %>% 
   html_text() %>% 
+  # put newlines where they belong if needed then separate
   str_replace_all('\\"',"\n") %>%
   str_replace_all(',',"") %>%
   tokenize_regex("\n") %>%
@@ -73,7 +77,10 @@ last_song_line <- last_song_line %>% pull(rownum)
   
 artist_title <- text  %>% 
   filter(rownum >= first_song_line) %>% 
-  filter(rownum < last_song_line)
+  filter(rownum < last_song_line) %>% 
+  select(-rownum) %>% 
+  # relabel row column for debugging but not needed otherwise
+  rowid_to_column(var="rownum")
 
 
 # this is way too complicated but the variances across all the playlist pages is too great.
@@ -81,9 +88,12 @@ artist <- list()
 title <- list()
 n <- 1
 row_state <- "artist"
+new_title <- ""
+new_artist <- ""
+# use "while" instead of "for" because the count of rows is dynamic
 while (n < nrow(artist_title)){
   cur_row <- artist_title$value[n]
-  print(cur_row) # DEBUG
+  #detect artist name by ALL CAPS
   if (cur_row == str_to_upper(cur_row)){
     #insert a row after the artist name with label
     artist_title <- rbind(artist_title[1:n,],
@@ -92,27 +102,28 @@ while (n < nrow(artist_title)){
     
   } 
   if (cur_row == "song_delimiter"){
-    n <- n + 1
-    cur_row <- artist_title$value[n]
+    # on to next song. Close out build of title
+    print(paste(new_artist,new_title))
+    title <- c(title,new_title)
+    artist = c(artist,new_artist)
     row_state <- "artist"
     new_artist <- ""
-  }
-  if (cur_row  == "artist_title_divide"){
-    artist = c(artist,new_artist)
-    n <- n + 1
-    cur_row <- artist_title$value[n]
-    row_state = "title"
     new_title <- ""
   }
-  if ((cur_row != "song_delimiter") & (row_state == "artist")){
-    new_artist <- paste(new_artist,cur_row)
-    n <- n + 1
+  if (cur_row  == "artist_title_divide"){
+    row_state = "title"
   }
-  if ((cur_row != "song_delimiter") & (row_state == "title")){
-    title <- c(title,paste(new_title,cur_row))
-    n <- n + 1
+  if ((cur_row != "song_delimiter") & 
+      (cur_row != "artist_title_divide") &
+      (row_state == "artist")){
+    new_artist <- paste0(new_artist,cur_row)
   }
-  print(paste(artist,title))
+  if ((cur_row != "song_delimiter") & 
+      (cur_row != "artist_title_divide") &
+      (row_state == "title")){
+    new_title <- paste0(new_title,cur_row)
+  }
+  n <- n+ 1
 }
 
 playlist <- tibble(DJ="GK",AirDate=AirDate,Artist=unlist(artist),Title=unlist(title)) %>% 
