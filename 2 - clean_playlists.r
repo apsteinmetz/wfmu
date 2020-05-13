@@ -207,7 +207,7 @@ for (n in 1:200){
   print(n)
   song<-count_by_song$artist_song[n]
   gini<-song_conc(song)
-  if (gini>0.985){
+  if (gini>0.999){
     songs_to_strip<-c(songs_to_strip,song)
   }
   

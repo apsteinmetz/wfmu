@@ -2,13 +2,8 @@
 
 library(rvest)
 library(stringr)
-library(xml2)
 library(tidyverse)
-
-
-
-
-
+library(tokenizers)
 # ----------------------------------------------
 ROOT_URL<-"https://www.wfmu.org"
 
@@ -133,9 +128,9 @@ get_playlist_page_URLs_old_Hova<-function(url_custom ="http://wfmu.org/hova/oldp
 
   return(pl_url)
 }
-
+#------------------------------------------------------------------
 # Old Greasy Kid stuff playlist URLs
-getGKpaylistURLs<-function(music_djs) {
+getGKPlaylistURLs<-function(music_djs) {
   DJ_playlists = NULL
   dudList<-NULL
   xpath = "//a[contains(@href,'playlists/shows')]"
@@ -158,6 +153,8 @@ getGKpaylistURLs<-function(music_djs) {
         pl<-singleDJ %>%
           html_nodes(xpath=xpath) %>%
           html_attr("href")
+        pl <- paste0("/Playlists/GK/",pl)
+        
       }
       
       # get show dates and titles
@@ -328,6 +325,7 @@ get_playlist_HN <-function(plURL,DJ){
     plraw<-tibble(DJ, AirDate, Artist,Title)
   }
 }
+
 #------------------------------------------------------------------
 get_playlist_HN_old <-function(plURL,DJ){
   wholepage <- read_html(paste0(ROOT_URL, plURL))
@@ -345,6 +343,7 @@ get_playlist_HN_old <-function(plURL,DJ){
     
   }
   
+  
   plraw <- NULL
   #hand-rolled
   #simplest case. A table with obvious header names
@@ -355,7 +354,7 @@ get_playlist_HN_old <-function(plURL,DJ){
       html_nodes(xpath="//div[@class='songlist']") %>% 
       html_text() %>% 
       str_extract_all("\n[\\S ]+: [\\S ]+\n") %>% 
-      .[[1]] 
+      .[[1]]
   } else {
     nodes <- wholepage %>% html_nodes(xpath="//font[@size='-1']/child::node()")
     artist_index <- nodes %>% html_name() %>% 
@@ -363,10 +362,147 @@ get_playlist_HN_old <-function(plURL,DJ){
     artist_index <- which(artist_index==1,arr.ind = TRUE)
     title_index <- artist_index + 1
     plraw <- tibble(DJ, AirDate, Artist = nodes[artist_index] %>% html_text(trim = TRUE),
-              Title = nodes[title_index] %>% html_text(trim = TRUE))
+                    Title = nodes[title_index] %>% html_text(trim = TRUE))
   }
   return(plraw)
+}
+
+# ------------------------------------------------------
+get_playlist_GK_old <-function(plURL,DJ){
+  wholepage <- read_html(paste0(ROOT_URL, plURL))
+  # tests of different playlist web page styles
+  # wholepage_new <- read_html("https://wfmu.org/playlists/shows/20644") %>%
+  #   xml_find_all(".//body") %>% 
+  #   xml_serialize(NULL)
+  # wholepage_middle <- read_html("https://www.wfmu.org/Playlists/GK/gks.001111.html")  %>%
+  # xml_find_all(".//body") %>% 
+  #   xml_serialize(NULL)
+  # wholepage_old <- read_html("https://www.wfmu.org/Playlists/GK/gks.970823.html") %>%
+  # xml_find_all(".//body") %>% 
+  #   xml_serialize(NULL)
+  #wholepage <- xml_unserialize(wholepage_old)
+  
+  # parsing artist and title is dependent on <br> tag being between songs and EITHER
+  # the artist is in bold face with the <b> tag or the artist is in ALL CAPS.
+  # the <b> tag is used here and the case is detected later in the routine.
+  wholepage %>% xml_find_all(".//br") %>%
+    xml_add_sibling("p", "\n song_delimiter \n") %>%
+    {.}
+  wholepage %>% xml_find_all(".//b") %>%
+    xml_add_sibling("p", "\n artist_title_divide \n") %>%
+    {.}
+  
+  
+  #try to pull out the show date.  assume first date in text on page is the show date
+  AirDate <- wholepage %>%
+    html_text() %>%
+    str_extract('[A-Za-z]+ [0-9]{1,2}, [0-9]{4}') %>%
+    as.Date("%B %d, %Y")
+  if (is.na(AirDate)) {
+    #try something else
+    AirDate <- wholepage %>%
+      html_text() %>%
+      str_extract('[0-9]{1,2} [A-Za-z]+ [0-9]{4}') %>%
+      as.Date("%d %B %Y")
+    
   }
+  # print(AirDate) #DEBUG
+  text <- wholepage %>% 
+    html_text() %>% 
+    # put newlines where they belong if needed then separate
+    str_replace_all('\\"',"\n") %>%
+    str_replace_all(',',"") %>%
+    tokenize_regex("\n") %>%
+    unlist() %>%
+    enframe(name="rownum") %>%
+    mutate_if(is.character, trimws) %>% 
+    filter(str_length(value)>1) %>% 
+    {.}
+  
+  first_song_line <- text %>%
+    filter(value == "Greasy Kid Stuff") %>% 
+    pull(rownum) %>% -1
+  if (length(text$value[first_song_line]) < 2) first_song_line <- first_song_line - 1
+  
+  # I include fill-in shows that don't start with the song "greasy kid stuff"
+  if (is_empty(first_song_line)){
+    n <- 1
+    repeat({
+      print(text[n:(n+9),])
+      first_song_line <- readline("Can't find first song.  Enter a line number to start on. <enter> for more")
+      if (first_song_line == ""){
+        n <- n + 10
+      } else{ 
+        first_song_line <- as.numeric(first_song_line)
+        break
+      }
+    })
+  }
+  
+  last_song_line <- text %>%
+    filter(str_detect(value,"Previous playlist"))
+  if (nrow(last_song_line) == 0){
+    last_song_line <- text %>%
+      filter(str_detect(str_to_lower(value),"gks main"))
+  }    
+  
+  last_song_line <- last_song_line %>% pull(rownum)
+  
+  artist_title <- text  %>% 
+    filter(rownum >= first_song_line) %>% 
+    filter(rownum < last_song_line) %>% 
+    select(-rownum) %>% 
+    # relabel row column for debugging but not needed otherwise
+    rowid_to_column(var="rownum")
+  
+  
+  # this is way too complicated but the variances across all the playlist pages is too great.
+  artist <- list()
+  title <- list()
+  n <- 1
+  row_state <- "artist"
+  new_title <- ""
+  new_artist <- ""
+  # use "while" instead of "for" because the count of rows is dynamic
+  while (n < nrow(artist_title)){
+    cur_row <- artist_title$value[n]
+    #detect artist name by ALL CAPS
+    if (cur_row == str_to_upper(cur_row)){
+      #insert a row after the artist name with label
+      artist_title <- rbind(artist_title[1:n,],
+                            data.frame(rownum=0,value="artist_title_divide"),
+                            artist_title[-(1:n),])
+      
+    } 
+    if (cur_row == "song_delimiter"){
+      # on to next song. Close out build of title
+      # print(paste(new_artist,new_title)) # DEBUG
+      title <- c(title,str_trim(new_title))
+      artist = c(artist,str_trim(new_artist))
+      row_state <- "artist"
+      new_artist <- ""
+      new_title <- ""
+    }
+    if (cur_row  == "artist_title_divide"){
+      row_state = "title"
+    }
+    if ((cur_row != "song_delimiter") & 
+        (cur_row != "artist_title_divide") &
+        (row_state == "artist")){
+      new_artist <- paste(new_artist,cur_row)
+    }
+    if ((cur_row != "song_delimiter") & 
+        (cur_row != "artist_title_divide") &
+        (row_state == "title")){
+      new_title <- paste(new_title,cur_row)
+    }
+    n <- n+ 1
+  }
+  
+  playlist <- tibble(DJ="GK",AirDate=AirDate,Artist=unlist(artist),Title=unlist(title)) %>% 
+    mutate_at(vars(c("Artist","Title")),str_to_title)
+  return(playlist)
+}
 
 #------------------------------------------------------------------
 
@@ -522,10 +658,10 @@ get_playlist <- function(plURL, dj) {
 
 playlists_DJ <- NULL
 dj <- "GK"
-playlistURLs<-getDJPlaylistURLs(dj)
+# playlistURLs<-getGKPlaylistURLs(dj)
 
-playlistURLs <- get_playlist_page_URLs_old_Hova()
-playlistURLs <- get_playlist_page_URLs_old_Hova()
+
+#playlistURLs <- get_playlist_page_URLs_old_Hova()
 #showCounts<-playlistURLs %>% 
 #  group_by(DJ) %>% 
 #  summarise(showCount=n()) %>% 
@@ -544,36 +680,52 @@ playlistURLs <- get_playlist_page_URLs_old_Hova()
   plURLs <- playlistURLs$playlistURL
   for (plURL in plURLs){
     print(paste(dj, plURL,Sys.time()))
-      playlist<-get_playlist_HN_old(plURL, dj)
+      playlist<-get_playlist_GK_old(plURL, dj)
       playlists_DJ <- bind_rows(playlists_DJ, playlist)
     }
-  #save to disk after each dj
-#  save(playlists_raw,file="playlists_raw.rdata")
+  # save to disk after each dj
+  # playlists_raw <- bind_rows(playlists_raw,playlists_DJ)  
+  # save(playlists_raw,file="playlists_raw.rdata")
 
+fix_rows_gk <- function(playlist){
+  # fix dashes
+  playlist <- playlist %>% 
+    separate(Artist, into = c("Artist2","Title2"),remove = FALSE,sep=" - ") %>% 
+    mutate(Title = ifelse(Title == "" & !is.na(Title2),Title2,Title)) %>% 
+    mutate(Title = ifelse(Title=="",Artist2,Title)) %>% 
+    mutate(Artist = ifelse((Artist =="" & Title == "Greasy Kid Stuff"),"The Jack Mormons",Artist)) %>%
+    mutate(Artist = str_remove(Artist,"^[0-9]{1,2}\\. ")) %>% 
+    select(-Artist2,-Title2) %>% 
+    filter(Title != "") %>% 
+    mutate(Artist = ifelse(str_detect(Artist,"nknown"),"Unknown",Artist)) %>%
+    mutate(Artist = ifelse(Artist == "","Unknown",Artist)) %>%
+    mutate(Artist = ifelse(str_detect(Title,"& Kate"),"Max & Kate's Review",Artist)) %>% 
+    mutate(Title = ifelse(str_detect(Title,"& Kate"),str_remove(Title,"^.+: "),Title)) %>% 
+    {.}
+  return(playlist)
+}
 
 #bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw)
 
-playlists_raw <- bind_rows(playlists_raw,playlists_DJ)  
-save(playlists_raw,file="playlists_raw.rdata")
 
 # Add first show and last show to DJKey
-FirstShow<-playlists %>% 
-  group_by(DJ) %>% 
-  select(DJ,AirDate) %>% 
-  distinct() %>% 
-  top_n(-1) %>% rename(FirstShow=AirDate)
+#FirstShow<-playlists %>% 
+#  group_by(DJ) %>% 
+#  select(DJ,AirDate) %>% 
+#  distinct() %>% 
+#  top_n(-1) %>% rename(FirstShow=AirDate)
 
-LastShow<-playlists %>% 
-  group_by(DJ) %>% 
-  select(DJ,AirDate) %>% 
-  distinct() %>% 
-  top_n(1) %>% rename(LastShow=AirDate)
+#LastShow<-playlists %>% 
+#  group_by(DJ) %>% 
+#  select(DJ,AirDate) %>% 
+#  distinct() %>% 
+#  top_n(1) %>% rename(LastShow=AirDate)
 
-DJKey <- DJKey %>% 
-  left_join(FirstShow,by="DJ") %>% 
-  left_join(LastShow,by="DJ")
+#DJKey <- DJKey %>% 
+#  left_join(FirstShow,by="DJ") %>% 
+#  left_join(LastShow,by="DJ")
 
 #cleanup
-rm(LastShow,FirstShow)
+#rm(LastShow,FirstShow)
 
 
