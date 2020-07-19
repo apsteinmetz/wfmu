@@ -146,19 +146,30 @@ print('Stripping signature songs that would distort analysis.  This takes a few 
 #this will strip the song entirely from the database.
 #should strip the artist/title pair, not the title
 STRIP_THRESHOLD <- 20
-playlists <- playlists %>%  
+playlists <- playlists_full %>%  
   mutate(artist_song=paste(ArtistToken,Title)) %>% 
   group_by(DJ,AirDate)
 
-songs_to_strip<-playlists %>%
+
+strip_songs <- function(playlist) {
+  playlist <- playlist %>%
   summarize(FirstSong=first(artist_song)) %>%
   group_by(FirstSong) %>%
   summarise(FirstPlayCount=n()) %>%
   arrange(desc(FirstPlayCount)) %>%
   filter(FirstPlayCount>STRIP_THRESHOLD) %>%
-  pull(FirstSong)
-playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
+  pull(FirstSong) %>% 
+  {.}
+return (playlist)
+}
+
+songs_to_strip <- strip_songs(playlists)
 print(songs_to_strip)
+playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
+# a few DJs play TWO signature songs to open the show.  Get rid of the second one by doing it again
+songs_to_strip <- strip_songs(playlists)
+print(songs_to_strip)
+playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 
 #now strip closing songs
 songs_to_strip<-playlists %>%
@@ -168,8 +179,8 @@ songs_to_strip<-playlists %>%
   arrange(desc(FirstPlayCount)) %>%
   filter(FirstPlayCount>STRIP_THRESHOLD) %>%
   pull(FirstSong)
-playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 print(songs_to_strip)
+playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 
 #Songs where only one DJ plays it - over and over even though it might not be a signature song
 #distort the analysis.  I use the Gini coefficent (used for measuring income inequality) to
@@ -178,7 +189,9 @@ print(songs_to_strip)
 
 #how aggressive should we be in scrubbing artists with lopsided appeal?
 #Setting TOLERANCE to 1.000 would only filter songs with exactly one DJ accounting for all plays.
-TOLERANCE <- 0.987 
+# I have set this to 0.997 which essentially deprecates the function because the show, Greasy
+# Kid stuff played a few songs an awful lot but I didn't want to lose the greatest hits.
+TOLERANCE <- 0.997
 NUM_DJS<- length(unique(playlists$DJ))
 
 song_conc<-function(song){
@@ -207,7 +220,7 @@ for (n in 1:200){
   print(n)
   song<-count_by_song$artist_song[n]
   gini<-song_conc(song)
-  if (gini>0.985){
+  if (gini > TOLERANCE){
     songs_to_strip<-c(songs_to_strip,song)
   }
   
@@ -251,4 +264,25 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^The ","")
 playlists <- playlists %>% mutate_if(is.character,str_squish)
 save(playlists,file="playlists.rdata")
 #write_csv(playlists,path="playlists.csv")
+
+# add first show and last show to djkey
+FirstShow<-playlists %>% 
+  group_by(DJ) %>% 
+  select(DJ,AirDate) %>% 
+  distinct() %>% 
+  top_n(-1) %>% rename(FirstShow=AirDate)
+
+LastShow<-playlists %>% 
+  group_by(DJ) %>% 
+  select(DJ,AirDate) %>% 
+  distinct() %>% 
+  top_n(1) %>% rename(LastShow=AirDate)
+
+DJKey <- DJKey %>% 
+  select(DJ,ShowName,onSched) %>% 
+  left_join(FirstShow,by=c("DJ")) %>% 
+  left_join(LastShow,by=c("DJ"))
+
+save(DJKey, file = "DJKey.RData")
+
 

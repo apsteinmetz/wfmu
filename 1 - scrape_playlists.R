@@ -233,7 +233,7 @@ fixHeaders <- function(pl) {
 }
 
 #--------------------------------------------------------------------
-get_playlist <- function(plURL, dj) {
+get_playlist <- function(plURL="/playlists/shows/93065", dj = "WA") {
   
   wholepage <- read_html(paste0(ROOT_URL, plURL))
   #try to pull out the show date.  assume first date in text on page is the show date
@@ -281,7 +281,6 @@ get_playlist <- function(plURL, dj) {
           break
         }
         if (n == nrow(plraw)) {
-          print("DUD. Cand't find header")
           plraw <- NULL
         }
       }
@@ -316,14 +315,23 @@ get_playlist <- function(plURL, dj) {
     #try idiosyncratic djs
     if (dj=="TW") plraw<-try_BK(wholepage)
     if (dj=="HN") plraw<-try_HN(wholepage)
-    if (is.null(plraw)) print("DUD. Can't find header")
-    #final dead end
     }
     
+# new 2020 style headers.  Nobody told me about it!
+  if (is.null(plraw)){
+    artists <- wholepage %>% html_nodes(xpath = "//td[@class='song col_artist']") %>% html_text() %>% 
+      str_remove_all("\\n")
+    titles <- wholepage %>% html_nodes(xpath = "//td[@class='song col_song_title']") %>% html_text() %>% 
+      str_remove_all("\\n")
+    plraw <- tibble(Artist = artists,Title = titles)
+    if (nrow(plraw) == 0) plraw <- NULL
+  }  
+  
   plraw<-fixHeaders(plraw)
   # final clean up if we have something
   if (is.null(plraw)) {
     playlist <- NULL
+    print("DUD")
   } else {
     if (TRUE %in% is.na(names(plraw)))
       plraw <- plraw[, -which(is.na(names(plraw)))] #sometimes an NA column
@@ -348,14 +356,17 @@ get_playlist <- function(plURL, dj) {
       ) %>% 
       filter(Artist != '') %>% 
       filter(!is.na(Artist))
-    print(playlist[1:5, ])
+    # just to track progress
+    if (is.null(playlist)){
+      print("No Playlist")
+    } else {
+      print(playlist[1:5, ]) 
+    }
     
   }
   
   return(playlist)
 }
-
-
 #-------------- MAIN -----------------
 DJURLs<-getDJURLs()
 DJKey<-getShowNames(DJURLs)
@@ -463,5 +474,5 @@ playlists_raw<-playlists_raw %>%
   distinct()
 
 save(playlists_raw,file="playlists_raw.rdata")
-
+right_join(DJKey,bad_Tables) %>% save(file="bad_tables.rdata")
 
