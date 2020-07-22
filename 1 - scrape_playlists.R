@@ -235,7 +235,12 @@ fixHeaders <- function(pl) {
 #--------------------------------------------------------------------
 get_playlist <- function(plURL="/playlists/shows/93065", dj = "WA") {
   
-  wholepage <- read_html(paste0(ROOT_URL, plURL))
+  wholepage <- tryCatch(
+    read_html(paste0(ROOT_URL, plURL)),
+    error = function(e){NA}) #handle 404 errors
+  if(is.na(wholepage)){
+    return(bind_rows(playlists_raw,tibble(DJ="",AirDate=as.Date(NA),Artist="",Title="")))
+  }
   #try to pull out the show date.  assume first date in text on page is the show date
   airDate <- wholepage %>%
     html_text() %>%
@@ -438,7 +443,7 @@ if (UPDATE_ONLY) {
  
 djList_temp<-djList
 #example way to restart if failure occurs in middle of list at,say dj "VR"
-#djList_temp<-djList[match("VR",djList):length(djList)]
+djList_temp<-djList[match("RQ",djList):length(djList)]
 for (dj in djList_temp) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%
@@ -459,7 +464,9 @@ for (dj in djList_temp) {
     print(paste(dj, n, plURL,Sys.time()))
     if (!is.na(pull(plURLs[1,1]))){
       playlist<-get_playlist(plURL, dj)
-      playlists_raw <- bind_rows(playlists_raw, playlist)
+      if(!is.null(playlist)){
+        playlists_raw <- bind_rows(playlists_raw, playlist)
+      }
     }
     if (is.null(playlist)) break #done with this DJ
   }
@@ -467,7 +474,7 @@ for (dj in djList_temp) {
   save(playlists_raw,file="playlists_raw.rdata")
 }
 
-bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw)
+bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw) %>% left_join(DJKey)
 
 playlists_raw<-playlists_raw %>% 
   filter(Artist != Title) %>% #single column span across table.  Not a song.
