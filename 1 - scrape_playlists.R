@@ -82,7 +82,12 @@ get_playlist_page_URLs<-function(url_suffix) {
   pl_url<-singleDJ %>%
     html_nodes(xpath=paste0("//a[contains(@href,'playlists/",dj,"')]")) %>%
     html_attr("href")
-  pl_url<-c(latest_url,pl_url) %>% unique()
+  # combine root with children but remove dupes and redundant URLs
+   pl_url<-c(latest_url,pl_url) %>% 
+     unique() %>% 
+     str_remove_all("http.+") %>%
+     stringi::stri_remove_empty()
+     
   
 return(pl_url)
 }
@@ -434,7 +439,7 @@ if (UPDATE_ONLY) {
     arrange(AirDate) %>% 
     group_by(DJ) %>% 
     summarise(most_recent = max(AirDate))
-  most_recent_date<-max(playlists_raw$AirDate)
+  most_recent_date<-max(playlists_raw$AirDate,na.rm = TRUE)
   #go_back_num<- as.integer(round ((Sys.Date() - most_recent_date) * 5/7))
   #print(paste("Updating ONLY last",go_back_num,"Shows"))
 } else{
@@ -443,7 +448,7 @@ if (UPDATE_ONLY) {
  
 djList_temp<-djList
 #example way to restart if failure occurs in middle of list at,say dj "VR"
-djList_temp<-djList[match("RQ",djList):length(djList)]
+#djList_temp<-djList[match("RQ",djList):length(djList)]
 for (dj in djList_temp) {
   plURLs <- playlistURLs %>%
     filter(DJ == dj) %>%

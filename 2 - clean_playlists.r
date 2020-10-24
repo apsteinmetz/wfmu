@@ -136,7 +136,7 @@ playlists_full<-playlists
 
 
 save(playlists_full,file="playlists_full.rdata")
-write_csv(playlists,path="playlists_full.csv")
+write_csv(playlists,file="playlists_full.csv")
 
 # ------------------------------------------------------------
 #OPTIONAL
