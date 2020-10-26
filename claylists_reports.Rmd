@@ -1,7 +1,7 @@
 ---
 title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
-date: "June 2020"
+date: "October 2020"
 output: 
   pdf_document:
     toc: TRUE
@@ -51,7 +51,7 @@ claylists %>%
   
 
 ```
-
+\newpage
 # Top Artists By Month for Wake and Bake, Last 12 Months
 ```{r echo=FALSE, message=FALSE}
 claylists %>%
@@ -68,7 +68,7 @@ claylists %>%
   {.}
 
 ```
-
+\newpage
 # Top 40 Songs of All Time for Wake and Bake
 
 ```{r echo=FALSE, message=FALSE}
@@ -81,7 +81,7 @@ claylists %>%
 
 ```
 
-
+\newpage
 # Top 40 Artists of All Time for Wake and Bake
 
 ```{r echo=FALSE, message=FALSE}
