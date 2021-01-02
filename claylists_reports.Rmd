@@ -1,7 +1,7 @@
 ---
 title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
-date: "October 2020"
+date: "December 2020"
 output: 
   pdf_document:
     toc: TRUE
