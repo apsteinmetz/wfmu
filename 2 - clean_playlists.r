@@ -25,7 +25,8 @@ playlists$ArtistToken<-playlists$Artist
 playlists$ArtistToken<-str_replace(playlists$ArtistToken,"!!!","chkchkchk")
 # now change some common punctuation to space
 print("Stripping Punctuation")
-
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^\\? \\&","Question Mark And ")
+playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^\\? And","Question Mark And ")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"\\&"," ")
 
 playlists$ArtistToken<-str_to_lower(playlists$ArtistToken)
