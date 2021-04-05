@@ -1,7 +1,7 @@
 ---
 title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
-date: "December 2020"
+date: "April 2021"
 output: 
   pdf_document:
     toc: TRUE
@@ -24,7 +24,7 @@ library(gt)
 load(file='playlists.rdata')
 ```
 # Top Songs By Month for Wake and Bake, Last 12 Months
-```{r echo=FALSE, message=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 claylists <- playlists %>% filter(DJ=="WA") %>% mutate(artist_song = paste(ArtistToken,Title,sep=" - "))
 
