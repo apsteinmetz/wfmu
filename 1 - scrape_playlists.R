@@ -64,7 +64,7 @@ getShowNames<-function(DJURLs) {
   
 
   return (DJKey)  
-  #save(DJKey,file="DJKey.rdata")
+  #save(DJKey,file = "data/DJKey.rdata")
 }
 
 # -------------get the URLs of the playlist pages for a DJ ----------
@@ -148,7 +148,7 @@ getDJArtistNames<-function(DJURLs) {
     DJArtists<-data.frame(DJ,artistRaw=unlist(artistList))
     if (nrow(DJArtists) >0) allDJArtists = rbind(allDJArtists,DJArtists)
     #remove factor level of DJs with no artists
-    save(allDJArtists,file="allDJArtists.rdata")
+    save(allDJArtists,file = "data/allDJArtists.rdata")
   }
   return(allDJArtists)
 }  
@@ -380,8 +380,8 @@ get_playlist <- function(plURL="/playlists/shows/93065", dj = "WA") {
 #-------------- MAIN -----------------
 DJURLs<-getDJURLs()
 DJKey<-getShowNames(DJURLs)
-save(DJKey,file="DJKey.rdata")
-#load(file='djkey.rdata')
+save(DJKey,file = "data/DJKey.rdata")
+#load(file='data/djkey.rdata')
 
 excludeDJs <-
   c('SD',
@@ -419,7 +419,7 @@ showCounts<-playlistURLs %>%
   summarise(showCount=n()) %>% 
   arrange(desc(showCount))
 DJKey<-left_join(DJKey,showCounts) %>% drop_na()
-save(DJKey,file="DJKey.rdata")
+save(DJKey,file = "data/DJKey.rdata")
 
 #limit analysis to DJs with at least numShows shows.
 # This also excludes DJs where we couldn't extract valid playlist URLs.
@@ -430,7 +430,7 @@ djList <- DJKey %>%
   pull(DJ)
 
 #careful not to trash intermediate results!
-load("playlists_raw.rdata")
+load("data/playlists_raw.rdata")
 UPDATE_ONLY =TRUE
 if (UPDATE_ONLY) {
   #assume at most 5 shows per week
@@ -476,7 +476,7 @@ for (dj in djList_temp) {
     if (is.null(playlist)) break #done with this DJ
   }
   #save to disk after each dj
-  save(playlists_raw,file="playlists_raw.rdata")
+  save(playlists_raw,file = "data/playlists_raw.rdata")
 }
 
 bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw) %>% left_join(DJKey)
@@ -485,6 +485,6 @@ playlists_raw<-playlists_raw %>%
   filter(Artist != Title) %>% #single column span across table.  Not a song.
   distinct()
 
-save(playlists_raw,file="playlists_raw.rdata")
-right_join(DJKey,bad_Tables) %>% save(file="bad_tables.rdata")
+save(playlists_raw,file = "data/playlists_raw.rdata")
+right_join(DJKey,bad_Tables) %>% save(file = "data/bad_tables.rdata")
 

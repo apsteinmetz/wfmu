@@ -4,10 +4,10 @@ library(xts)
 
 #clean up raw playlists
 
-load("playlists_raw.rdata")
-load("djkey.rdata")
+load("data/playlists_raw.rdata")
+load("data/djkey.rdata")
 
-#Clean up inconsistant artist names
+#Clean up inconsistent artist names
 
 playlists<-as_tibble(playlists_raw)
 
@@ -136,8 +136,8 @@ playlists <- playlists %>% mutate_if(is.character,str_squish)
 playlists_full<-playlists
 
 
-save(playlists_full,file="playlists_full.rdata")
-write_csv(playlists,file="playlists_full.csv")
+save(playlists_full,file = "data/playlists_full.rdata")
+write_csv(playlists,file = "data/playlists_full.csv")
 
 # ------------------------------------------------------------
 #OPTIONAL
@@ -234,12 +234,12 @@ playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
 # save the results
 playlists<-playlists %>% select(-artist_song) # remove before saving. much smaller file
 
-save(playlists,file="playlists.rdata")
+save(playlists,file = "data/playlists.rdata")
 
 #get a better show count tally
 show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise()%>% summarise(showCount=n())
 DJKey<-DJKey %>% select(-showCount) %>% left_join(show_count) %>% distinct()
-save(DJKey,file="DJKey.rdata")
+save(DJKey,file = "data/DJKey.rdata")
 
 
 #use artisttoken to select the most common version of the artist name and make that the token.
@@ -263,7 +263,7 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"[^A-Z^a-z^ ^0-9]",
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^The ","")
 # strip leading/trailing whitespace
 playlists <- playlists %>% mutate_if(is.character,str_squish)
-save(playlists,file="playlists.rdata")
+save(playlists,file = "data/playlists.rdata")
 #write_csv(playlists,path="playlists.csv")
 
 # add first show and last show to djkey

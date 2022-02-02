@@ -1,0 +1,97 @@
+---
+title: "Playlist Summary for 'Wake and Bake' on WFMU"
+author: "Art Steinmetz"
+date: "April 2021"
+output: 
+  pdf_document:
+    toc: TRUE
+---
+
+```{r setup, include=FALSE}
+# pulled from YAML Header
+#date: "`r format(Sys.Date(), "%B %d, %Y")`"
+
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(lubridate)
+library(xts)
+library(knitr)
+library(remotes)
+library(gt)
+
+load(file='playlists.rdata')
+```
+# Top Songs By Month for Wake and Bake, Last 12 Months
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+claylists <- playlists %>% filter(DJ=="WA") %>% mutate(artist_song = paste(ArtistToken,Title,sep=" - "))
+
+write_csv(claylists,"claylists.csv")
+claylists <- ungroup(claylists)
+claylists <- claylists %>% 
+  # limit to whole months
+  filter(AirDate<floor_date(Sys.Date(),unit="months")) %>% 
+  mutate(year_month=as.yearmon(AirDate))
+
+claylists %>% 
+  #limit top songs to last 12 months
+  filter(AirDate > Sys.Date()-365) %>% 
+  group_by(year_month,artist_song) %>% 
+  summarise(top_songs=n()) %>%
+  arrange(desc(year_month),desc(top_songs)) %>% 
+  top_n(10) %>% 
+ gt::gt(groupname_col = "year_month") %>%
+ cols_merge(vars(artist_song,top_songs),pattern="{1} - {2}") %>%
+ cols_label(artist_song= md("**Artist - Song - Play Count**")) %>%
+  tab_style(style = list(cell_text(weight = "bold",size = "large",style="italic")),
+            locations = cells_row_groups()) %>% 
+  {.}
+  
+
+```
+\newpage
+# Top Artists By Month for Wake and Bake, Last 12 Months
+```{r echo=FALSE, message=FALSE}
+claylists %>%
+  #limit top songs to last 12 months
+  filter(AirDate > Sys.Date()-365) %>% 
+  group_by(year_month,Artist) %>% 
+  summarise(top_artists=n()) %>% 
+  arrange(desc(year_month),desc(top_artists)) %>% 
+  top_n(10) %>% 
+  gt::gt(groupname_col = "year_month") %>% cols_merge(vars(Artist,top_artists),pattern="{1} - {2}") %>%
+  cols_label(Artist= md("**Artist - Play Count**")) %>% 
+  tab_style(style = list(cell_text(weight = "bold",size = "large",style="italic")),
+            locations = cells_row_groups()) %>% 
+  {.}
+
+```
+\newpage
+# Top 40 Songs of All Time for Wake and Bake
+
+```{r echo=FALSE, message=FALSE}
+claylists %>% 
+  group_by(artist_song) %>% 
+  summarise(top_songs=n()) %>% 
+  arrange(desc(top_songs)) %>% top_n(40) %>% 
+  gt::gt() %>% cols_merge(vars(artist_song,top_songs),pattern="{1} - {2}") %>% 
+  cols_label(artist_song= md("**Artist - Song - Play Count**"))
+
+```
+
+\newpage
+# Top 40 Artists of All Time for Wake and Bake
+
+```{r echo=FALSE, message=FALSE}
+claylists %>% 
+  group_by(Artist) %>% 
+  summarise(top_songs=n()) %>% 
+  arrange(desc(top_songs)) %>% top_n(40) %>% 
+  gt::gt() %>% cols_merge(vars(Artist,top_songs),pattern="{1} - {2}") %>% 
+  cols_label(Artist= md("**Artist - Play Count**"))
+
+```
+
+

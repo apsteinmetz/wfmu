@@ -2,15 +2,15 @@
 
 # load then save with old file format that works with R 3.4
 
-load(file='DJKey.RData')
-load(file="playlists.Rdata")
-load(file='djSimilarity.RData')
-load(file='djdtm.RData')
+load(file = "data/DJKey.RData")
+load(file = "data/playlists.Rdata")
+load(file = "data/djSimilarity.RData")
+load(file = "data/djdtm.RData")
 
-save(DJKey,file='DJKey.RData',version = 2)
-save(playlists,file="playlists.Rdata",version = 2)
-save(dj_similarity_tidy,file='djSimilarity.RData',version = 2)
-save(djdtm,file='djdtm.RData',version = 2)
+save(DJKey,file = "data/DJKey.RData",version = 2)
+save(playlists,file = "data/playlists.Rdata",version = 2)
+save(dj_similarity_tidy,file = "data/djSimilarity.RData",version = 2)
+save(djdtm,file = "data/djdtm.RData",version = 2)
 
 
 
@@ -23,4 +23,4 @@ files = c("DJKey.rdata",
           "playlists.rdata",
           "djsimilarity.rdata")
 shiny_app_dir = "../wfmu_explorer/"
-file_copy(files,paste0(shiny_app_dir,files),overwrite = TRUE)
+file_copy(paste0("data/",files),paste0(shiny_app_dir,files),overwrite = TRUE)
