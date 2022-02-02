@@ -1,10 +1,13 @@
 ---
 title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
-date: "September 2021"
-output: 
+date: "December 2021"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
   pdf_document:
-    toc: TRUE
+    toc: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -21,7 +24,7 @@ library(knitr)
 library(remotes)
 library(gt)
 
-load(file='playlists.rdata')
+load(file='data/playlists.rdata')
 ```
 # Top Songs By Month for Wake and Bake, Last 12 Months
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
@@ -39,14 +42,15 @@ claylists %>%
   #limit top songs to last 12 months
   filter(AirDate > Sys.Date()-365) %>% 
   group_by(year_month,artist_song) %>% 
-  summarise(top_songs=n()) %>%
+  summarise(top_songs=n(),.groups="keep") %>%
   arrange(desc(year_month),desc(top_songs)) %>% 
-  top_n(10) %>% 
+  top_n(10,wt=top_songs) %>% 
  gt::gt(groupname_col = "year_month") %>%
  cols_merge(vars(artist_song,top_songs),pattern="{1} - {2}") %>%
  cols_label(artist_song= md("**Artist - Song - Play Count**")) %>%
-  tab_style(style = list(cell_text(weight = "bold",size = "large",style="italic")),
-            locations = cells_row_groups()) %>% 
+  tab_style(style = list(cell_text(weight = "bold",
+                                   size = "large",style="italic")),
+            locations = cells_row_groups()) %>%
   {.}
   
 
@@ -58,10 +62,10 @@ claylists %>%
   #limit top songs to last 12 months
   filter(AirDate > Sys.Date()-365) %>% 
   group_by(year_month,Artist) %>% 
-  summarise(top_artists=n()) %>% 
+  summarise(top_artists=n(),.groups="keep") %>% 
   arrange(desc(year_month),desc(top_artists)) %>% 
-  top_n(10) %>% 
-  gt::gt(groupname_col = "year_month") %>% cols_merge(vars(Artist,top_artists),pattern="{1} - {2}") %>%
+  top_n(10,wt=top_artists) %>% 
+  gt::gt(groupname_col = "year_month") %>% cols_merge(c(Artist,top_artists),pattern="{1} - {2}") %>%
   cols_label(Artist= md("**Artist - Play Count**")) %>% 
   tab_style(style = list(cell_text(weight = "bold",size = "large",style="italic")),
             locations = cells_row_groups()) %>% 
@@ -75,8 +79,10 @@ claylists %>%
 claylists %>% 
   group_by(artist_song) %>% 
   summarise(top_songs=n()) %>% 
-  arrange(desc(top_songs)) %>% top_n(40) %>% 
-  gt::gt() %>% cols_merge(vars(artist_song,top_songs),pattern="{1} - {2}") %>% 
+  arrange(desc(top_songs)) %>% 
+  top_n(40,wt=top_songs) %>% 
+  gt::gt() %>% cols_merge(c(artist_song,top_songs),
+                          pattern="{1} - {2}") %>% 
   cols_label(artist_song= md("**Artist - Song - Play Count**"))
 
 ```
@@ -88,8 +94,10 @@ claylists %>%
 claylists %>% 
   group_by(Artist) %>% 
   summarise(top_songs=n()) %>% 
-  arrange(desc(top_songs)) %>% top_n(40) %>% 
-  gt::gt() %>% cols_merge(vars(Artist,top_songs),pattern="{1} - {2}") %>% 
+  arrange(desc(top_songs)) %>% 
+  top_n(40,wt=top_songs) %>% 
+  gt::gt() %>% cols_merge(c(Artist,top_songs),
+                          pattern="{1} - {2}") %>% 
   cols_label(Artist= md("**Artist - Play Count**"))
 
 ```
