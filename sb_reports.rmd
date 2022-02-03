@@ -1,7 +1,7 @@
 ---
-title: "Playlist Summary for 'Wake and Bake' on WFMU"
+title: "Playlist Summary for 'Sophisticated Boom Boom' on WFMU"
 author: "Art Steinmetz"
-date: "December 2021"
+date: "January 2022"
 output:
   html_document:
     toc: yes
@@ -26,47 +26,52 @@ library(gt)
 
 load(file='data/playlists.rdata')
 ```
-# Top Songs By Month for Wake and Bake, Last 12 Months
+# Top Songs for Sophisticated Boom Boom, Last 12 Months
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-claylists <- playlists %>% filter(DJ=="WA") %>% mutate(artist_song = paste(ArtistToken,Title,sep=" - "))
+# not run because no song is played more than once
 
-write_csv(claylists,"claylists.csv")
-claylists <- ungroup(claylists)
-claylists <- claylists %>% 
+sblists <- playlists %>% filter(DJ=="CF") %>% 
+  mutate(artist_song = paste(ArtistToken,Title,sep=" - "))
+
+write_csv(sblists,"sblists.csv")
+sblists <- ungroup(sblists)
+sblists <- sblists %>% 
   # limit to whole months
   filter(AirDate<floor_date(Sys.Date(),unit="months")) %>% 
   mutate(year_month=as.yearmon(AirDate))
 
-claylists %>% 
+sblists %>% 
   #limit top songs to last 12 months
   filter(AirDate > Sys.Date()-365) %>% 
-  group_by(year_month,artist_song) %>% 
-  summarise(top_songs=n(),.groups="keep") %>%
-  group_by(year_month) %>% 
+  group_by(artist_song) %>% 
+  summarise(PlayCount=n(),.groups="keep") %>%
+#  group_by(year_month) %>% 
 #  top_n(10,top_songs) %>% 
-  slice_max(top_songs,n=8,with_ties = TRUE) %>% 
+  filter(PlayCount > 1) %>% 
+  arrange(desc(PlayCount)) %>% 
+#  slice_max(top_songs,n=20,with_ties = FALSE) %>% 
 gt::gt(groupname_col = "year_month") %>%
-cols_merge(vars(artist_song,top_songs),pattern="{1} - {2}") %>%
+cols_merge(vars(artist_song,PlayCount),pattern="{1} - {2}") %>%
 cols_label(artist_song= md("**Artist - Song - Play Count**")) %>%
- tab_style(style = list(cell_text(weight = "bold",
-                                  size = "large",style="italic")),
-           locations = cells_row_groups()) %>%
+tab_style(style = list(cell_text(weight = "bold",
+                                 size = "large",style="italic")),
+          locations = cells_row_groups()) %>%
   {.}
   
-
 ```
 \newpage
-# Top Artists By Month for Wake and Bake, Last 12 Months
+# Top Artists for Sophisticated Boom Boom, Last 12 Months
 ```{r echo=FALSE, message=FALSE}
-claylists %>%
+sblists %>%
   #limit top songs to last 12 months
   filter(AirDate > Sys.Date()-365) %>% 
-  group_by(year_month,Artist) %>% 
+  group_by(Artist) %>% 
   summarise(top_artists=n(),.groups="keep") %>% 
-  group_by(year_month) %>% 
-  top_n(10,wt=top_artists) %>% 
-  gt::gt(groupname_col = "year_month") %>% cols_merge(c(Artist,top_artists),pattern="{1} - {2}") %>%
+  ungroup() %>% 
+  slice_max(top_artists,n=10,with_ties = T) %>% 
+  gt::gt(groupname_col = "year_month") %>%
+  cols_merge(c(Artist,top_artists),pattern="{1} - {2}") %>%
   cols_label(Artist= md("**Artist - Play Count**")) %>% 
   tab_style(style = list(cell_text(weight = "bold",size = "large",style="italic")),
             locations = cells_row_groups()) %>% 
@@ -74,10 +79,10 @@ claylists %>%
 
 ```
 \newpage
-# Top 40 Songs of All Time for Wake and Bake
+# Top 40 Songs of All Time for Sophisticated Boom Boom
 
 ```{r echo=FALSE, message=FALSE}
-claylists %>% 
+sblists %>% 
   group_by(artist_song) %>% 
   summarise(top_songs=n()) %>% 
   arrange(desc(top_songs)) %>% 
@@ -89,10 +94,10 @@ claylists %>%
 ```
 
 \newpage
-# Top 40 Artists of All Time for Wake and Bake
+# Top 40 Artists of All Time for Sophisticated Boom Boom
 
 ```{r echo=FALSE, message=FALSE}
-claylists %>% 
+sblists %>% 
   group_by(Artist) %>% 
   summarise(top_songs=n()) %>% 
   arrange(desc(top_songs)) %>% 
