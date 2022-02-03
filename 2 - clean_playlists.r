@@ -261,8 +261,12 @@ playlists<-playlists %>%
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"[^A-Z^a-z^ ^0-9]","")
 #and leading "the"
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^The ","")
-# strip leading/trailing whitespace
-playlists <- playlists %>% mutate_if(is.character,str_squish)
+
+# strip leading/trailing whitespace and unicode that LaTex balks at
+playlists <- playlists %>% 
+  mutate_if(is.character,str_remove_all,"[\u236-\u400E]") %>% 
+  mutate_if(is.character,str_squish)
+
 save(playlists,file = "data/playlists.rdata")
 #write_csv(playlists,path="playlists.csv")
 
