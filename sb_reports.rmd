@@ -1,13 +1,13 @@
 ---
 title: "Playlist Summary for 'Sophisticated Boom Boom' on WFMU"
-author: "Art Steinmetz"
+author: "by Art Steinmetz"
 date: "January 2022"
 output:
+  pdf_document:
+    toc: yes
   html_document:
     toc: yes
     df_print: paged
-  pdf_document:
-    toc: yes
 ---
 
 ```{r setup, include=FALSE}
