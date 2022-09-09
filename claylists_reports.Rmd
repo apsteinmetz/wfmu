@@ -1,13 +1,13 @@
 ---
 title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
-date: "December 2021"
+date: "June 2022"
 output:
+  pdf_document:
+    toc: yes
   html_document:
     toc: yes
     df_print: paged
-  pdf_document:
-    toc: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -45,7 +45,8 @@ claylists %>%
   summarise(top_songs=n(),.groups="keep") %>%
   group_by(year_month) %>% 
 #  top_n(10,top_songs) %>% 
-  slice_max(top_songs,n=8,with_ties = TRUE) %>% 
+  slice_max(top_songs,n=8,with_ties = TRUE) %>%
+  arrange(desc(year_month)) %>% 
 gt::gt(groupname_col = "year_month") %>%
 cols_merge(vars(artist_song,top_songs),pattern="{1} - {2}") %>%
 cols_label(artist_song= md("**Artist - Song - Play Count**")) %>%
@@ -66,6 +67,7 @@ claylists %>%
   summarise(top_artists=n(),.groups="keep") %>% 
   group_by(year_month) %>% 
   top_n(10,wt=top_artists) %>% 
+  arrange(desc(year_month)) %>% 
   gt::gt(groupname_col = "year_month") %>% cols_merge(c(Artist,top_artists),pattern="{1} - {2}") %>%
   cols_label(Artist= md("**Artist - Play Count**")) %>% 
   tab_style(style = list(cell_text(weight = "bold",size = "large",style="italic")),
