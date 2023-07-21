@@ -1,0 +1,86 @@
+---
+title: "ai dj similarity"
+author: "art steinmetz"
+format: html
+editor: visual
+---
+## produced by chatgpt
+
+As of my last update in September 2021, OpenAI does not provide a dedicated API for calculating pairwise similarity directly. However, you can achieve this using a combination of OpenAI's text-based API and some R code. We'll use the `openai` R package to interact with the OpenAI API.
+
+To compute the pairwise similarity between DJs based on their artists and songs, we'll use a transformer-based language model (such as GPT-3) to encode the text data and then calculate the cosine similarity between their embeddings.
+
+Here's how you can do it step-by-step:
+```{r}
+# Install required packages if not already installed
+install.packages(c("openai", "textembed"))
+
+# Load required libraries
+library(openai)
+library(textembed)
+
+# Authenticate with OpenAI. Replace "YOUR_API_KEY" with your actual API key.
+openai::openai_auth(api_key = "YOUR_API_KEY")
+
+# Sample data frame with DJs, artists, and songs
+data <- data.frame(
+  DJ = c("DJ1", "DJ1", "DJ2", "DJ2", "DJ3", "DJ3"),
+  Artist = c("Artist1", "Artist2", "Artist3", "Artist4", "Artist5", "Artist6"),
+  Song = c("Song1", "Song2", "Song3", "Song4", "Song5", "Song6")
+)
+
+# Function to get text embeddings for each DJ's artists and songs
+get_text_embeddings <- function(dj_data) {
+  max_token_limit <- 4096
+  unique_djs <- unique(dj_data$DJ)
+  dj_embeddings <- list()
+
+  for (dj in unique_djs) {
+    dj_subset <- dj_data[dj_data$DJ == dj, ]
+    text <- paste(dj_subset$Artist, dj_subset$Song, sep = " - ")
+    
+    # Check if the text exceeds the token limit
+    if (textembed::text_tokens(text) > max_token_limit) {
+      # Split the text into smaller chunks to comply with token limit
+      chunks <- textembed::split_text(text, max_token_limit)
+      embeddings <- list()
+      for (chunk in chunks) {
+        embeddings <- c(embeddings, textembed::embed(chunk, model = "openai/gpt-3.5-turbo"))
+      }
+      dj_embeddings[[dj]] <- textembed::combine_textembed(embeddings)
+    } else {
+      # Use the original text if it fits within the token limit
+      embeddings <- textembed::embed(text, model = "openai/gpt-3.5-turbo")
+      dj_embeddings[[dj]] <- embeddings
+    }
+  }
+
+  return(dj_embeddings)
+}
+
+# Calculate pairwise cosine similarity between DJs based on text embeddings
+calculate_similarity <- function(embeddings) {
+  similar_djs <- unique(names(embeddings))
+  similarities <- matrix(0, nrow = length(similar_djs), ncol = length(similar_djs))
+
+  for (i in 1:length(similar_djs)) {
+    for (j in 1:length(similar_djs)) {
+      dj1 <- similar_djs[i]
+      dj2 <- similar_djs[j]
+      similarities[i, j] <- textembed::cosine_similarity(embeddings[[dj1]], embeddings[[dj2]])
+    }
+  }
+
+  colnames(similarities) <- similar_djs
+  rownames(similarities) <- similar_djs
+  return(similarities)
+}
+
+# Get the DJ embeddings and calculate the similarity matrix
+embeddings <- get_text_embeddings(data)
+similarities <- calculate_similarity(embeddings)
+
+# Print the similarity matrix
+print(similarities)
+
+```

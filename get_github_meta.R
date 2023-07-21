@@ -1,4 +1,3 @@
-# chatGPT code to get metadata for a github repo file
 library(dplyr)
 library(curl)
 library(jsonlite)
@@ -13,7 +12,7 @@ get_github_file_date <- function(owner='apsteinmetz', repo='wfmu', filepath='REA
 }
 
 
-refresh_parquet_data <- function(filepath){
+refresh_data <- function(filepath){
   # download from github if data in the cloud is new than local copy
   local_date <- pull(fs::file_info(filepath),modification_time)
   local_date <- ifelse (is.na(local_date),0,local_date)
@@ -24,11 +23,11 @@ refresh_parquet_data <- function(filepath){
                   mode = "wb",
                   destfile = filepath)
   } else print(paste0(filepath," :Local file is up to date."))
-  # otherwise load local copy
-  playlists <- arrow::read_parquet(file=filepath,as_data_frame = FALSE)
-  
 }
 
 filepath <- "data/playlists.parquet"
-refresh_parquet_data(filepath)
+filepath <- "data/djSimilarity.parquet"
+filepath <- "data/DJKey.parquet"
+filepath <- "data/djSimilarity.RData"
+refresh_data(filepath)
 
