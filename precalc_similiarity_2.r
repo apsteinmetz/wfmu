@@ -4,31 +4,41 @@
 library(tm)
 library(tidyverse)
 library(lubridate)
+library(word2vec)
 library(vegan) #similarity measures
+
 load("data/playlists.rdata")
 
 #Analyze similarity 
 #-------------------------------------------------------------  
-#combineAllArtists
+# create embeddings
+embed <- playlists |> select(ArtistToken,Title) |> 
+  unique() |> 
+  rownames_to_column(var = "song_id")
+
 playlists <- playlists |> 
-  mutate(ArtistSong = paste(ArtistToken,Title))
-concat_artists<- tibble()
+  left_join(embed)
 #make sure there aren't extra levels
 playlists$DJ<-factor(playlists$DJ,as.character(unique(playlists$DJ)))
 
+playlists_concat<- tibble()
 for (dj in levels(playlists$DJ)){
   print(dj)
   #put all words in string for each DJ
-  concat_artists<-bind_rows(concat_artists,
+  playlists_concat<-bind_rows(playlists_concat,
                             tibble(
                               DJ=dj,
-                              ArtistSongs= playlists%>%
+                              song_ids = playlists%>%
                                 filter(DJ==dj)%>%
-                                pull(ArtistSong)%>% 
-                                paste(collapse=" ")%>%
-                                str_replace_all("[^A-Za-z ]","")%>%as.character()
+                                pull(song_id)%>% 
+                                paste(collapse=" ")
                             ))
 }
+
+
+model <- playlists_concat$song_ids[1:5] |> word2vec()
+
+
 #artists should not have factor levels
 #concat_artists$Artists<-as.character(concat_artists$Artists)
 concat_artists<-filter(concat_artists,Artists!="") %>% distinct()
