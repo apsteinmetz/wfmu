@@ -1,44 +1,81 @@
-#update doc term matrix and dj similarity table for saving to server
+# this was a failed experiment.  word2vec did not do better
+# than a document term matrix using artist only
+# using artist and song was too small a set of commonality
+# use embeddings and word2vec to get similarity measures
 # use both song and artist
-
-library(tm)
 library(tidyverse)
-library(lubridate)
 library(word2vec)
-library(vegan) #similarity measures
+library(doc2vec)
 
 load("data/playlists.rdata")
 
 #Analyze similarity 
 #-------------------------------------------------------------  
 # create embeddings
-embed <- playlists |> select(ArtistToken,Title) |> 
-  unique() |> 
-  rownames_to_column(var = "song_id")
+# embed <- playlists |> select(ArtistToken) |> 
+#   # embed <- playlists |> select(ArtistToken,Title) |> 
+#   unique() |> 
+#   rownames_to_column(var = "token_id")
+# 
+# playlists <- playlists |> 
+#   left_join(embed)
 
-playlists <- playlists |> 
-  left_join(embed)
+playlists <- playlists |>
+  mutate(token_id = str_replace_all(ArtistToken,
+                                    " ", "_")) |>
+  filter(token_id != "")
+
 #make sure there aren't extra levels
 playlists$DJ<-factor(playlists$DJ,as.character(unique(playlists$DJ)))
+# take top 999 songs for each DJ. Limitation of doc2vec
 
-playlists_concat<- tibble()
-for (dj in levels(playlists$DJ)){
+
+
+tokens_to_keep <- playlists |> 
+  select(DJ,token_id) |> 
+  group_by(DJ,token_id) |> 
+  count(token_id) |> 
+  filter(n > 2)
+  
+tokens_by_freq <- 
+  tokens_to_keep |> 
+  left_join(playlists,by = c("DJ","token_id")) |> 
+  group_by(DJ) |> 
+  #  sample with replacement to fill DJs with less than 
+  # 1000 songs played at least twice
+  slice_sample(n = 999,replace = TRUE) |> 
+  select(DJ,token_id)
+
+  
+db <- tibble()
+for (dj in levels(tokens_by_freq$DJ)) {
   print(dj)
   #put all words in string for each DJ
-  playlists_concat<-bind_rows(playlists_concat,
-                            tibble(
-                              DJ=dj,
-                              song_ids = playlists%>%
-                                filter(DJ==dj)%>%
-                                pull(song_id)%>% 
-                                paste(collapse=" ")
-                            ))
+  db <- bind_rows(db,
+                  tibble(
+                    doc_id = dj,
+                    text = tokens_by_freq %>%
+                      filter(DJ == dj) %>%
+                      pull(token_id) %>%
+                      paste(collapse = " ")
+                  ))
 }
 
+model <- paragraph2vec(db,dim = 150,min_count = 2)
 
-model <- playlists_concat$song_ids[1:5] |> word2vec()
+similar = predict(model,newdata = "CF",
+                  type = "nearest",
+                  which = "doc2doc",
+                  top_n = 20)
 
 
+
+
+similar |>  
+  bind_rows() |> 
+  rename(DJ = term2) |> 
+  left_join(DJKey) |> 
+  select(1:5)
 #artists should not have factor levels
 #concat_artists$Artists<-as.character(concat_artists$Artists)
 concat_artists<-filter(concat_artists,Artists!="") %>% distinct()
