@@ -2,6 +2,10 @@ library(tidyverse)
 library(ineq) #inequality measures
 library(xts)
 
+# try the collapse package
+library(collapse)
+set_collapse(mask = NULL)
+
 #clean up raw playlists
 
 load("data/playlists_raw.rdata")
@@ -132,7 +136,7 @@ playlists <- playlists %>%
   distinct() %>% #why would there be dupes?  Don't know, but there are
   group_by(DJ) 
 
-playlists <- playlists %>% mutate_if(is.character,str_squish)
+playlists <- playlists %>% mutate(across(where(is.character),str_squish))
 playlists_full<-playlists
 
 
@@ -166,11 +170,17 @@ return (playlist)
 
 songs_to_strip <- strip_songs(playlists)
 print(songs_to_strip)
-playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
+playlists<- playlists |> 
+  ungroup() |> 
+  filter(!(artist_song %in% songs_to_strip)) |> 
+  group_by(DJ,AirDate)
 # a few DJs play TWO signature songs to open the show.  Get rid of the second one by doing it again
 songs_to_strip <- strip_songs(playlists)
 print(songs_to_strip)
-playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
+playlists<- playlists %>% 
+  ungroup() |> 
+  filter(!(artist_song %in% songs_to_strip)) |> 
+  group_by(DJ,AirDate)
 
 #now strip closing songs
 songs_to_strip<-playlists %>%
@@ -181,7 +191,11 @@ songs_to_strip<-playlists %>%
   filter(FirstPlayCount>STRIP_THRESHOLD) %>%
   pull(FirstSong)
 print(songs_to_strip)
-playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
+playlists<- playlists %>% 
+  ungroup() |> 
+  filter(!(artist_song %in% songs_to_strip)) |> 
+  group_by(DJ,AirDate)
+
 
 #Songs where only one DJ plays it - over and over even though it might not be a signature song
 #distort the analysis.  I use the Gini coefficent (used for measuring income inequality) to
@@ -229,7 +243,10 @@ for (n in 1:200){
 print("Stripping")
 print(songs_to_strip)
 
-playlists<- playlists %>% filter(!(artist_song %in% songs_to_strip))
+playlists<- playlists %>% 
+  ungroup() |> 
+  filter(!(artist_song %in% songs_to_strip)) |> 
+  group_by(DJ,AirDate)
 
 # save the results
 playlists<-playlists %>% select(-artist_song) # remove before saving. much smaller file
@@ -237,7 +254,12 @@ playlists<-playlists %>% select(-artist_song) # remove before saving. much small
 save(playlists,file = "data/playlists.rdata")
 
 #get a better show count tally
-show_count<-playlists %>% group_by(DJ,AirDate) %>% summarise()%>% summarise(showCount=n())
+show_count<-playlists %>% 
+  ungroup() |> 
+  distinct(DJ, AirDate) %>% 
+  group_by(DJ) |> 
+  summarise(showCount=n())
+
 DJKey<-DJKey %>% select(-showCount) %>% left_join(show_count) %>% distinct()
 save(DJKey,file = "data/DJKey.rdata")
 
@@ -248,7 +270,8 @@ playlists<-playlists %>%
   select(ArtistToken,Artist) %>% 
   group_by(ArtistToken,Artist) %>% 
   summarise(n=n()) %>% 
-  top_n(1) %>% rename(base_artist=Artist) %>% 
+  top_n(1) %>% 
+  rename(base_artist=Artist) %>% 
   right_join(playlists,by='ArtistToken') %>%
   ungroup() %>% 
   select(-ArtistToken,-n) %>% 
