@@ -237,6 +237,14 @@ maxWords = 200
 ```
 What's with NRBQ?  How many DJ's play them in any given quarter?  Not many, it seems.
 ```{r}
+
+# polars function to simulate yrqtr type
+pl_to_yrqtr <- function(x){
+  q <- x$dt$quarter()$cast(pl$String)
+  y <- x$dt$year()$cast(pl$String)
+  pl$concat_str(y,q,separator = "Q")
+}
+
 artist_token='Nrbq'
 cutoff_date=as.Date("2007-01-01")
 
@@ -244,17 +252,20 @@ dj_count<-playlists %>%
   ungroup() %>% 
   filter(ArtistToken==artist_token) %>% 
    filter(AirDate > cutoff_date) %>% 
-  # mutate(AirDate=as.yearqtr(AirDate))  %>% 
-  mutate(AirDate= (month(AirDate)-1) mod 3)  %>% 
-  group_by(DJ,AirDate) %>% 
+  mutate(yrqtr = pl_to_yrqtr(AirDate))  %>% 
+  group_by(DJ,yrqtr) %>% 
   summarise(Spins=n()) %>% 
-  arrange(AirDate) %>% 
-  group_by(AirDate) %>% 
-  summarise(DJCount=n())
+  group_by(yrqtr) %>% 
+  summarise(DJCount=n()) |> 
+  arrange(yrqtr) |> 
+  as_tibble()
 
-gg<-dj_count %>% ggplot(aes(x=AirDate,y=DJCount))+geom_col()
+
+  
+  
+gg<-dj_count %>% ggplot(aes(x=yrqtr,y=DJCount))+geom_col()
 gg<-gg+labs(title=paste("How many DJs Spin",artist_token,"every Quarter?"))
-gg<-gg+scale_x_continuous()
+# gg<-gg+scale_x_continuous()
 gg
 ```
 So maybe certain DJs account for most of the plays?
