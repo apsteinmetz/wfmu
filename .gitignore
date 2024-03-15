@@ -30,3 +30,7 @@ cb_2016_us_county_500k.zip
 claylists_reports.log
 claylists_reports.docx
 claylists_reports.pdf
+.Rdata
+.httr-oauth
+.DS_Store
+.quarto
