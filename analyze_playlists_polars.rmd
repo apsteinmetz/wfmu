@@ -1,0 +1,932 @@
+---
+title: "My Science Project: A Statistical Examination of 33 Years of Playlists WFMU.org."
+output: 
+  html_notebook: 
+    code_folding: hide
+author: Arthur Steinmetz
+---
+ 
+
+```{r, message=FALSE, warning=FALSE}
+
+
+#library(devtools)
+# library(stringr)
+# library(tm)
+library(tidyverse)
+library(lubridate)
+# library(broom)
+# library(ggrepel)
+# library(ggplot2)
+# library(ggfortify)
+# library(cowplot)
+# library(xts)
+library("wordcloud")
+# library("RColorBrewer")
+# #library("SnowballC")
+# library(igraph)
+# library(cluster)
+# # library(reshape2)
+# library(vegan) #similarity measures
+# library(Matrix)
+# library(knitr)
+# library(circlize)
+# library(RColorBrewer)
+library(polars)
+library(tidypolars)
+library(gt)
+
+
+#read parquet file with polars
+playlists <- polars::pl$read_parquet("data/playlists.parquet")
+
+DJKey <- polars::pl$read_parquet('data/DJKey.parquet')
+
+```
+Free form radio, WFMU.ORG, maintains a huge trove of past playlists from many DJ's radio shows.  More recently, web-only programming has been added to this.  This dataset offers lots of opportunities for analysis.  I scraped all the playlists I could from the web site and started asking questions.
+
+The scraping and data-cleaning process was the most time consuming part of the exercise. Playlist tables are not in a consistent format and my HTML skills are rudimentary.  Further, the DJ's are inconsistent in how they enter artist names.  There are 12 different ways Andy Breckman can misspell "Bruce Springsteen"  I take a stab at fixing some of the glaring errors. Additionally, many artist names are variant due to collaborators with "featuring," "and the," "with," etc in the name.  I condense the first two words of every artist name into a token and drop the rest. In a very few cases the air date is clearly wrong. I strip those shows out.
+
+There is a final step which is really a judgement call.  Many DJs have signature songs to open and/or close their shows.  Including these skews the play count for songs.  I have chosen to strip those out, or try to.  Songs where one DJ accounts for just about all the plays are stripped out as well.  Should they count anyway?  In the cleaning step I created playlist files with and without lopsided songs stripped out. The analysis below uses the more pared down list.
+
+The end result is an reasonably accurate but incomplete record of all the playlists available at WFMU.ORG as of July 2017.  The code used for scraping and cleaning is not included here but is available at https://github.com/apsteinmetz/wfmu, as is the cleaned playlist file in R data and csv format.
+
+I ask questions about the data below.  I take a meandering path and there is no real narrative here, just questions I thought were interesting.
+
+In the future, I plan to make an interactive tool to query the data set.
+
+Thanks to station manager, Ken Freedman, for giving me permission to scrape the site.
+
+So what do we have?
+
+```{r}
+year_count<-playlists %>% 
+  ungroup() %>% 
+  mutate(Year_count=year(AirDate)) %>% 
+  select(Year_count) %>%
+  distinct() %>% 
+  nrow()
+
+dj_count<-playlists %>% 
+  group_by(DJ) %>% 
+  summarise(DJs=n()) %>% 
+  nrow #DJs
+
+show_count<-playlists %>% 
+  group_by(DJ,AirDate) %>% 
+  summarise(Shows=n()) %>% 
+  nrow()
+
+#Artists
+artist_count<-playlists %>% 
+  ungroup() %>% 
+  select(ArtistToken) %>% 
+  distinct() %>% 
+  nrow()
+
+#songs
+song_count <-
+  playlists %>% 
+  ungroup() %>% 
+  select(ArtistToken, Title) %>% 
+  distinct() %>% 
+  nrow()
+
+spins_count<-nrow(playlists) # spins
+
+the_numbers<-tibble(
+           Count=c(year_count,dj_count,show_count,artist_count,song_count,spins_count),
+           Stat=c("Years","DJs","Shows","Artists","Songs","Spins"))
+
+the_numbers %>% gt() |> 
+  tab_header(title="WFMU Archives by the Numbers") %>%
+  fmt_number(
+    columns = everything(),
+    decimals = 0,
+    sep_mark=",")
+
+```
+
+```{r}
+cur_year <- year(Sys.Date())
+
+#playlists_raw by year
+playlists %>% 
+  ungroup() %>% 
+  mutate(Year=year(AirDate))  %>% 
+  group_by(Year) %>% 
+  summarise(SongCount=n()) %>% 
+  arrange(Year) %>% 
+  filter(Year > 1979) %>% 
+  filter(Year < cur_year) %>% 
+  as_tibble() |> 
+  ggplot(aes(x=Year,y=SongCount))+geom_col()+labs(title="Songs Streamed or Aired on WFMU in a Year",x="Airdate")
+
+
+
+```
+```{r}
+
+#playlists_raw by year
+playlists %>% 
+  ungroup() %>% 
+  mutate(Year=year(AirDate))  %>% 
+  select(DJ,AirDate,Year) %>% 
+  distinct() %>% 
+  group_by(Year) %>% 
+  summarise(ShowCount=n()) %>% 
+  arrange(Year) %>% 
+  filter(Year > 1979) %>% 
+  as_tibble() |>
+  ggplot(aes(x=Year,y=ShowCount))+geom_col()+labs(title="Shows Archived at WFMU.ORG by Airdate",x="Airdate")
+
+
+
+```
+#Popular WFMU artists
+Who are the most popular artists?  One way to think about it is how widely played an artist is, regardless of how often they are played.  Has every DJ played them at least once?
+```{r}
+top_artists<-playlists %>%
+  ungroup() %>% 
+  select(DJ,ArtistToken) %>% 
+  distinct() %>%
+  group_by(ArtistToken) %>% 
+  summarise(play_count=n()) %>% 
+  filter(!(ArtistToken %in% c("","Unknown"))) %>%
+  arrange(desc(play_count))
+
+top_artists[1:10,] |> gt()
+```
+96 out of 150 DJ's have played David Bowie at least once.  Can is a venerable industrial Krautrock act that is the second most widely played artist.  Wild!
+
+Let's make a word cloud to visualize this.  I love word clouds!  
+```{r}
+#-------------------------------------------------------------------------------------
+# We love wordclouds!
+#scalefactor magnifies differences for wordcloud
+#use filters to select on or off schedule and constrain show airdate range
+scaleFactor=8
+maxWords = 200
+top_artists |> as_tibble() |> 
+  with(wordcloud(words = ArtistToken, 
+          freq = play_count^scaleFactor,
+          max.words=maxWords, 
+          random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),
+          scale = c(3,.3)))
+
+```
+The above analysis ignores how often an artist is played.  Now let's take that into account. What artists get the most spins?
+
+```{r, message=FALSE, warning=FALSE}
+
+#-------------------------------------------------------------------------------------
+# We love wordclouds!
+#scalefactor magnifies differences for wordcloud
+#use filters to select on or off schedule and constrain show airdate range
+scaleFactor=2
+maxWords = 200
+  #most popular artists
+  top_artists<-DJKey %>% 
+    #filter(onSched=='YES') %>% #on Sched or off?
+    left_join(playlists)%>%
+    group_by(ArtistToken)%>%
+    #filter(AirDate<Sys.Date()-(365*5)) %>%  #date range?
+    summarize(play_count=n())%>%
+    arrange(desc(play_count))%>%
+    as_tibble() |> 
+    with(wordcloud(words = ArtistToken, 
+          freq = play_count^scaleFactor,
+          max.words=maxWords, 
+          random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),
+          scale = c(3,.3)))
+
+```
+Beach Boys!  I never would have guessed.  They are along way from Can!
+
+We've gone back into ancient history but let's look at the recent past. Let's confine ourselves to the last five years using only DJ's who are on the current schedule. Who are the most popular artists among the current on-air DJs?
+```{r, message=FALSE, warning=FALSE}
+
+#-------------------------------------------------------------------------------------
+# We love wordclouds!
+#scalefactor magnifies differences for wordcloud
+#use filters to select on or off schedule and constrain show airdate range
+scaleFactor=1.3
+maxWords = 200
+cutoff_date <- Sys.Date()-(365*5) # 5 years
+
+scaleFactor=2
+maxWords = 200
+  #most popular artists
+  top_artists<-DJKey %>% 
+    #filter(onSched=='YES') %>% #on Sched or off?
+    left_join(playlists)%>%
+    group_by(ArtistToken)%>%
+    filter(AirDate > cutoff_date) %>%  #date range?
+    summarize(play_count=n())%>%
+    arrange(desc(play_count))%>%
+    as_tibble() |> 
+    with(wordcloud(words = ArtistToken, 
+          freq = play_count^scaleFactor,
+          max.words=maxWords, 
+          random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),
+          scale = c(3,.3)))
+
+```
+What's with NRBQ?  How many DJ's play them in any given quarter?  Not many, it seems.
+```{r}
+artist_token='Nrbq'
+cutoff_date=as.Date("2007-01-01")
+
+dj_count<-playlists %>% 
+  ungroup() %>% 
+  filter(ArtistToken==artist_token) %>% 
+   filter(AirDate > cutoff_date) %>% 
+  # mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  mutate(AirDate= (month(AirDate)-1) mod 3)  %>% 
+  group_by(DJ,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate) %>% 
+  group_by(AirDate) %>% 
+  summarise(DJCount=n())
+
+gg<-dj_count %>% ggplot(aes(x=AirDate,y=DJCount))+geom_col()
+gg<-gg+labs(title=paste("How many DJs Spin",artist_token,"every Quarter?"))
+gg<-gg+scale_x_continuous()
+gg
+```
+So maybe certain DJs account for most of the plays?
+```{r, message=FALSE, warning=FALSE}
+artist_token<-'Nrbq'
+play_count_by_DJ<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  mutate(DJ=as.character(DJ)) %>% 
+  filter(ArtistToken==artist_token) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(DJ,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate)
+
+threshold <-5
+pc1<- play_count_by_DJ %>% 
+  filter(Spins>=threshold)
+
+#lump together all DJ's who played the artist less than 'threshold' times
+pc2<- play_count_by_DJ %>% 
+  filter(Spins<threshold) %>% 
+  group_by(AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  mutate(ShowName='AllOther')
+
+play_count_by_DJ<-pc1 %>% 
+  left_join(DJKey) %>% 
+  bind_rows(pc2) %>% 
+  select(AirDate,ShowName,Spins)
+
+gg<-play_count_by_DJ %>% ggplot(aes(x=AirDate,y=Spins,fill=ShowName))+geom_col()
+gg<-gg+labs(title=paste("Who accounts for the most\n" ,artist_token,"\nplays every quarter?",sep=' '))
+gg<-gg+scale_x_continuous()
+gg
+```
+Bob Brainen is the NRBQ show. Contrast that to The Beach Boys, where interest is more spread around.
+```{r, message=FALSE, warning=FALSE}
+artist_token<-'BeachBoys'
+
+play_count_by_DJ<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  mutate(DJ=as.character(DJ)) %>% 
+  filter(ArtistToken==artist_token) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(DJ,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate)
+
+threshold <-5
+pc1<- play_count_by_DJ %>% 
+  filter(Spins>=threshold)
+
+#lump together all DJ's who played the artist less than 'threshold' times
+pc2<- play_count_by_DJ %>% 
+  filter(Spins<threshold) %>% 
+  group_by(AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  mutate(ShowName='AllOther')
+
+play_count_by_DJ<-pc1 %>% 
+  left_join(DJKey) %>% 
+  bind_rows(pc2) %>% 
+  select(AirDate,ShowName,Spins)
+
+gg<-play_count_by_DJ %>% ggplot(aes(x=AirDate,y=Spins,fill=ShowName))+geom_col()
+gg<-gg+labs(title=paste("Who accounts for the most\n",artist_token,"\nplays every quarter?"))
+gg<-gg+scale_x_continuous()
+gg
+```
+#Most played songs.
+What are the most played songs ever on WFMU? Remember, I am using a data set with opening, closing and single-DJ-played songs stripped out.
+
+```{r}
+
+#combined artist and title
+playlists_songs<-playlists %>% 
+  ungroup() %>% 
+  transmute(DJ=as.character(DJ),AirDate=year(AirDate),Song=paste(ArtistToken,Title))
+
+count_by_song<-playlists_songs %>%
+  group_by(Song,AirDate) %>% 
+  summarise(Song_Count=n()) %>% 
+  arrange(desc(Song_Count))
+
+count_by_song %>% 
+  summarise(count=n()) %>% 
+  arrange(desc(count)) %>% 
+  top_n(100)
+```
+
+Here are WFMU's biggest hits by year! Looks like the Vivian Girls were the breakout band of 2008 with two songs in the top ten. Nice.
+
+Warning:  A single DJ can greatly skew the results.  I tried to strip out songs with high play counts where only one DJ was responsible. Not a perfect process.  Once that was done, it only took about 10 plays to make the list.  WFMU is a very diverse station!  I once asked the music director of WDUB, my college station, why The Buggles were on the hot new artist list when I was the only one who played them....Oh.
+
+```{r, message=FALSE, warning=FALSE}
+
+top_10_long<-count_by_song %>%
+  group_by(AirDate) %>%
+  filter(AirDate>2001) %>% 
+  arrange(AirDate,desc(Song_Count))
+
+top_10<-NULL
+years_top_10 <-unique(top_10_long$AirDate)
+for (n in years_top_10){
+  ten<-filter(top_10_long,AirDate==n) %>%
+    pull(Song) %>% .[1:10] %>% as_tibble()
+  top_10<-bind_cols(top_10,ten)
+}
+names(top_10)<-years_top_10
+kable(top_10)
+```
+#Ancient History
+
+Above, I don't show years prior to 2002 because the number of DJ's who have playlists for airdates before 2002 is very small.
+```{r}
+dj_count<-playlists %>% 
+  ungroup() %>% 
+  mutate(AirDate=year(AirDate))  %>% 
+  group_by(AirDate,DJ) %>% 
+  summarise(Spins=n()) %>% 
+  summarise(DJs=n()) %>% 
+  filter(AirDate<2002)
+  
+
+gg<-dj_count %>% ggplot(aes(x=AirDate,y=DJs))+geom_col()
+gg<-gg+labs(title=paste("How many DJs have Playlists earlier than 2002?"))
+gg<-gg+scale_x_continuous()
+gg
+
+```
+
+Diane "Kamikaze" Ferris is the only DJ with playlists from the 80s.  Yay, Diane! What a time capsule!  What were her most played artists back then?  More wordcloud!
+```{r}
+scaleFactor=2
+maxWords = 200
+
+DK<-playlists %>% 
+  filter(AirDate<as.Date("1990-01-01")) %>% 
+  group_by(ArtistToken) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(desc(Spins))
+  
+
+wordcloud(words = DK$ArtistToken, 
+          freq = DK$Spins^scaleFactor,
+          max.words=maxWords, 
+          random.order=FALSE,rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"),scale = c(3,.3))
+
+
+```
+Boy, that takes me back! You see the Canadian metal band, Voivod in that cloud?  They are also in the current show worldcloud above.  That's entirely due to Diane!
+
+```{r, message=FALSE, warning=FALSE}
+artist_token<-'Voivod'
+
+play_count_by_DJ<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  mutate(DJ=as.character(DJ)) %>% 
+  filter(ArtistToken==artist_token) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(DJ,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate)
+
+threshold <-2
+pc1<- play_count_by_DJ %>% 
+  filter(Spins>=threshold)
+
+#lump together all DJ's who played the artist less than 'threshold' times
+pc2<- play_count_by_DJ %>% 
+  filter(Spins<threshold) %>% 
+  group_by(AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  mutate(ShowName='AllOther')
+
+play_count_by_DJ<-pc1 %>% 
+  left_join(DJKey) %>% 
+  bind_rows(pc2) %>% 
+  select(AirDate,ShowName,Spins)
+
+gg<-play_count_by_DJ %>% ggplot(aes(x=AirDate,y=Spins,fill=ShowName))+geom_col()
+gg<-gg+labs(title=paste("Who accounts for the most\n",artist_token,"\nplays every quarter?"))
+gg<-gg+scale_x_continuous()
+gg
+
+```
+She may have kicked the habit again. She is still playing them more recently but if a DJ is responsible for less than 2 plays in a quarter I lump them in "AllOther."
+
+#Dead Artist Effect. 
+
+If there's a rock and roll heaven you can find out who's there by analyzing WFMU playlists.  Apparently, Amy Winehouse isn't in it.
+```{r}
+dead_artists=c('Bowie','Prince','AmyWinehouse','SharonJones','ChuckBerry','AllmanBrothers')
+
+dead_artist_plays<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  filter(ArtistToken %in% dead_artists) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate)
+gg<-dead_artist_plays %>% ggplot(aes(x=AirDate,y=Spins))
+gg<-gg+geom_col()+facet_wrap(~ArtistToken)
+gg<-gg+scale_x_continuous()+ggtitle("Dead Artist Effect")
+gg
+```
+Prince is the prince but Bowie is the king.  The deaths of Prince and Davie Bowie led to some continuing interest in the artist, while plays for Chuck Berry, Sharon Jones and the Allman brothers dropped back to their pre-death background levels.  Amy Winehouse barely registers, before or after. To make this more visible, zoom in by clipping the y-axis at 100. Now how does it look?
+```{r}
+#clip outliers
+dead_artist_plays[dead_artist_plays$Spins>100,]$Spins=100
+
+gg<-dead_artist_plays %>% ggplot(aes(x=AirDate,y=Spins))
+gg<-gg+geom_col()+facet_wrap(~ArtistToken)
+gg<-gg+scale_x_continuous()+ggtitle("Dead Artist Effect")
+gg
+
+
+```
+
+#Durability of popular artists
+
+How much stability to the most popular artists have in the rotation?
+
+```{r, message=FALSE, warning=FALSE}
+
+big_artists=top_artists$ArtistToken[1:6]
+
+artist_trends<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  filter(ArtistToken %in% big_artists) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate)
+
+#clip outliers
+artist_trends[artist_trends$Spins>100,]$Spins=100
+
+gg<-artist_trends %>% ggplot(aes(x=AirDate,y=Spins))+geom_col()
+gg<-gg+facet_wrap(~ArtistToken)
+gg<-gg+scale_x_continuous()+ylim(0,100)
+gg<-gg+labs(title="Durability of popular artists\nQuarterly Plays",caption="Outliers clipped to 100")
+gg
+
+```
+
+Who are the top trending (increasing rate of play) artists at WFMU over the last three years?
+
+```{r}
+cutoff_date<-Sys.Date()-(365*3)
+cutoff_artists<-500
+
+top_artists<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate>cutoff_date) %>%  #date range?
+  group_by(ArtistToken)%>%
+  summarize(play_count=n())%>%
+  arrange(desc(play_count)) %>%
+  .[1:cutoff_artists,] %>% 
+  pull(ArtistToken)
+
+# we use total_spins to normalize trends vs. overall growth in the number of spins in the database
+total_spins<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(AirDate) %>% 
+  summarise(all_spins=n()) %>% 
+  arrange(AirDate)
+
+
+#getting into the tidyverse over my head here.
+#building linear trend models on entire data frame
+#copying from https://blog.rstudio.com/2016/02/02/tidyr-0-4-0/ without
+#fully understanding
+trending_artists<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  filter(ArtistToken %in% top_artists) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  left_join(total_spins,by='AirDate') %>% #normalize trend by trend in overall growth in playlists
+  mutate(adj_spins=Spins/all_spins) %>% # normalize trend
+  arrange(AirDate) %>% 
+  group_by(ArtistToken) %>% 
+  nest() %>% 
+  #heavy stuff here
+  mutate(model = purrr::map(data, ~ lm(adj_spins ~ AirDate, data = .))) %>% 
+  unnest(model %>% purrr::map(broom::tidy)) %>% 
+  filter(term=="AirDate") %>% 
+  filter(statistic>2.0) %>% #only statistically significant trends
+  arrange(desc(estimate)) %>% 
+  .[1:12,] %>% #get top 12 strongest trends
+  na.omit() %>% 
+  pull(ArtistToken) #after all that, just a list of artists
+
+# now we have the artists where there
+# is a statistically significant trend in plays, ranked by trend strength.
+
+artist_trends<-playlists %>% 
+  ungroup() %>% 
+  filter(AirDate > cutoff_date) %>% 
+  filter(ArtistToken %in% trending_artists) %>% 
+  mutate(AirDate=as.yearqtr(AirDate))  %>% 
+  group_by(ArtistToken,AirDate) %>% 
+  summarise(Spins=n()) %>% 
+  arrange(AirDate)
+
+
+gg<-artist_trends %>% ggplot(aes(x=AirDate,y=Spins))+geom_col()
+gg<-gg+facet_wrap(~ArtistToken)
+gg<-gg+scale_x_continuous()+ylim(0,100)
+gg<-gg+labs(title="Trending Artists\nQuarterly Plays")
+gg
+
+```
+No newer artists?  Lots of new stuff gets played on WFMU but nothing percolates into the conciousness of many DJs at once, it seems.  So "trending" seems to be irrelevant.  BTW: "GuidedBy" is Guided By Voices. 
+
+Despite the perils of trying to pigeon hole the jocks, let's see if we can identify similar DJs.
+
+#Analyze similarity 
+
+I use some "big data" techniques here.  I join all the artists a DJ has played into a single "document" and create a "document term matrix."  Then I compute an index of similarity for each possible pair of DJs using the "Bray" algorithm.  Finally I use "K-means" to create clusters of similar DJs.  I chose four clusters in two "principal component" dimensions but this is arbitrary. Two dimensions is sufficient to explain nearly 50% of the artist variation among DJs.  
+
+```{r, warning=FALSE}
+#-------------------------------------------------------------  
+#combineAllArtists
+  concat_artists<- data_frame()
+  #make sure there aren't extra levels
+  playlists$DJ<-factor(playlists$DJ,as.character(unique(playlists$DJ)))
+  for (dj in levels(playlists$DJ)){
+    print(dj)
+    #put all words in string for each DJ
+    concat_artists<-bind_rows(concat_artists,
+                              data_frame(
+                                DJ=dj,
+                                Artists= playlists%>%
+                                  filter(DJ==dj)%>%
+                                  pull(ArtistToken)%>% 
+                                  paste(collapse=" ")%>%
+                                  str_replace_all("[^A-Za-z ]","")%>%as.character() ,
+                                onSched=DJKey%>%filter(DJ==dj)%>%pull(onSched)
+                        ))
+  }
+  #artists should not have factor levels
+  #concat_artists$Artists<-as.character(concat_artists$Artists)
+  concat_artists<-filter(concat_artists,Artists!="") %>% distinct()
+
+
+```
+
+```{r}
+djCorpus <- VCorpus(VectorSource(concat_artists$Artists))
+
+
+for (i in 1:length(djCorpus)) {
+  meta(djCorpus[[i]], tag="id") <- concat_artists$DJ[i]  
+  meta(djCorpus[[i]], tag="DJ") <- concat_artists$DJ[i]
+  meta(djCorpus[[i]], tag="onSched") <- (DJKey %>% 
+    filter(DJ==concat_artists[1,1] %>% 
+             pull()) %>% 
+    pull(onSched))
+}
+
+
+
+#sched_status=c("on","off","all")
+#status<-sched_status[1]
+#idx <- switch(mic,
+#              on = (meta(djCorpus, "onMic") == TRUE),
+#              off = (meta(djCorpus, "onMic") == FALSE),
+#              both = rep(TRUE,length(djCorpus))
+#              )
+
+
+#djtdm<-TermDocumentMatrix(djCorpus[idx])%>%removeSparseTerms(SPARSE)
+
+#OR if you have the memory to pre-create
+#make 3 Term Document Matrices where artist is in the column based on onmic status
+#get roughly top 400 artists when removeSparseTerms(0.80) used. top 8000 when 0.95 sparse is used
+SPARSE<- 0.95 #sparsity of term document matrices
+
+# djtdm_all<-TermDocumentMatrix(djCorpus) #%>%removeSparseTerms(SPARSE)
+# djtdm_on<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onSched") == TRUE])%>%removeSparseTerms(SPARSE)
+# djtdm_off<-TermDocumentMatrix(djCorpus[meta(djCorpus, "onSched") == FALSE])%>%removeSparseTerms(SPARSE)
+
+# now create Document Term Matrix where DJs are the column
+djdtm<-DocumentTermMatrix(djCorpus) %>%removeSparseTerms(SPARSE)
+save(djdtm,file="djdtm.RData")
+```
+
+```{r, warning=FALSE}
+#some functions used below
+#-----------------------------------------------------------
+songs_in_common<-function(Djs){
+  return(
+  playlists %>% 
+  filter(DJ %in% top_pc2_DJs) %>% 
+  group_by(DJ,ArtistToken) %>% 
+  summarise(n=n()) %>%
+  spread(DJ,n) %>% 
+  mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
+  mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
+  mutate(FaveIndex=sum_x-1.4*sd_x) %>% 
+  top_n(10) %>% 
+  select(-sum_x,-sd_x) %>% 
+  arrange(desc(FaveIndex))
+  )
+}
+#-----------------------------------------------------------
+
+dj_similarity<-djdtm %>%
+  as.matrix() %>% 
+  vegdist(method="bray") %>% 
+  as.matrix()
+
+#cluster plot of DJs
+set.seed(1)
+CLUSTERS=4
+  kdj<-kmeans(dj_similarity,CLUSTERS)
+  clust<-kdj$cluster
+  #djCluster<-cbind(DJ=names(clust),data.frame(cluster=clust))
+  
+  #if ("cluster" %in% names(DJKey)){
+  #  # then remove the cluster column
+  #  DJKey<-select(DJKey,-cluster)
+  #}
+  # now replace with new clustering
+  #DJKey<-inner_join(DJKey,djCluster)%>%arrange(cluster)
+  
+# traditional way.  I like ggplot2 better
+# clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
+    
+gg<-autoplot(kdj,data=dj_similarity,label=TRUE,frame=TRUE,frame.type='norm')
+gg<-gg+labs(title="DJ Similarity Clusters") 
+gg<-gg + theme_minimal()+theme(legend.position="none")
+gg
+```
+So you are not a data nerd, what does this mean?  We have some idea that DJs clustered together are somewhat similar, but how?  This is not a very interesting as cluster analyses go as the clusters are not well defined and have a lot of overlap.  It's a pretty evenly distributed cloud.  You really can't group the DJ's into types based on the artists they play.  The "PC" axes have no specific attribute, by design, but we can get some intuition around them by looking at the most common artists for DJs at the extremes of each component.
+```{r, message=FALSE, warning=FALSE}
+
+#function to create wordclound in ggplot framework to allow further annotation
+gg_wordcloud<-function(words_and_count){
+#hat tip:http://mhairihmcneill.com/blog/2016/04/05/wordclouds-in-ggplot.html
+gg<-words_and_count %>% 
+  ggplot(aes(x = 1, y = 1, size = count, label = word))+
+  geom_text_repel(segment.size = 0, force = 2) +
+  scale_size(range = c(2, 5), guide = FALSE) +
+  scale_y_continuous(breaks = NULL) +
+  scale_x_continuous(breaks = NULL) +
+  labs(x = '', y = '') +
+  theme_classic()
+return(gg)
+}
+#-----------------------------------------------------------
+#doesn't work
+gg_wordlist<-function(words_and_count){
+gg<-words_and_count %>% 
+  ggplot()+
+  annotate("text",label="some text")
+  theme_classic()
+return(gg)
+}
+
+#-----------------------------------------------------------
+top_count<-5
+pca<-prcomp(j) %>% tidy()
+top_pc1_DJs<-pca %>% filter(PC==1) %>% top_n(top_count) %>% pull(row) %>% as.character()
+bottom_pc1_DJs<-pca %>% filter(PC==1) %>% top_n(-top_count) %>% pull(row) %>% as.character()
+top_pc2_DJs<-pca %>% filter(PC==2) %>% top_n(top_count) %>% pull(row) %>% as.character()
+bottom_pc2_DJs<-pca %>% filter(PC==2) %>% top_n(-top_count) %>% pull(row) %>% as.character()
+
+artists_in_common<-function(DJs){
+  return(
+  playlists %>% 
+  filter(DJ %in% DJs) %>% 
+  group_by(DJ,ArtistToken) %>% 
+  summarise(n=n()) %>%
+  spread(DJ,n) %>% 
+  mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
+  mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
+  mutate(FaveIndex=sum_x-1.4*sd_x) %>% 
+  top_n(10) %>% 
+  select(-sum_x,-sd_x) %>% 
+  arrange(desc(FaveIndex))
+  )
+}
+
+quadrant_wc<-function(DJs,plot_quadrant=c("n","e","s","w")){
+  #quadrants in order are N,E,S,W
+  xy<-switch(plot_quadrant,
+         'n'=c(.4,.6),
+         's'=c(.4,.1),
+         'e'=c(.7,.4),
+         'w'=c(.1,.3))
+  artists<-artists_in_common(DJs) %>% 
+    rename(word=ArtistToken,count=FaveIndex)
+  gg<-gg_wordcloud(artists)
+  gg<-draw_plot(gg,xy[1],xy[2],width=0.2,height=0.35)
+  return (gg)
+  
+}
+
+#doesn't work
+quadrant_wl<-function(gg,DJs,plot_quadrant=c("n","e","s","w")){
+  #quadrants in order are N,E,S,W
+  xy<-switch(plot_quadrant,
+         'n'=c(0.0,.15),
+         's'=c(-.15,0.0),
+         'e'=c(.7,.4),
+         'w'=c(.1,.3))
+  artists<-artists_in_common(DJs) %>% 
+    rename(word=ArtistToken,count=FaveIndex)
+  gg<-gg+ggplot2::annotate("text",x=xy[1],y=xy[2],paste(songs$word,collapse = '\n'))
+  return (gg)
+  
+}
+gg<-autoplot(kdj,data=dj_similarity,label=FALSE,frame=TRUE,frame.type='norm')
+gg<-gg+labs(title="DJ Similarity Clusters") 
+gg<-gg + theme_minimal()+theme(legend.position="none")
+gg$layers[[1]]=NULL #this only works the first time invoked
+gg1<-quadrant_wc(top_pc1_DJs,'e')
+gg2<-quadrant_wc(top_pc2_DJs,'n')
+gg3<-quadrant_wc(bottom_pc2_DJs,'s')
+gg4<-quadrant_wc(bottom_pc1_DJs,'w')
+ggdraw()+gg1+gg2+gg3+gg4+draw_plot(gg)
+```
+
+Sometimes, when using principal components analysis, we can ascribe clear meanings to the dimensions.  In this case it's not so clear. This shows that the DJs are not very tied to certain genres.  Looking at the artists, we might say that higher values of PC2 are associated with old-school classic rock that tilts towards R&B.  The other end of the dimension is "not that."  PC1 is even harder to interpret.  I'd say lower values are associated with alternative rock but that is iffy.  PC1, whatever it is, is the stronger determinant.  It accounts for 20% of the variance among DJs, while PC2 accounts for 10%.
+```{r}
+prcomp(dj_similarity) %>% 
+  summary() %>%
+  .$importance %>% 
+  as.data.frame() %>% 
+#  as_tibble() %>% 
+  rownames_to_column(var='Stat') %>% 
+  select(Stat,PC1,PC2) %>% 
+  kable(digits=3)
+
+```
+Finally, let's look at similarities among specific DJ's. I listen religiously to Bill Kelly.  When I started this project, I was looking to anwser the question "what DJ's are most similar to Bill?" As this project shows, there is generally little overlap among DJ's and I know it's a point of pride at WFMU.  Still, let's answer the ur-question shall we?  Here are the shows most similar to "Teenage Wasteland."  Similarity is defined as an index of common artists defined by the "Bray" similarity measure.
+
+```{r, message=FALSE}
+dj_similarity_tidy<-dj_similarity%>% 
+  as.data.frame() %>% 
+  mutate(DJ1=rownames(.)) %>% 
+  as_tibble() %>% 
+  gather(DJ2,Similarity,-DJ1) %>% 
+  mutate(Similarity=1-Similarity) %>% 
+  filter(DJ1 != DJ2) %>%  #remove diagonals
+  group_by(DJ1) %>% 
+  arrange(desc(Similarity))
+save(dj_similarity_tidy,file='djsimilarity.rdata')
+
+dj1<-"TW"
+similar_DJS<-dj_similarity_tidy %>% 
+  filter(DJ1==dj1) %>% 
+  arrange(desc(Similarity)) %>% 
+  top_n(10) %>% pull(DJ2)
+
+DJKey %>% 
+  filter(DJ %in% similar_DJS) %>% 
+  kable(title="DJs most similar to Bill Kelly")
+
+
+```
+Here are the artists Bill has in common with his most simpatico show, with the play counts shown.  
+```{r, message=FALSE}
+artists_in_common<-function(dj1,dj2){
+  artists<-playlists %>% 
+    filter(DJ %in% c(dj1,dj2)) %>% 
+    group_by(DJ,ArtistToken) %>% 
+    summarise(n=n()) %>%
+    spread(DJ,n) %>% 
+    mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
+    mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
+    mutate(FaveIndex=trunc(sum_x-1.8*sd_x)) %>% 
+    #select(ArtistToken,sum,FaveIndex) %>% 
+    top_n(10) %>% 
+    select(-sum_x,-sd_x) %>% 
+    arrange(desc(FaveIndex))
+  return(artists)
+}
+
+songs_in_common<-function(dj1,dj2){
+  songs<-playlists %>% 
+    filter(DJ %in% c(dj1,dj2)) %>%
+    mutate(Artist_Title=paste(Artist,Title)) %>% 
+    group_by(DJ,Artist_Title) %>% 
+    summarise(n=n()) %>%
+    spread(DJ,n) %>% 
+    mutate(sum_x=rowSums(.[2:ncol(.)],na.rm=TRUE)) %>% 
+    mutate(sd_x=.[2:ncol(.)] %>% na.fill(0) %>% apply(1,sd)) %>% 
+    mutate(FaveIndex=trunc((sum_x-1.8*sd_x)*10)) %>% #apply some arbitrary scaling
+    #select(ArtistToken,sum,FaveIndex) %>% 
+    top_n(10) %>% 
+    select(-sum_x,-sd_x) %>% 
+    arrange(desc(FaveIndex))
+  return(songs)
+}
+
+for(dj2 in similar_DJS[1]){
+  print(paste("Bill Kelly and",DJKey %>% filter(DJ==dj2) %>% pull(ShowName)))
+  print(artists_in_common(dj1,dj2))
+}
+```
+Here are the songs they most often have in common.
+```{r, message=FALSE}
+for(dj2 in similar_DJS[1]){
+  print(paste("Bill Kelly and",DJKey %>% filter(DJ==dj2) %>% pull(ShowName)))
+  print(songs_in_common(dj1,dj2))
+}
+
+```
+Now lets choose a DJ that I also like but is not very similar, Sheila B. They still have some overlap. Bill likes the ladies and Sheila features "female-fronted" pop. Leslie Gore, FTW!
+
+```{r, message=FALSE}
+dj2="CF"
+print(paste("Bill Kelly and",DJKey %>% filter(DJ==dj2) %>% pull(ShowName)))
+print(artists_in_common(dj1,dj2))
+print(songs_in_common(dj1,dj2))
+
+
+```
+I've already exhausted your tolerance for this naval gazing but I'll end it with one more chart. Let's visualize Bill Kelly affinity universe with a "chord" graph.  The width of the chords is proportional to the similiary among DJs. I selected the 10 DJ's with the most similarity. 
+```{r}
+djCorpus_subset<-tm_filter(djCorpus, FUN = function(x) meta(x)[["DJ"]] %in% c(similar_DJS,dj1))
+# get document-term matrix
+djdtm_subset = DocumentTermMatrix(djCorpus_subset) %>% removeSparseTerms(0.50)
+
+dj_mat<-as.matrix(djdtm_subset)
+
+adj_mat1 = dj_mat %*% t(dj_mat)
+# set zeros in diagonal
+diag(adj_mat1) = 0
+
+#change from dJ to show name
+dimnames(adj_mat1)<-rep(list(Docs=filter(DJKey,DJ  %in% row.names(adj_mat1)) %>% pull(ShowName)),2)
+# create graph from adjacency matrix
+graph_artists1 = graph.adjacency(adj_mat1, mode="undirected", weighted=TRUE, diag=FALSE)
+# get edgelist 1
+edges1 = get.edgelist(graph_artists1)
+
+# arc widths based on graph_artists1
+w1 = E(graph_artists1)$weight
+lwds = w1/20000
+
+# # arc-diagram
+# arcDiagram(edges1, lwd=lwds, cex=0.8, mar=c(7,1,4,1))
+# arcplot(edges1, lwd.arcs=lwds, cex.nodes = 0.8, mar=c(7,1,4,1))
+# title("Selected DJ Associations", cex.main=0.9)
+
+
+#chord diagrams
+cdf<-bind_cols(as_tibble(edges1),value=lwds)
+#reorder columns gets a better appearance
+#cdf<- cdf %>% select(V2,V1,value)
+#make show names compact
+cdf$V2<-str_replace_all(cdf$V2,"[^A-Z^a-z^ ^0-9]","")
+cdf$V1<-str_replace_all(cdf$V1,"[^A-Z^a-z^ ^0-9]","")
+cdf<-cdf %>% lapply(str_replace_all,"The ","") %>% bind_rows
+cdf<-cdf %>% lapply(str_trim) %>% bind_rows
+cdf<-cdf %>% lapply(str_replace_all," ",'\n') %>% bind_rows
+cdf$value <- as.numeric(cdf$value)
+colset<-RColorBrewer::brewer.pal(11,'Paired')
+chordDiagram(cdf,annotationTrack = c('grid','name'),grid.col = colset)
+```
+
