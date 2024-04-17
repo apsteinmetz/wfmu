@@ -17,15 +17,16 @@ tables = c("DJKey",
 
 file_ext = ".parquet"
 
-save_parquet <- function(file_stem){
+save_parquet_to_local <- function(file_stem){
   arrow::write_parquet(eval(parse(text=file_stem)),
                        sink=paste0("data/",file_stem,file_ext))
 }
 
-save_parquet2 <- function(file_stem){
+save_parquet_to_shiny <- function(file_stem){
   arrow::write_parquet(eval(parse(text=file_stem)),
                        sink=paste0("../wfmu_explorer/data/",file_stem,file_ext))
 }
 
-tables |> walk(save_parquet2)
+tables |> walk(save_parquet_to_local)
+tables |> walk(save_parquet_to_shiny))
 save(djdtm,file="../wfmu_explorer/data/djdtm.rdata")
