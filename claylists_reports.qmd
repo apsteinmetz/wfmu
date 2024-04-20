@@ -3,12 +3,14 @@ title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
 date: "April 2024"
 format:
-  pdf:
+  typst:
     toc: true
-    df-print: paged
+    df-print: "paged"
   html:
     toc: true
-    df-print: paged
+    df-print: "paged"
+execute:
+  keep-md: true
 ---
 
 ```{r setup, include=FALSE}
@@ -28,7 +30,14 @@ library(gt)
 load(file='data/playlists.rdata')
 ```
 # Top Songs By Month for Wake and Bake, Last 12 Months
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| output: asis
+
+
+#show figure: set block(breakable: true)
 
 claylists <- playlists %>% filter(DJ=="WA") %>% mutate(artist_song = paste(ArtistToken,Title,sep=" - "))
 
@@ -48,13 +57,13 @@ claylists %>%
 #  top_n(10,top_songs) %>% 
   slice_max(top_songs,n=8,with_ties = TRUE) %>%
   arrange(desc(year_month)) %>% 
-  knitr::kable()
-# gt::gt(groupname_col = "year_month") %>%
-# cols_merge(vars(artist_song,top_songs),pattern="{1} - {2}") %>%
-# cols_label(artist_song= md("**Artist - Song - Play Count**")) %>%
-#  tab_style(style = list(cell_text(weight = "bold",
-#                                   size = "large",style="italic")),
-#            locations = cells_row_groups())
+gt::gt(groupname_col = "year_month") %>%
+  tab_header("Top Songs By Month for Wake and Bake, Last 12 Months") %>%
+cols_merge(c(artist_song,top_songs),pattern="{1} - {2}") %>%
+cols_label(artist_song= md("**Artist - Song - Play Count**")) %>%
+ tab_style(style = list(cell_text(weight = "bold",
+                                  size = "large",style="italic")),
+           locations = cells_row_groups())
 
   
 
