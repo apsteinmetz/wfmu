@@ -7,13 +7,15 @@ load(file = "data/DJKey.RData")
 load(file = "data/playlists.Rdata")
 load(file = "data/djSimilarity.RData")
 load(file = "data/djdtm.RData")
+load(file = "data/distinctive_artists.RData")
 
 
 library(fs)
 
 tables = c("DJKey",
           "playlists",
-          "dj_similarity_tidy")
+          "dj_similarity_tidy",
+          "distinctive_artists")
 
 file_ext = ".parquet"
 
@@ -28,5 +30,5 @@ save_parquet_to_shiny <- function(file_stem){
 }
 
 tables |> walk(save_parquet_to_local)
-tables |> walk(save_parquet_to_shiny))
+tables |> walk(save_parquet_to_shiny)
 save(djdtm,file="../wfmu_explorer/data/djdtm.rdata")
