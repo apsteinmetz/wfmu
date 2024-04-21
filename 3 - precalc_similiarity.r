@@ -3,6 +3,7 @@
 library(tm)
 library(tidyverse)
 library(lubridate)
+library(tidytext)
 library(vegan) #similarity measures
 load("data/playlists.rdata")
 
@@ -57,4 +58,24 @@ mutate(Similarity=1-Similarity) %>%
 filter(DJ1 != DJ2) %>%  #remove diagonals
 group_by(DJ1) %>% 
 arrange(desc(Similarity))
-save(dj_similarity_tidy,file='djsimilarity.rdata')
+save(dj_similarity_tidy,file='data/djsimilarity.rdata')
+
+# what artists make a dj different from another
+dj_tf_idf <- playlists |> select(DJ, ArtistToken) |> 
+    filter(ArtistToken != '') |>
+  # remove ArtistToken where only numerals, probably bogus
+  filter(!str_detect(ArtistToken, '^[0-9]+$')) |> 
+  summarise(.by= c(DJ,ArtistToken), n = n()) |> 
+  bind_tf_idf(ArtistToken, DJ, n)
+
+distinctive_artists <- dj_tf_idf|> 
+  slice_max(tf_idf, n = 100,by= DJ) |> 
+  select(DJ, ArtistToken)
+
+distinctive_artists
+save(distinctive_artists,file='data/distinctive_artists.rdata')
+
+
+  
+
+  
