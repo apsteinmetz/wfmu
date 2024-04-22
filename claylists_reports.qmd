@@ -3,14 +3,14 @@ title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
 date: "April 2024"
 format:
-  typst:
+  pdf:
     toc: true
     df-print: "paged"
   html:
     toc: true
     df-print: "paged"
 execute:
-  keep-md: true
+  keep-md: false
 ---
 
 ```{r setup, include=FALSE}
