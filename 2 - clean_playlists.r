@@ -91,6 +91,15 @@ playlists<- filter(playlists,!str_detect(Artist, "Wake N Bake"))
 playlists<- filter(playlists,!str_detect(Title, "Wfmu"))
 playlists<- filter(playlists,!str_detect(Title, "Primavera"))
 
+# get rid of wake n bake non-music plays
+claylists <- playlists %>% filter(DJ=="WA")
+playlists <- playlists %>% filter(DJ !="WA")
+
+claylists<- filter(claylists,!str_detect(Artist, "^Wake "))
+claylists<- filter(claylists,!str_detect(Artist, "^Pidge "))
+claylists<- filter(claylists,!str_detect(Artist, "^Clay "))
+playlists <- bind_rows(playlists,claylists)
+
 numWords=2 #is two enought for uniqueness?
 
 # we replaced all punctuation with spaces
