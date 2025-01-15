@@ -1,6 +1,6 @@
 ---
 title: "Untitled"
-format: pdf
+format: html
 ---
 
 ## Quarto
@@ -16,10 +16,14 @@ When you click the **Render** button a document will be generated that includes 
 ```
 
 You can add options to executable code like this 
-\newpage
+
 ```{r}
 #| echo: false
 2 * 2
+# function to change date to string
+date_to_string <- function(date) {
+  return(as.character(date))
+}
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).

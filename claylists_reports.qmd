@@ -4,12 +4,12 @@ author: "Art Steinmetz"
 date: "January 2025"
 # format: html
 format:
-  typst:
-    toc: true
-    df-print: "paged"
-#  html:
+#  typst:
 #    toc: true
 #    df-print: "paged"
+  html:
+    toc: true
+    df-print: "paged"
 execute:
   echo: false
   message: false
@@ -81,7 +81,7 @@ print_month_table <- function(month_table) {
     # gt set column widths
     tab_options(table.font.size = px(10),
                 row_group.font.weight = "bold",
-                data_row.padding = px(0),
+                data_row.padding = px(1),
                 column_labels.font.weight = "bold") |> 
     # tab_header("Top Songs By Month for Wake and Bake, Last 12 Months") %>%
     cols_merge(c(artist_song, song_count), pattern = "{1} - {2}") %>%
@@ -123,7 +123,7 @@ print_month_table <- function(month_table) {
     gt::gt(groupname_col = "year_month") %>%
     # gt set column widths
     tab_options(table.font.size = px(10),
-                data_row.padding = px(0),
+                data_row.padding = px(1),
                 row_group.font.weight = "bold",
                 column_labels.font.weight = "bold") |> 
     cols_merge(c(Artist, artist_count), pattern = "{1} - {2}") %>%
@@ -164,7 +164,7 @@ panel %>%
     table.font.size = px(10),
     row_group.font.weight = "bold",
     column_labels.font.weight = "bold",
-    data_row.padding = px(0)
+    data_row.padding = px(1)
   ) |>
   cols_merge(c(artist_song, song_count), pattern = "{1} - {2}") %>%
   cols_label(artist_song = md("**Artist - Song - Play Count**"))
@@ -196,7 +196,7 @@ print_all_time <- function(panel){
       table.font.size = px(10),
       row_group.font.weight = "bold",
       column_labels.font.weight = "bold",
-      data_row.padding = px(0)
+      data_row.padding = px(1)
     ) |>
     cols_merge(c(Artist, artist_count), pattern = "{1} - {2}") %>%
     cols_label(Artist = md("**Artist - Play Count**"))

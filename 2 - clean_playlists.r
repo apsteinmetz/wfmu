@@ -32,7 +32,7 @@ playlists$ArtistToken<-playlists$Artist
 # one artist is all punctuation so give !!! special treatment
 playlists$ArtistToken<-str_replace(playlists$ArtistToken,"!!!","chkchkchk")
 # now change some common punctuation to space
-print("Stripping Punctuation")
+cat("Stripping Punctuation\n")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^\\? \\&","Question Mark And ")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^\\? And","Question Mark And ")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"\\&"," ")
@@ -40,7 +40,7 @@ playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"\\&"," ")
 playlists$ArtistToken<-str_to_lower(playlists$ArtistToken)
 # I choose to strip out the stuff below though dealing with it might get better analysis
 #remove any text in parentheses
-print("Stripping filler words")
+cat("Stripping filler words\n")
 # get rid of anything between parenthesis
 #tricky regex to handle cases of multiple parentheticals in one artist
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"(\\([^(]+\\))","")
@@ -105,7 +105,7 @@ numWords=2 #is two enought for uniqueness?
 # we replaced all punctuation with spaces
 #maybe strip spaces and combine all artist Words
 #combine first two words
-print("Trying to make sense of artist names")
+cat("Trying to make sense of artist names\n")
 #does this break if numWords> number of words?
 playlists$ArtistToken<-playlists$ArtistToken %>% str_to_title()
 t<-str_split_fixed(playlists$ArtistToken,pattern="[ ]+",n=numWords+1)[,1:numWords]
@@ -125,7 +125,7 @@ playlists<- playlists %>%
 #artistTokens<-playlists%>%select(DJ,artistToken)%>%group_by(DJ)%>%distinct(artistToken)
 
 
-print("Combining iconic 2-name artists into one name to save space in wordcloud")
+cat("Combining iconic 2-name artists into one name to save space in wordcloud\n")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Rolling Stones","Stones")
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"Ennio Morricone","Morricone") #only on WFMU!
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"David Bowie","Bowie")
@@ -159,7 +159,7 @@ write_csv(playlists,file = "data/playlists_full.csv")
 # ------------------------------------------------------------
 #OPTIONAL
 #using judgement to pare legitimate entries that distort analysis
-print('Stripping signature songs that would distort analysis.  This takes a few minutes')
+cat('Stripping signature songs that would distort analysis.  This takes a few minutes\n')
 #strip out signature opening songs where one opens a show more than 20 times
 #this will strip the song entirely from the database.
 #should strip the artist/title pair, not the title
@@ -242,18 +242,18 @@ count_by_song<-playlists %>%
   summarise(Song_Count=n()) %>% 
   arrange(desc(Song_Count))
 
-print('Computing DJ concentration of most-played songs')
+cat('Computing DJ concentration of most-played songs\n')
 songs_to_strip<-NULL
 for (n in 1:200){
-  print(n)
+  cat(n)
   song<-count_by_song$artist_song[n]
   gini<-song_conc(song)
   if (gini > TOLERANCE){
     songs_to_strip<-c(songs_to_strip,song)
   }
-  
 }
-print("Stripping")
+cat("\n")
+cat("Stripping\n")
 print(songs_to_strip)
 
 playlists<- playlists %>% 
@@ -262,9 +262,8 @@ playlists<- playlists %>%
   group_by(DJ,AirDate)
 
 # save the results
-playlists<-playlists %>% select(-artist_song) # remove before saving. much smaller file
-
-save(playlists,file = "data/playlists.rdata")
+playlists<-playlists %>% 
+  select(-artist_song) # remove before saving. much smaller file
 
 #get a better show count tally
 show_count<-playlists %>% 
@@ -273,8 +272,11 @@ show_count<-playlists %>%
   group_by(DJ) |> 
   summarise(showCount=n())
 
-DJKey<-DJKey %>% select(-showCount) %>% left_join(show_count) %>% distinct()
-save(DJKey,file = "data/DJKey.rdata")
+DJKey<-DJKey %>% 
+  select(-showCount) %>% 
+  left_join(show_count) %>% 
+  distinct()
+# save(DJKey,file = "data/DJKey.rdata")
 
 
 #use artisttoken to select the most common version of the artist name and make that the token.
@@ -303,8 +305,8 @@ playlists <- playlists %>%
   mutate_if(is.character,str_remove_all,"[\u236-\u400E]") %>% 
   mutate_if(is.character,str_squish)
 
-save(playlists,file = "data/playlists.rdata")
-#write_csv(playlists,path="playlists.csv")
+# save(playlists,file = "data/playlists.rdata")
+# write_csv(playlists,path="playlists.csv")
 
 # add first show and last show to djkey
 FirstShow<-playlists %>% 
@@ -324,6 +326,29 @@ DJKey <- DJKey %>%
   left_join(FirstShow,by=c("DJ")) %>% 
   left_join(LastShow,by=c("DJ"))
 
-save(DJKey, file = "data/DJKey.RData")
+DJKey <- select(playlists,DJ) |> 
+  distinct() |> 
+  left_join(DJKey)
+
+# save unique artisttokens as parquet
+cat("Saving unique artist tokens as rdata\n")
+all_artisttokens <- playlists |> 
+  select(ArtistToken) |> 
+  distinct() |> 
+  arrange(ArtistToken) |> 
+  pull(ArtistToken)
+# save as rdata
+save(all_artisttokens, file = "data/all_artisttokens.rdata")
+
+cat("Saving DJKey.parquet\n")
+# save(DJKey, file = "data/DJKey.RData")
+# save DJKey as parquet
+duckplyr::df_to_parquet(DJKey, "data/DJKey.parquet")
 
 
+# save(playlists,file = "data/playlists.rdata")
+# save as parquet
+cat("Saving playlists as parquet\n")
+playlists <- playlists |> 
+  mutate(DJ = as.character(DJ))
+duckplyr::df_to_parquet(playlists, "data/playlists.parquet")
