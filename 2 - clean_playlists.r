@@ -9,7 +9,7 @@ set_collapse(mask = NULL)
 #clean up raw playlists
 
 load("data/playlists_raw.rdata")
-load("data/djkey.rdata")
+load("data/djKey.rdata")
 
 #Clean up inconsistent artist names
 
@@ -272,11 +272,11 @@ show_count<-playlists %>%
   group_by(DJ) |> 
   summarise(showCount=n())
 
-DJKey<-DJKey %>% 
+djKey<-djKey %>% 
   select(-showCount) %>% 
   left_join(show_count) %>% 
   distinct()
-# save(DJKey,file = "data/DJKey.rdata")
+# save(djKey,file = "data/djKey.rdata")
 
 
 #use artisttoken to select the most common version of the artist name and make that the token.
@@ -308,7 +308,7 @@ playlists <- playlists %>%
 # save(playlists,file = "data/playlists.rdata")
 # write_csv(playlists,path="playlists.csv")
 
-# add first show and last show to djkey
+# add first show and last show to djKey
 FirstShow<-playlists %>% 
   group_by(DJ) %>% 
   select(DJ,AirDate) %>% 
@@ -321,14 +321,14 @@ LastShow<-playlists %>%
   distinct() %>% 
   top_n(1) %>% rename(LastShow=AirDate)
 
-DJKey <- DJKey %>% 
+djKey <- djKey %>% 
   select(DJ,ShowName,onSched,showCount) %>% 
   left_join(FirstShow,by=c("DJ")) %>% 
   left_join(LastShow,by=c("DJ"))
 
-DJKey <- select(playlists,DJ) |> 
+djKey <- select(playlists,DJ) |> 
   distinct() |> 
-  left_join(DJKey)
+  left_join(djKey)
 
 # save unique artisttokens as parquet
 cat("Saving unique artist tokens as rdata\n")
@@ -340,10 +340,10 @@ all_artisttokens <- playlists |>
 # save as rdata
 save(all_artisttokens, file = "data/all_artisttokens.rdata")
 
-cat("Saving DJKey.parquet\n")
-# save(DJKey, file = "data/DJKey.RData")
-# save DJKey as parquet
-duckplyr::df_to_parquet(DJKey, "data/DJKey.parquet")
+cat("Saving djKey.parquet\n")
+# save(djKey, file = "data/djKey.RData")
+# save djKey as parquet
+duckplyr::df_to_parquet(djKey, "data/djKey.parquet")
 
 
 # save(playlists,file = "data/playlists.rdata")

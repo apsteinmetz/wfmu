@@ -4,7 +4,7 @@ library(rvest)
 library(stringr)
 library(xml2)
 library(tidyverse)
-
+library(progress)
 
 
 
@@ -14,6 +14,7 @@ ROOT_URL<-"http://wfmu.org"
 
 #-------------------------------------------
 getDJURLs <- function(){
+  
   rawDJURLs<- read_html(paste(ROOT_URL,"/playlists",sep=""))
   # get the urls of the each DJs RSS playlist feed
   t<-rawDJURLs%>%html_nodes(xpath='//html//body//center[2]//table[1]//table//a[contains(.,"Playlists")]') %>% 
@@ -40,7 +41,10 @@ getDJsOffSched <- function(){
 #---------------------------------------------------
 # get the shownames for a DJ
 getShowNames<-function(DJURLs) {
-  DJKey <- data.frame()
+  pb <- progress_bar$new(
+    format = "  Getting Show :what [:bar] :percent eta: :eta",
+    clear = FALSE, total = length(DJURLs))
+  djKey <- data.frame()
   for (page in DJURLs) {
     singleDJ<- read_html(page)
     showName <- html_node(singleDJ,"title")%>%html_text()
@@ -48,23 +52,29 @@ getShowNames<-function(DJURLs) {
     showName<-str_replace(showName,'WFMU:',"")
     showName<-str_replace_all(showName,':Playlists and Archives',"")
     DJ <- sub("http://wfmu.org/playlists/","",page)
-    DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
-    print(showName)
+    profileURL<-singleDJ%>%
+      html_nodes(xpath="//a[contains(@href,'profile')]") %>%
+      html_attr("href")
+    # if profile URL is not found, use the DJ URL
+    if (length(profileURL)==0) profileURL<-page
+    # print(DJ)
+    djKey<-rbind(djKey,data.frame(DJ=DJ,ShowName=showName,profileURL=profileURL))
+    pb$tick(tokens = list(what = DJ))
   }
   # now identifty those DJs which are currently ON MIC
-  DJKey$onSched <- 'YES'
-  DJKey$onSched[which(DJKey$DJ %in% getDJsOffSched())]<-'NO'
+  djKey$onSched <- 'YES'
+  djKey$onSched[which(djKey$DJ %in% getDJsOffSched())]<-'NO'
   #strip "WFMU" and "Playlists and Archives" and some punctuation
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylists (and|&) (A|a)rchives","")
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"-","")
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylist|(R|r)ecent","")
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"WFMU|wfmu","")
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"The ","")
-  DJKey$ShowName<-str_trim(DJKey$ShowName)
+  djKey$ShowName<-str_replace_all(djKey$ShowName,"(P|p)laylists (and|&) (A|a)rchives","")
+  djKey$ShowName<-str_replace_all(djKey$ShowName,"-","")
+  djKey$ShowName<-str_replace_all(djKey$ShowName,"(P|p)laylist|(R|r)ecent","")
+  djKey$ShowName<-str_replace_all(djKey$ShowName,"WFMU|wfmu","")
+  djKey$ShowName<-str_replace_all(djKey$ShowName,"The ","")
+  djKey$ShowName<-str_trim(djKey$ShowName)
   
 
-  return (DJKey)  
-  #save(DJKey,file = "data/DJKey.rdata")
+  return (djKey)  
+  #save(djKey,file = "data/djKey.rdata")
 }
 
 # -------------get the URLs of the playlist pages for a DJ ----------
@@ -97,7 +107,7 @@ return(pl_url)
 getDJPlaylistURLs<-function(music_djs) {
   DJ_playlists = NULL
   dudList<-NULL
-  #DJKey = data.frame()
+  #djKey = data.frame()
   for (dj in music_djs) {
     print(dj)
     url_suffixes<-get_playlist_page_URLs(dj)
@@ -129,6 +139,25 @@ getDJPlaylistURLs<-function(music_djs) {
   return(DJ_playlists)
 }
 
+# get profile page URL by extracting href containing the word "profile" from the DJ page
+getDJProfileURLs<-function(DJURLs) {
+  pb <- progress_bar$new(total = length(DJURLs))
+  DJProfileURLs = NULL
+  for (page in DJURLs) {
+    singleDJ<- read_html(page)
+    DJ <- sub("http://wfmu.org/playlists/","",page)
+    profileURL<-singleDJ%>%
+      html_nodes(xpath="//a[contains(@href,'profile')]") %>%
+      html_attr("href")
+#    profileURL<-as.character(na.omit(profileURL[str_detect(profileURL,"profile")]))
+    if (length(profileURL)>0) {
+      DJProfileURLs = bind_rows(DJProfileURLs, tibble(DJ=DJ,profileURL = profileURL))
+    }
+    pb$tick()
+  }
+  return(DJProfileURLs)
+}
+
 #-------------------------------------------------
 # Get all Artists ever played by a DJ
 #WFMU maintains this as a separate page
@@ -141,7 +170,7 @@ getDJArtistNames<-function(DJURLs) {
     showName <- html_node(singleDJ,"title")%>%html_text()
     showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     DJ <- sub("http://wfmu.org/playlists/","",page)
-    DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
+    djKey<-rbind(djKey,data.frame(DJ=DJ,ShowName=showName))
     print(showName)
     artistListPage <- paste(ROOT_URL,URL_BRANCH,DJ, sep="")
     artistList<-read_html(artistListPage)%>%html_node(xpath="//body/div")%>%html_text()%>%str_split("\n")
@@ -379,9 +408,9 @@ get_playlist <- function(plURL="/playlists/shows/93065", dj = "WA") {
 }
 #-------------- MAIN -----------------
 DJURLs<-getDJURLs()
-DJKey<-getShowNames(DJURLs)
-save(DJKey,file = "data/DJKey.rdata")
-#load(file='data/djkey.rdata')
+djKey<-getShowNames(DJURLs)
+save(djKey,file = "data/djKey.rdata")
+#load(file='data/djKey.rdata')
 
 excludeDJs <-
   c('SD',
@@ -409,7 +438,7 @@ excludeDJs <-
     'TP',
     'RC',
     'VC')
-music_djs<-DJKey %>% 
+music_djs<-djKey %>% 
   select(DJ) %>% 
   anti_join(tibble(DJ=excludeDJs)) %>% 
   pull(DJ)
@@ -418,14 +447,14 @@ showCounts<-playlistURLs %>%
   group_by(DJ) %>% 
   summarise(showCount=n()) %>% 
   arrange(desc(showCount))
-DJKey<-left_join(DJKey,showCounts) %>% drop_na()
-save(DJKey,file = "data/DJKey.rdata")
+djKey<-left_join(djKey,showCounts) %>% drop_na()
+save(djKey,file = "data/djKey.rdata")
 
 #limit analysis to DJs with at least numShows shows.
 # This also excludes DJs where we couldn't extract valid playlist URLs.
 numShows <- 10
 # non-music shows
-djList <- DJKey %>% 
+djList <- djKey %>% 
   filter(showCount > numShows, !(DJ %in% excludeDJs)) %>%
   pull(DJ)
 
@@ -479,12 +508,12 @@ for (dj in djList_temp) {
   save(playlists_raw,file = "data/playlists_raw.rdata")
 }
 
-bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw) %>% left_join(DJKey)
+bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw) %>% left_join(djKey)
 
 playlists_raw<-playlists_raw %>% 
   filter(Artist != Title) %>% #single column span across table.  Not a song.
   distinct()
 
 save(playlists_raw,file = "data/playlists_raw.rdata")
-right_join(DJKey,bad_Tables) %>% save(file = "data/bad_tables.rdata")
+right_join(djKey,bad_Tables) %>% save(file = "data/bad_tables.rdata")
 
