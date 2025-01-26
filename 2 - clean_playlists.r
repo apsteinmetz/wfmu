@@ -1,6 +1,7 @@
 library(tidyverse)
 library(ineq) #inequality measures
 library(xts)
+library(duckplyr)
 
 # try the collapse package
 library(collapse)
@@ -8,8 +9,8 @@ set_collapse(mask = NULL)
 
 #clean up raw playlists
 
-load("data/playlists_raw.rdata")
-load("data/djKey.rdata")
+djKey<-df_from_parquet("data/djKey_prelim.parquet")
+playlists_raw <- df_from_parquet("data/playlists_raw.parquet")
 
 #Clean up inconsistent artist names
 
@@ -150,11 +151,11 @@ playlists <- playlists %>%
   group_by(DJ) 
 
 playlists <- playlists %>% mutate(across(where(is.character),str_squish))
-playlists_full<-playlists
+# playlists_full<-playlists
 
 
-save(playlists_full,file = "data/playlists_full.rdata")
-write_csv(playlists,file = "data/playlists_full.csv")
+# save(playlists_full,file = "data/playlists_full.rdata")
+# write_csv(playlists,file = "data/playlists_full.csv")
 
 # ------------------------------------------------------------
 #OPTIONAL
@@ -164,7 +165,10 @@ cat('Stripping signature songs that would distort analysis.  This takes a few mi
 #this will strip the song entirely from the database.
 #should strip the artist/title pair, not the title
 STRIP_THRESHOLD <- 20
-playlists <- playlists_full %>%  
+# playlists <- playlists_full %>%  
+#   mutate(artist_song=paste(ArtistToken,Title)) %>% 
+#   group_by(DJ,AirDate)
+playlists <- playlists %>%  
   mutate(artist_song=paste(ArtistToken,Title)) %>% 
   group_by(DJ,AirDate)
 
@@ -276,8 +280,6 @@ djKey<-djKey %>%
   select(-showCount) %>% 
   left_join(show_count) %>% 
   distinct()
-# save(djKey,file = "data/djKey.rdata")
-
 
 #use artisttoken to select the most common version of the artist name and make that the token.
 playlists<-playlists %>% 
@@ -341,12 +343,9 @@ all_artisttokens <- playlists |>
 save(all_artisttokens, file = "data/all_artisttokens.rdata")
 
 cat("Saving djKey.parquet\n")
-# save(djKey, file = "data/djKey.RData")
 # save djKey as parquet
 duckplyr::df_to_parquet(djKey, "data/djKey.parquet")
 
-
-# save(playlists,file = "data/playlists.rdata")
 # save as parquet
 cat("Saving playlists as parquet\n")
 playlists <- playlists |> 

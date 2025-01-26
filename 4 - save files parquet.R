@@ -26,9 +26,9 @@ file_ext = ".parquet"
 #                       sink=paste0("data/",file_stem,file_ext))
 #}
 
-fs::file_copy("data/djKey.RData",
-              "../wfmu_explorer/data/djKey.RData",
-              overwrite = TRUE)
+# fs::file_copy("data/djKey.RData",
+#              "../wfmu_explorer/data/djKey.RData",
+#              overwrite = TRUE)
 
 
 

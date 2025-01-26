@@ -38,7 +38,15 @@ getDJsOffSched <- function(){
   return(d_off)
 }
 
-#---------------------------------------------------
+# get_other_shownames
+get_other_shownames <- function(url) {
+  html <- read_html(url)
+  all_shownames <- html %>%
+    html_nodes(".KDBprogram + a") |>
+    html_text()
+  return(all_shownames[all_shownames != base_showname])
+}
+  #---------------------------------------------------
 # get the shownames for a DJ
 getShowNames<-function(DJURLs) {
   pb <- progress_bar$new(
