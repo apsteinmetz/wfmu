@@ -297,7 +297,7 @@ playlists<-playlists %>%
 
 #test section
 #clean it again
-#get rid of punctution
+#get rid of punctuation
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"[^A-Z^a-z^ ^0-9]","")
 #and leading "the"
 playlists$ArtistToken<-str_replace_all(playlists$ArtistToken,"^The ","")
@@ -324,7 +324,7 @@ LastShow<-playlists %>%
   top_n(1) %>% rename(LastShow=AirDate)
 
 djKey <- djKey %>% 
-  select(DJ,ShowName,onSched,showCount) %>% 
+#  select(DJ,ShowName,onSched,showCount) %>% 
   left_join(FirstShow,by=c("DJ")) %>% 
   left_join(LastShow,by=c("DJ"))
 
