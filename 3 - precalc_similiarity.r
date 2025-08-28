@@ -8,7 +8,8 @@ library(vegan) #similarity measures
 library(duckplyr)
 # load("data/playlists.rdata")
 # load playlists with duckplyr
-playlists <- df_from_parquet("data/playlists.parquet")
+playlists <- read_parquet_duckdb("data/playlists.parquet") |> 
+  collect()
 
 #Analyze similarity 
 #-------------------------------------------------------------  
@@ -68,7 +69,7 @@ dj_similarity_tidy <- dj_similarity %>%
 # save(dj_similarity_tidy,file='data/djsimilarity.rdata')
 # save as parquet
 cat("Saving djsimilarity as parquet\n")
-df_to_parquet(dj_similarity_tidy, "data/djsimilarity.parquet")
+compute_parquet(dj_similarity_tidy, "data/djsimilarity.parquet")
 
 # what artists make a dj different from another
 cat("Computing distinctive artists\n")
@@ -88,7 +89,7 @@ distinctive_artists <- dj_tf_idf|>
 # save(distinctive_artists,file='data/distinctive_artists.rdata')
 # save as parquet
 cat("Saving distinctive_artists as parquet\n")
-df_to_parquet(distinctive_artists, "data/distinctive_artists.parquet")
+compute_parquet(distinctive_artists, "data/distinctive_artists.parquet")
 
 
   
