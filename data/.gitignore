@@ -1,2 +1,4 @@
 lastfm_tags.db
 msd_summary_file.h5
+playlists_raw.parquet
+playlists_temp.parquet

@@ -10,6 +10,7 @@ library(duckplyr)
 
 
 
+
 # ----------------------------------------------
 ROOT_URL<-"http://wfmu.org"
 testurl <- "http://wfmu.org/playlists/KF"
@@ -281,7 +282,7 @@ djKey <- djKey %>%
   filter(showCount > numShows, !(DJ %in% excludeDJs))
 
 
-df_to_parquet(djKey,"data/djKey_prelim.parquet")
+compute_parquet(djKey,"data/djKey_prelim.parquet")
 # save playlistURLs as parquet
-df_to_parquet(playlistURLs,"data/playlistURLs.parquet")
+compute_parquet(playlistURLs,"data/playlistURLs.parquet")
 
