@@ -92,6 +92,8 @@ playlists<- filter(playlists,!str_detect(Title, "Music (B|b)ehind"))
 playlists<- filter(playlists,!str_detect(Artist, "Wake N Bake"))
 playlists<- filter(playlists,!str_detect(Title, "Wfmu"))
 playlists<- filter(playlists,!str_detect(Title, "Primavera"))
+playlists<- filter(playlists,!str_detect(Artist, "^Your Dj"))
+playlists<- filter(playlists,!str_detect(Title, "^Your Dj"))
 
 # get rid of wake n bake non-music plays
 claylists <- playlists %>% filter(DJ=="WA")
