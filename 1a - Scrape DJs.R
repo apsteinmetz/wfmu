@@ -265,12 +265,14 @@ DJURLs <-DJURLs[!str_detect(DJURLs,paste0(excludeDJs,collapse="|"))]
 djKey<-getShowNames(DJURLs)
 
 
-playlistURLs<-getDJPlaylistURLs(djKey$DJ)
+playlistURLs<-getDJPlaylistURLs(djKey$DJ) |> 
+  unique()
 showCounts<-playlistURLs %>%
   group_by(DJ) %>%
   summarise(showCount=n()) %>%
   arrange(desc(showCount))
 djKey<-left_join(djKey,showCounts) %>% 
+  unique() |> 
   drop_na() |> 
   as_tibble()
 

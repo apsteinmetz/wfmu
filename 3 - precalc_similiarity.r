@@ -10,7 +10,7 @@ library(duckplyr)
 # load playlists with duckplyr
 playlists <- read_parquet_duckdb("data/playlists.parquet") |> 
   collect()
-
+methods_restore()
 #Analyze similarity 
 #-------------------------------------------------------------  
 #combineAllArtists

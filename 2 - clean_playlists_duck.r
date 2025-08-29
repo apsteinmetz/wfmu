@@ -17,7 +17,7 @@ playlists_raw <-read_parquet_duckdb("data/playlists_raw.parquet")
 
 playlists<-as_tibble(playlists_raw)
 
-playlists_raw <- playlists_raw %>% distinct()
+playlists_raw <- playlists_raw |> as_tibble() %>% distinct()
 #filter out squirrelly dates
 #only Diane "Kamikaze" has archived playlists stretching back to the '80s.  Yay, Diane!
 # Charlie Lewis has playlists going back to 1997 but for some reason the dates I scraped
@@ -87,8 +87,8 @@ playlists$ArtistToken<-str_trim(playlists$ArtistToken)
 playlists<-filter(playlists,Artist!="")
 playlists<-filter(playlists,Artist!="Artist")
 
-playlists<- filter(playlists,!str_detect(Artist, "Music Behind"))
-playlists<- filter(playlists,!str_detect(Title, "Music Behind"))
+playlists<- filter(playlists,!str_detect(Artist, "Music (B|b)ehind"))
+playlists<- filter(playlists,!str_detect(Title, "Music (B|b)ehind"))
 playlists<- filter(playlists,!str_detect(Artist, "Wake N Bake"))
 playlists<- filter(playlists,!str_detect(Title, "Wfmu"))
 playlists<- filter(playlists,!str_detect(Title, "Primavera"))
@@ -144,6 +144,7 @@ playlists<-playlists %>% mutate(ArtistToken=ifelse(ArtistToken=="","Unknown",Art
 
 playlists <- playlists %>% 
   filter(ArtistToken !="Your Dj") %>% 
+  filter(Title !="Your Dj") %>% 
   filter(ArtistToken !="Hoof Mouth") %>% 
   filter(ArtistToken !="Tom Wilson") %>%  #not songs
   filter(ArtistToken !="Hank Levine") %>%  #not songs
@@ -235,7 +236,7 @@ count_by_song<-playlists %>%
 cat('Computing DJ concentration of most-played songs\n')
 songs_to_strip<-NULL
 for (n in 1:200){
-  cat(n)
+  cat(n," ")
   song<-count_by_song$artist_song[n]
   gini<-song_conc(song)
   if (gini > TOLERANCE){
@@ -247,7 +248,6 @@ cat("Stripping\n")
 print(songs_to_strip)
 
 playlists<- playlists %>% 
-  ungroup() |> 
   filter(!(artist_song %in% songs_to_strip)) 
 
 # save the results
@@ -265,13 +265,16 @@ djKey<-djKey %>%
   distinct()
 
 #use artisttoken to select the most common version of the artist name and make that the token.
-playlists <- playlists %>% 
+
+top_artist_version <-playlists %>% 
   select(ArtistToken,Artist) %>% 
-  summarise(.by=c(ArtistToken,Artist),n=n()) |> 
-  slice_max(order_by = n,n=1) %>% 
-  rename(base_artist=Artist) %>% 
+  summarise(.by=c(ArtistToken,Artist),tokens=n()) |> 
+  slice_max(order_by = tokens,n=1,by="ArtistToken") %>% 
+  rename(base_artist=Artist)
+
+playlists <- top_artist_version %>% 
   right_join(playlists,by='ArtistToken') %>%
-  select(-ArtistToken,-n) %>% 
+  select(-ArtistToken,-tokens) %>% 
   rename(ArtistToken=base_artist)
 
 #test section
@@ -324,7 +327,7 @@ save(all_artisttokens, file = "data/all_artisttokens.rdata")
 
 cat("Saving djKey.parquet\n")
 # save djKey as parquet
-duckplyr::compute_parquet(djKey, "data/djKey.parquet")
+compute_parquet(djKey, "data/djKey.parquet")
 
 # save as parquet
 cat("Saving playlists as parquet\n")
