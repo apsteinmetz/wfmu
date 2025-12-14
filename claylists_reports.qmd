@@ -4,12 +4,12 @@ author: "Art Steinmetz"
 date: "January 2025"
 # format: html
 format:
-#  typst:
-#    toc: true
-#    df-print: "paged"
-  html:
+  typst:
     toc: true
     df-print: "paged"
+#  html:
+#    toc: true
+#    df-print: "paged"
 execute:
   echo: false
   message: false
