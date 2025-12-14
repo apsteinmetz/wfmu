@@ -7,47 +7,52 @@ library(tidyverse)
 library(progress)
 library(duckplyr)
 
-
-
+source("func_get_show_links.R")
 
 
 # ----------------------------------------------
-ROOT_URL<-"http://wfmu.org"
+ROOT_URL <- "http://wfmu.org"
 testurl <- "http://wfmu.org/playlists/KF"
 #-------------------------------------------
-getDJURLs <- function(){
-  
-  rawDJURLs<- read_html(paste(ROOT_URL,"/playlists",sep=""))
+getDJURLs <- function() {
+  rawDJURLs <- read_html(paste(ROOT_URL, "/playlists", sep = ""))
   # get the urls of the each DJs RSS playlist feed
-  t<-rawDJURLs%>%html_nodes(xpath='//html//body//center[2]//table[1]//table//a[contains(.,"Playlists")]') %>% 
-    html_attr(name="href")
+  t <- rawDJURLs %>%
+    html_nodes(
+      xpath = '//html//body//center[2]//table[1]//table//a[contains(.,"Playlists")]'
+    ) %>%
+    html_attr(name = "href")
 
-  DJURLs<-paste("http://wfmu.org",t,sep="")[-1]
+  DJURLs <- paste("http://wfmu.org", t, sep = "")[-1]
   # above got the RSS feed links but we want the longer list of shows.  Below modifies
   # the URL to get the right link
-  DJURLs<- gsub("playlistfeed","playlists",DJURLs)
-  DJURLs<- gsub(".xml","",DJURLs)
-  
+  DJURLs <- gsub("playlistfeed", "playlists", DJURLs)
+  DJURLs <- gsub(".xml", "", DJURLs)
+
   return(DJURLs)
 }
 #-------------------------------------------
-getDJsOffSched <- function(){
+getDJsOffSched <- function() {
   #table 9 is off sched. 2-8 are monday through sunday
-  rawDJURLs<- read_html(paste(ROOT_URL,"/playlists",sep=""))
-  t_off<-rawDJURLs%>%html_nodes(xpath='//html//body//center[2]//table[1]//table[9]//a[contains(.,"Playlists")]')  %>% html_attr(name="href") 
-  d_off <- str_replace(t_off,"/playlistfeed/","")
-  d_off <- str_replace(d_off,".xml","")
+  rawDJURLs <- read_html(paste(ROOT_URL, "/playlists", sep = ""))
+  t_off <- rawDJURLs %>%
+    html_nodes(
+      xpath = '//html//body//center[2]//table[1]//table[9]//a[contains(.,"Playlists")]'
+    ) %>%
+    html_attr(name = "href")
+  d_off <- str_replace(t_off, "/playlistfeed/", "")
+  d_off <- str_replace(d_off, ".xml", "")
   return(d_off)
 }
 
 # get_other_shownames for the given DJ
-get_other_shownames <- function(url,base_showname){
+get_other_shownames <- function(url, base_showname) {
   # read_html with error checking
   html <- try(xml2::read_html(url), silent = TRUE)
-  if (inherits(html, "try-error")){
+  if (inherits(html, "try-error")) {
     html <- NULL
-  } 
-  
+  }
+
   if (is.null(html)) {
     return(NULL)
   }
@@ -55,83 +60,96 @@ get_other_shownames <- function(url,base_showname){
     html_nodes(".KDBprogram + a") |>
     html_text()
   # remove the current show name from the list
-  shownames <- all_shownames[all_shownames != base_showname] |> 
-  paste0(collapse = '\n')
+  shownames <- all_shownames[all_shownames != base_showname] |>
+    paste0(collapse = '\n')
   return(shownames)
 }
 #---------------------------------------------------
 # get the shownames for a DJ
-getShowNames<-function(DJURLs) {
+getShowNames <- function(DJURLs) {
   pb <- progress_bar$new(
     format = "  Getting Show :what [:bar] :percent eta: :eta",
-    clear = FALSE, total = length(DJURLs))
+    clear = FALSE,
+    total = length(DJURLs)
+  )
   djKey_raw <- data.frame()
   for (page in DJURLs) {
-    singleDJ<- read_html(page)
-    showName <- html_node(singleDJ,"title") %>% html_text()
-    showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
-    showName<-str_replace(showName,'WFMU:',"")
-    showName<-str_replace_all(showName,':Playlists and Archives',"")
-    DJ <- sub("http://wfmu.org/playlists/","",page)
+    singleDJ <- read_html(page)
+    showName <- html_node(singleDJ, "title") %>% html_text()
+    showName <- gsub("\n", "", sub("Playlists and Archives for ", "", showName))
+    showName <- str_replace(showName, 'WFMU:', "")
+    showName <- str_replace_all(showName, ':Playlists and Archives', "")
+    DJ <- sub("http://wfmu.org/playlists/", "", page)
     pb$tick(tokens = list(what = DJ))
-    profileURL<-singleDJ%>%
-      html_nodes(xpath="//a[contains(@href,'profile')]") %>%
-      html_attr("href") |> pluck(1)
+    profileURL <- singleDJ %>%
+      html_nodes(xpath = "//a[contains(@href,'profile')]") %>%
+      html_attr("href") |>
+      pluck(1)
     # if profile URL is not found, use the DJ URL
-    if (length(profileURL)==0){
-      profileURL<-page
+    if (length(profileURL) == 0) {
+      profileURL <- page
       other_shownames <- "none"
     } else {
-      other_shownames <- get_other_shownames(profileURL,showName)
-      if (length(other_shownames)==0) other_shownames <- "none"
+      other_shownames <- get_other_shownames(profileURL, showName)
+      if (length(other_shownames) == 0) other_shownames <- "none"
     }
     # print(DJ)
-    djKey_raw<-rbind(djKey_raw,data.frame(DJ=DJ,
-                                  ShowName=showName,
-                                  profileURL=profileURL,
-                                  other_shows = other_shownames))
-    
+    djKey_raw <- rbind(
+      djKey_raw,
+      data.frame(
+        DJ = DJ,
+        ShowName = showName,
+        profileURL = profileURL,
+        other_shows = other_shownames
+      )
+    )
   }
   # now identifty those DJs which are currently ON MIC
   djKey_raw$onSched <- 'YES'
-  djKey_raw$onSched[which(djKey_raw$DJ %in% getDJsOffSched())]<-'NO'
+  djKey_raw$onSched[which(djKey_raw$DJ %in% getDJsOffSched())] <- 'NO'
   #strip "WFMU" and "Playlists and Archives" and some punctuation
-  djKey_raw$ShowName<-str_replace_all(djKey_raw$ShowName,"(P|p)laylists (and|&) (A|a)rchives","")
-  djKey_raw$ShowName<-str_replace_all(djKey_raw$ShowName,"-","")
-  djKey_raw$ShowName<-str_replace_all(djKey_raw$ShowName,"(P|p)laylist|(R|r)ecent","")
-  djKey_raw$ShowName<-str_replace_all(djKey_raw$ShowName,"WFMU|wfmu","")
-  djKey_raw$ShowName<-str_replace_all(djKey_raw$ShowName,"The ","")
-  djKey_raw$ShowName<-str_trim(djKey_raw$ShowName)
-  
+  djKey_raw$ShowName <- str_replace_all(
+    djKey_raw$ShowName,
+    "(P|p)laylists (and|&) (A|a)rchives",
+    ""
+  )
+  djKey_raw$ShowName <- str_replace_all(djKey_raw$ShowName, "-", "")
+  djKey_raw$ShowName <- str_replace_all(
+    djKey_raw$ShowName,
+    "(P|p)laylist|(R|r)ecent",
+    ""
+  )
+  djKey_raw$ShowName <- str_replace_all(djKey_raw$ShowName, "WFMU|wfmu", "")
+  djKey_raw$ShowName <- str_replace_all(djKey_raw$ShowName, "The ", "")
+  djKey_raw$ShowName <- str_trim(djKey_raw$ShowName)
 
-  return (djKey_raw)  
+  return(djKey_raw)
 
   # extraction method
   # djKey_raw$other_shows[[1]] |> paste0(collapse = '\n') |> cat()
-  
-  }
+}
 
 # -------------get the URLs of the playlist pages for a DJ ----------
 #should work to delve into earlier years
-get_playlist_page_URLs<-function(url_suffix) {
+get_playlist_page_URLs <- function(url_suffix) {
   #first call should be the base DJ page with links to any earlier year playlist lists
-  if (str_length(url_suffix)==2){
-    dj<-url_suffix
-    latest_url<-paste0("/playlists/",url_suffix)
-    url_suffix<-latest_url
+  if (str_length(url_suffix) == 2) {
+    dj <- url_suffix
+    latest_url <- paste0("/playlists/", url_suffix)
+    url_suffix <- latest_url
   }
-  singleDJ<- read_html(paste0("http://wfmu.org",url_suffix))
+  singleDJ <- read_html(paste0("http://wfmu.org", url_suffix))
   #this assumes the earlier year playlist links are of the form
   # wfmu.org/playlists/<dj><year>/
-  pl_url<-singleDJ %>%
-    html_nodes(xpath=paste0("//a[contains(@href,'playlists/",dj,"')]")) %>%
+  pl_url <- singleDJ %>%
+    html_nodes(xpath = paste0("//a[contains(@href,'playlists/", dj, "')]")) %>%
     html_attr("href")
   # combine root with children but remove dupes and redundant URLs
-   pl_url<-c(latest_url,pl_url) %>% 
-     unique() %>% 
-     str_remove_all("http.+") %>%
-     stringi::stri_remove_empty()
-return(pl_url)
+  pl_url <- c(latest_url, pl_url) %>%
+    unique() %>%
+    str_remove_all("http.+") %>%
+    stringi::stri_remove_empty()
+  return(pl_url)
 }
 
 
@@ -146,10 +164,12 @@ return(pl_url)
 #---------------------------------------------------
 # get the URLs of the playlists for a DJ
 getDJPlaylistURLs <- function(music_djs) {
-  pb1 <- progress_bar$new(format = "  Getting Playlist URL for :what [:bar] :percent eta: :eta",
-                         clear = FALSE,
-                         total = length(music_djs))
-  
+  pb1 <- progress_bar$new(
+    format = "  Getting Playlist URL for :what [:bar] :percent eta: :eta",
+    clear = FALSE,
+    total = length(music_djs)
+  )
+
   DJ_playlists = NULL
   dudList <- NULL
   #djKey = data.frame()
@@ -165,16 +185,20 @@ getDJPlaylistURLs <- function(music_djs) {
       #format for newer shows
       pl <- as.character(na.omit(pl[str_detect(pl, "playlists/shows")]))
       # format for older shows
-      if (length(pl) < 1)
+      if (length(pl) < 1) {
         pl <- as.character(na.omit(pl[str_detect(pl, "Playlist")]))
-      
+      }
+
       #assume a full URL is a fill-in DJ.  We omit these from the analysis
       pl <- pl[!str_detect(pl, "http")]
-      
+
       playlistURL <- pl %>% as.character()
       #omit shows without valid playlists.  Talk shows?
       if (length(playlistURL) > 0) {
-        DJ_playlists = bind_rows(DJ_playlists, tibble(DJ = dj, playlistURL = playlistURL))
+        DJ_playlists = bind_rows(
+          DJ_playlists,
+          tibble(DJ = dj, playlistURL = playlistURL)
+        )
         dudflag <- "OK "
       } else {
         dudflag <- "DUD"
@@ -186,18 +210,21 @@ getDJPlaylistURLs <- function(music_djs) {
 }
 
 # get profile page URL by extracting href containing the word "profile" from the DJ page
-getDJProfileURLs<-function(DJURLs) {
+getDJProfileURLs <- function(DJURLs) {
   pb <- progress_bar$new(total = length(DJURLs))
   DJProfileURLs = NULL
   for (page in DJURLs) {
-    singleDJ<- read_html(page)
-    DJ <- sub("http://wfmu.org/playlists/","",page)
-    profileURL<-singleDJ%>%
-      html_nodes(xpath="//a[contains(@href,'profile')]") %>%
+    singleDJ <- read_html(page)
+    DJ <- sub("http://wfmu.org/playlists/", "", page)
+    profileURL <- singleDJ %>%
+      html_nodes(xpath = "//a[contains(@href,'profile')]") %>%
       html_attr("href")
-#    profileURL<-as.character(na.omit(profileURL[str_detect(profileURL,"profile")]))
-    if (length(profileURL)>0) {
-      DJProfileURLs = bind_rows(DJProfileURLs, tibble(DJ=DJ,profileURL = profileURL))
+    #    profileURL<-as.character(na.omit(profileURL[str_detect(profileURL,"profile")]))
+    if (length(profileURL) > 0) {
+      DJProfileURLs = bind_rows(
+        DJProfileURLs,
+        tibble(DJ = DJ, profileURL = profileURL)
+      )
     }
     pb$tick()
   }
@@ -226,54 +253,56 @@ getDJProfileURLs<-function(DJURLs) {
 #     save(allDJArtists,file = "data/allDJArtists.rdata")
 #   }
 #   return(allDJArtists)
-# }  
+# }
 
 #-------------- MAIN -----------------
 # spoken word shows
 excludeDJs <-
-  sort(c('SD',
-         'AF',
-         'HA',
-         'BC',
-         'CP',
-         'HP',
-         'JP',
-         'GM',
-         'DC',
-         'CC',
-         'DU',
-         'ES',
-         'LW',
-         'IM',
-         'LL',
-         'NW',
-         'GJ',
-         'NP',
-         'ZZ',
-         'FC',
-         'SY',
-         'TI',
-         'LK',
-         'TP',
-         'RC',
-         'TD',
-         'B3',
-         'VC'))
-DJURLs<-getDJURLs()
+  sort(c(
+    'SD',
+    'AF',
+    'HA',
+    'BC',
+    'CP',
+    'HP',
+    'JP',
+    'GM',
+    'DC',
+    'CC',
+    'DU',
+    'ES',
+    'LW',
+    'IM',
+    'LL',
+    'NW',
+    'GJ',
+    'NP',
+    'ZZ',
+    'FC',
+    'SY',
+    'TI',
+    'LK',
+    'TP',
+    'RC',
+    'TD',
+    'B3',
+    'VC'
+  ))
+DJURLs <- getDJURLs()
 # remove djurls in excludeDJs
-DJURLs <-DJURLs[!str_detect(DJURLs,paste0(excludeDJs,collapse="|"))]
-djKey<-getShowNames(DJURLs)
+DJURLs <- DJURLs[!str_detect(DJURLs, paste0(excludeDJs, collapse = "|"))]
+djKey <- getShowNames(DJURLs)
 
 
-playlistURLs<-getDJPlaylistURLs(djKey$DJ) |> 
+playlistURLs <- getDJPlaylistURLs(djKey$DJ) |>
   unique()
-showCounts<-playlistURLs %>%
+showCounts <- playlistURLs %>%
   group_by(DJ) %>%
-  summarise(showCount=n()) %>%
+  summarise(showCount = n()) %>%
   arrange(desc(showCount))
-djKey<-left_join(djKey,showCounts) %>% 
-  unique() |> 
-  drop_na() |> 
+djKey <- left_join(djKey, showCounts) %>%
+  unique() |>
+  drop_na() |>
   as_tibble()
 
 #limit analysis to DJs with at least numShows shows.
@@ -284,7 +313,6 @@ djKey <- djKey %>%
   filter(showCount > numShows, !(DJ %in% excludeDJs))
 
 
-compute_parquet(djKey,"data/djKey_prelim.parquet")
+compute_parquet(djKey, "data/djKey_prelim.parquet")
 # save playlistURLs as parquet
-compute_parquet(playlistURLs,"data/playlistURLs.parquet")
-
+compute_parquet(playlistURLs, "data/playlistURLs.parquet")
