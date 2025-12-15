@@ -1,66 +1,99 @@
-# scrape playlists
+# scrape DJs
 
 library(rvest)
+library(httr)
 library(stringr)
 library(xml2)
 library(tidyverse)
 library(progress)
 library(duckplyr)
+library(rlang)
 
-# ----------------------------------------------
-ROOT_URL <- "http://wfmu.org"
-testurl <- "http://wfmu.org/playlists/KF"
+# ==================================================
+# setup
+base_url = "https://www.wfmu.org/playlists"
+date_regex <- "\\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\\.?\\s+\\d{1,2},\\s+\\d{4}\\b"
+pause = 0.5
+ua <- httr::user_agent(
+  "wfmu-comment-counter/1.0 (contact: aspteinmetz@yahoo.com)"
+)
+safe_get_html <- function(url) {
+  res <- tryCatch(httr::GET(url, ua, httr::timeout(30)), error = function(e) {
+    NULL
+  })
+  if (is.null(res) || httr::http_error(res)) {
+    return(NULL)
+  }
+  tryCatch(read_html(res), error = function(e) NULL)
+}
+
+safe_get_html_raw <- function(url) {
+  res <- tryCatch(httr::GET(url, ua, httr::timeout(30)), error = function(e) {
+    NULL
+  })
+  if (is.null(res) || httr::http_error(res)) {
+    return(NULL)
+  }
+  res_text <- res |>
+    content(as = "text", encoding = "UTF-8") |>
+    strsplit("<br>") |>
+    unlist()
+  tryCatch(res_text, error = function(e) NULL)
+}
+# helper: absolute urls
+abs <- function(href, base) {
+  href <- href[!is.na(href)]
+  if (length(href) == 0) {
+    return(character(0))
+  }
+  xml2::url_absolute(href, base)
+}
+source("func_get_show_links.R")
+source("func_get_show_names.R")
+# ==================================================
+
+# fetch base and find DJ archive links like /playlists/<dj>
+base_doc <- safe_get_html(base_url)
+if (is.null(base_doc)) {
+  abort("Failed to fetch base URL")
+}
+
+all_hrefs <- base_doc %>%
+  html_nodes("a") %>%
+  html_attr("href") %>%
+  discard(is.na) %>%
+  unique()
+
+dj_ids <- all_hrefs[str_detect(all_hrefs, "^/playlists/[^/]+$")] |>
+  str_extract("(?<=/playlists/)[^/]+$") |>
+  unique() |>
+  # remove "JM" from list, never comments
+  discard(\(x) x == "JM")
+
+
+# get all show URLs for all DJs
+NO_REFRESH <- TRUE
+# if show_urls.rds exists, load it instead of re-fetching
+# set NO_REFRESH globally
+if (file.exists("data/wfmu_show_urls.rds") & NO_REFRESH) {
+  show_urls <- readRDS("data/wfmu_show_urls.rds")
+} else {
+  show_urls <- dj_ids |>
+    map_dfr(get_show_links) |>
+    distinct()
+  saveRDS(show_urls, "data/wfmu_show_urls.rds")
+  saveRDS(dj_profiles, "data/new_djKey.rds")
+}
+
+# work stopping point here
 #-------------------------------------------
 getDJURLs <- function() {
-  rawDJURLs <- read_html(paste(ROOT_URL, "/playlists", sep = ""))
-  # get the urls of the each DJs RSS playlist feed
-  t <- rawDJURLs %>%
-    html_nodes(
-      xpath = '//html//body//center[2]//table[1]//table//a[contains(.,"Playlists")]'
-    ) %>%
-    html_attr(name = "href")
-
-  DJURLs <- paste("http://wfmu.org", t, sep = "")[-1]
-  # above got the RSS feed links but we want the longer list of shows.  Below modifies
-  # the URL to get the right link
-  DJURLs <- gsub("playlistfeed", "playlists", DJURLs)
-  DJURLs <- gsub(".xml", "", DJURLs)
-
+  DJURLs <- abs(paste0("/playlists/", dj_ids), base_url)
   return(DJURLs)
 }
 #-------------------------------------------
-getDJsOffSched <- function() {
-  #table 9 is off sched. 2-8 are monday through sunday
-  rawDJURLs <- read_html(paste(ROOT_URL, "/playlists", sep = ""))
-  t_off <- rawDJURLs %>%
-    html_nodes(
-      xpath = '//html//body//center[2]//table[1]//table[9]//a[contains(.,"Playlists")]'
-    ) %>%
-    html_attr(name = "href")
-  d_off <- str_replace(t_off, "/playlistfeed/", "")
-  d_off <- str_replace(d_off, ".xml", "")
-  return(d_off)
-}
+DJURLs <- getDJURLs()
 
-# get_other_shownames for the given DJ
-get_other_shownames <- function(url, base_showname) {
-  # read_html with error checking
-  html <- try(xml2::read_html(url), silent = TRUE)
-  if (inherits(html, "try-error")) {
-    html <- NULL
-  }
-
-  if (is.null(html)) {
-    return(NULL)
-  }
-  all_shownames <- html %>%
-    html_nodes(".KDBprogram + a") |>
-    html_text()
-  # remove the current show name from the list
-  shownames <- all_shownames[all_shownames != base_showname] |>
-    paste0(collapse = '\n')
-  return(shownames)
-}
 #---------------------------------------------------
 # get the shownames for a DJ
 getShowNames <- function(DJURLs) {
