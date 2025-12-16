@@ -289,6 +289,8 @@ getDJProfileURLs <- function(DJURLs) {
 # spoken word shows
 excludeDJs <-
   sort(c(
+    'DX',
+    'WP',
     'SD',
     'AF',
     'HA',

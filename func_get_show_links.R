@@ -36,7 +36,7 @@ get_show_links <- function(dj_id, back_playlist = NULL) {
   empty <- tibble(
     dj = character(0),
     show_id = character(0),
-    href = character(0),
+    show_id = character(0),
     date = as.Date(character(0))
   )
 
@@ -61,7 +61,7 @@ get_show_links <- function(dj_id, back_playlist = NULL) {
     xpath = ".//a[(contains(translate(@href,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/playlist/')) or (contains(translate(@href,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/playlists/'))]"
   )
   if (length(anchors) == 0) {
-    return(tibble(date = as.Date(character()), href = character()))
+    return(tibble(date = as.Date(character()), show_id = character()))
   }
 
   hrefs <- html_attr(anchors, "href")
@@ -87,18 +87,18 @@ get_show_links <- function(dj_id, back_playlist = NULL) {
     date = dates_chr[keep] |>
       parse_date_time(orders = "BdY", quiet = TRUE) |>
       as.Date(),
-    href = hrefs[keep]
+    show_id = hrefs[keep]
   )
 
   # recursively handle links to prior years
-  prior_years <- all_items$href[str_detect(
-    all_items$href,
+  prior_years <- all_items$show_id[str_detect(
+    all_items$show_id,
     paste0(dj_id, "\\d{4}")
   )]
 
   playlist_rows <- all_items |>
-    filter(!href %in% prior_years) |>
-    filter(!href == paste0("/playlists/", dj_id))
+    filter(!show_id %in% prior_years) |>
+    filter(!show_id == paste0("/playlists/", dj_id))
 
   if (is.null(back_playlist)) {
     prior_years <- prior_years |>
