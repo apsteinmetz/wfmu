@@ -52,22 +52,21 @@ source("func_get_show_links.R")
 source("func_get_show_names.R")
 # ==================================================
 
-# fetch base and find DJ archive links like /playlists/<dj>
-base_doc <- safe_get_html(base_url)
-if (is.null(base_doc)) {
-  abort("Failed to fetch base URL")
-}
+# # fetch base and find DJ archive links like /playlists/<dj>
+# base_doc <- safe_get_html(base_url)
+# if (is.null(base_doc)) {
+#   abort("Failed to fetch base URL")
+# }
 
-all_hrefs <- base_doc %>%
-  html_nodes("a") %>%
-  html_attr("href") %>%
-  discard(is.na) %>%
-  unique()
+# all_hrefs <- base_doc %>%
+#   html_nodes("a") %>%
+#   html_attr("href") %>%
+#   discard(is.na) %>%
+#   unique()
 
-dj_ids <- all_hrefs[str_detect(all_hrefs, "^/playlists/[^/]+$")] |>
-  str_extract("(?<=/playlists/)[^/]+$") |>
-  unique()
-
+# dj_ids <- all_hrefs[str_detect(all_hrefs, "^/playlists/[^/]+$")] |>
+#   str_extract("(?<=/playlists/)[^/]+$") |>
+#   unique()
 
 #-------------- MAIN -----------------
 # spoken word shows
@@ -107,7 +106,7 @@ excludeDJs <-
     'VC'
   ))
 
-djKey_a <- get_show_names() |> 
+show_names <- get_show_names() |>
   filter(!(DJ %in% excludeDJs))
 
 # get all show URLs for all music DJs
@@ -115,7 +114,7 @@ NO_REFRESH <- TRUE
 # if show_urls.rds exists, load it instead of re-fetching
 # set NO_REFRESH globally
 if (file.exists("data/wfmu_show_urls.rds") & NO_REFRESH) {
-  show_urls <- readRDS("data/wfmu_show_urls.rds") 
+  show_urls <- readRDS("data/wfmu_show_urls.rds")
   dj_profiles <- readRDS("data/dj_profiles.rds")
 } else {
   show_urls <- dj_ids |>
@@ -132,32 +131,46 @@ showCount <- show_urls %>%
 
 # get first show and last show dates for each DJ
 showDates <- show_urls %>%
-  summarise(.by = "DJ",
+  summarise(
+    .by = "DJ",
     FirstShow = min(date, na.rm = TRUE),
     LastShow = max(date, na.rm = TRUE)
   ) %>%
   arrange(DJ)
 
-djKey <- dj_profiles |> 
-  left_join(showCount,by = "DJ") %>%
-  left_join(djKey_a, by = "DJ") |> 
-  left_join(showDates, by = "DJ") |> 
+djKey <- dj_profiles |>
+  left_join(show_names, by = "DJ") |>
+  left_join(showCount, by = "DJ") %>%
+  left_join(showDates, by = "DJ") |>
   # remove ShowName string from other_shownames
   mutate(
-    other_shownames = str_trim(str_remove(other_shownames, ShowName))) |> 
-  mutate(other_shownames = str_remove(other_shownames,"'s show")) |> 
-  mutate(other_shownames = str_remove(other_shownames,"^\\\n")) |> 
+    other_shownames = str_trim(str_remove(other_shownames, ShowName))
+  ) |>
+  mutate(other_shownames = str_remove(other_shownames, "'s show")) |>
+  mutate(other_shownames = str_remove(other_shownames, "^\\\n")) |>
   # replace empty string with "none"
-  mutate(other_shownames = ifelse(other_shownames == "", "none", other_shownames)) |> 
+  mutate(
+    other_shownames = ifelse(other_shownames == "", "none", other_shownames)
+  ) |>
   unique() |>
   drop_na() |>
-  as_tibble()
+  as_tibble() |>
+  select(
+    DJ,
+    ShowName,
+    onSched,
+    Channel,
+    other_shownames,
+    showCount,
+    FirstShow,
+    LastShow,
+    profileURL
+  )
 
 #limit analysis to DJs with at least numShows shows.
 # numShows <- 10
 # djKey <- djKey %>%
 #  filter(showCount > numShows)
-
 
 compute_parquet(djKey, "data/djKey.parquet")
 # save playlistURLs as parquet
