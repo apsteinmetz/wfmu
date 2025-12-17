@@ -40,6 +40,46 @@ get_show_names <- function() {
     bind_rows(
       make_dj_table(off_rows) |>
         mutate(onSched = FALSE)
-    )
+    ) |> 
+    distinct()
+
+# now identify which of the djs on the alternate stream 
+alt_streams <- 
+  tibble(url = c(
+  "https://www.wfmu.org/rocknsoulradio",
+"https://www.wfmu.org/drummer",
+"https://www.wfmu.org/sheena"),
+Channel = c("Rock & Soul","Give the Drummer","Sheena's Jungle Room"))
+
+
+get_alt_stream_djs <- function(stream_url){
+doc <- safe_get_html(stream_url)
+# get all tables from the page
+stream_djs <- html_elements(doc, "table") |> 
+  # get all the hrefs from the table
+  html_elements("a") |> 
+  html_attr("href") |> 
+  # extract 2-character DJ IDs from the URLs
+  str_extract("(?<=playlists\\/)([A-Z0-9]{2})") |> 
+  na.omit() |>
+  unique()
+return(tibble(DJ = stream_djs))
+}
+
+alt_show_names <- 
+  alt_streams |> 
+  rowwise() |> 
+  mutate(djs = list(get_alt_stream_djs(url))) |> 
+  unnest(djs)  |> 
+  mutate(onSched = TRUE) |> 
+  select(-url) |> 
+  distinct() |> 
+  left_join(show_names |> select(DJ, ShowName), by = "DJ")
+
+show_names <- show_names |> 
+  rows_update(alt_show_names, by = "DJ")
+
   return(show_names)
 }
+# example usage:
+# show_names <- get_show_names()
