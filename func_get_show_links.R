@@ -34,8 +34,7 @@ get_other_shownames <- function(url) {
 # as a global variable
 get_show_links <- function(dj_id, back_playlist = NULL) {
   empty <- tibble(
-    dj = character(0),
-    show_id = character(0),
+    DJ= character(0),
     show_id = character(0),
     date = as.Date(character(0))
   )
@@ -83,7 +82,7 @@ get_show_links <- function(dj_id, back_playlist = NULL) {
   }
 
   all_items <- tibble(
-    dj = dj_id,
+    DJ= dj_id,
     date = dates_chr[keep] |>
       parse_date_time(orders = "BdY", quiet = TRUE) |>
       as.Date(),
