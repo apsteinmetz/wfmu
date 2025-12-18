@@ -74,6 +74,7 @@ source("func_get_show_names.R")
 excludeDJs <-
   sort(c(
     'JM',
+    'SD',
     'DX',
     'WP',
     'SD',

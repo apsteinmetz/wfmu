@@ -9,7 +9,8 @@ library(duckplyr)
 # ----------------------------------------------
 ROOT_URL <- "http://wfmu.org"
 
---------------------------------------------------------------------------altArtistNames <- c(
+# --------------------------------------------------------------------------
+altArtistNames <- c(
   'THE STOOGE',
   'Band',
   'Singer',
@@ -94,34 +95,21 @@ fixHeaders <- function(pl) {
 }
 
 #--------------------------------------------------------------------
-get_playlist <- function(plURL = "/playlists/shows/155534", dj = "WA") {
+get_playlist <- function(show_info) {
   # turn off duckplyr
-  methods_restore()
+  # methods_restore()
+  dj <- show_info$DJ
+  airDate <- show_info$date
+
 
   wholepage <- tryCatch(
-    read_html(paste0(ROOT_URL, "\\/playlists\\/",plURL)),
+    read_html(paste0(ROOT_URL, "/playlists/",show_info$show_id)),
     error = function(e) {
       NA
     }
   ) #handle 404 errors
   if (is.na(wholepage)) {
     return(tibble(DJ = "", AirDate = as.Date(NA), Artist = "", Title = ""))
-  }
-  #try to pull out the show date.  assume first date in text on page is the show date
-  airDate <- wholepage |>
-    html_text() |>
-    str_extract('[A-Za-z]+ [0-9]{1,2}, [0-9]{4}') |>
-    as.Date("%B %d, %Y")
-  if (is.na(airDate)) {
-    #try something else
-    airDate <- wholepage |>
-      html_text() |>
-      str_extract('[0-9]{1,2} [A-Za-z]+ [0-9]{4}') |>
-      as.Date("%d %B %Y")
-  }
-  if (airDate < most_recent_date - 7) {
-    print("Back Far Enough")
-    return(NULL)
   }
   plraw <- NULL
   #hand-rolled
@@ -236,13 +224,13 @@ get_playlist <- function(plURL = "/playlists/shows/155534", dj = "WA") {
       filter(Artist != '') |>
       filter(!is.na(Artist))
     # just to track progress
-    if (is.null(playlist)) {
-      print("No Playlist")
-    } else {
-      print(playlist[1:5, ])
-    }
+    # if (is.null(playlist)) {
+    #  print("No Playlist")
+    #} else {
+    #  print(playlist[1:5, ])
+    #}
   }
-  methods_overwrite()
+  # methods_overwrite()
   return(playlist)
 }
 #-------------- MAIN -----------------
@@ -251,20 +239,15 @@ playlistURLs <- read_parquet_duckdb("data/playlistURLs.parquet")
 playlists_raw <- read_parquet_duckdb("data/playlists_raw.parquet") |>
   as_tibble()
 
-
 #careful not to trash intermediate results!
-# load("data/playlists_raw.rdata")
 UPDATE_ONLY = TRUE
 if (UPDATE_ONLY) {
-  #assume at most 5 shows per week
-  #most shows are 1/week except the morning show
   existing_shows <-  playlists_raw |>
     select(DJ, AirDate) |>
     distinct()
 
   missing_shows <- playlistURLs |>
-    anti_join(existing_shows, by = "DJ") |>
-    select(DJ, show_id)
+    anti_join(existing_shows, by = "DJ")
 
 
 playlists_temp <- tibble(
@@ -273,16 +256,29 @@ playlists_temp <- tibble(
   Artist = character(),
   Title = character()
 )
-
-
+  # progress bar for scraping missing shows
+  pb <- progress::progress_bar$new(
+    total = nrow(missing_shows),
+    format = "  Scraping [:bar] :current/:total (:percent) - :eta left - :message",
+    clear = FALSE
+  )
+  methods_restore()
   for (n in 1:nrow(missing_shows)) {
-    print(paste(n, missing_shows[n,],Sys.time()))
-    playlist <- get_playlist(#### RIGHT HERE####  )
+    # advance bar and set message for current DJ
+    pb$tick(tokens = list(message = paste0(missing_shows[n,]$DJ, " ", missing_shows[n,]$show_id)))
+
+    dj <- missing_shows[n,]$DJ
+    show_id <- missing_shows[n,]$show_id
+    # print(paste(n,dj,show_id,Sys.time()))
+    playlist <- get_playlist(missing_shows[n,])
       if (!is.null(playlist)) {
         playlists_temp <- bind_rows(playlists_temp, playlist)
       }
+    
+    if (is.null(playlist)) {
+      pb$terminate()
+      break # done with this DJ
     }
-    if (is.null(playlist)) break #done with this DJ
   }
   #save to disk after each dj
   compute_parquet(playlists_temp, "data/playlists_temp.parquet")
