@@ -50,23 +50,6 @@ abs <- function(href, base) {
 }
 source("func_get_show_links.R")
 source("func_get_show_names.R")
-# ==================================================
-
-# # fetch base and find DJ archive links like /playlists/<dj>
-# base_doc <- safe_get_html(base_url)
-# if (is.null(base_doc)) {
-#   abort("Failed to fetch base URL")
-# }
-
-# all_hrefs <- base_doc %>%
-#   html_nodes("a") %>%
-#   html_attr("href") %>%
-#   discard(is.na) %>%
-#   unique()
-
-# dj_ids <- all_hrefs[str_detect(all_hrefs, "^/playlists/[^/]+$")] |>
-#   str_extract("(?<=/playlists/)[^/]+$") |>
-#   unique()
 
 #-------------- MAIN -----------------
 # spoken word shows
@@ -74,6 +57,8 @@ source("func_get_show_names.R")
 excludeDJs <-
   sort(c(
     'JM',
+    'IP',
+    'AC',
     'SD',
     'DX',
     'WP',
@@ -92,6 +77,7 @@ excludeDJs <-
     'LW',
     'IM',
     'LL',
+    'LU'
     'NW',
     'GJ',
     'NP',
@@ -100,15 +86,20 @@ excludeDJs <-
     'SY',
     'TI',
     'LK',
-    'TP',
     'RC',
     'TD',
-    'B3',
-    'VC'
+    'B3'
   ))
 
-show_names <- get_show_names() |>
-  filter(!(DJ %in% excludeDJs))
+all_show_names <- get_show_names()
+
+# FYI
+excluded_shows <- all_show_names %>%
+  filter(DJ %in% excludeDJs) |> 
+  arrange(DJ)
+show_names <- all_show_names %>%
+  filter(!(DJ %in% excludeDJs)) |> 
+  arrange(DJ)
 
 # get all show URLs for all music DJs
 NO_REFRESH <- TRUE
@@ -118,10 +109,13 @@ if (file.exists("data/wfmu_show_urls.rds") & NO_REFRESH) {
   show_urls <- readRDS("data/wfmu_show_urls.rds")
   dj_profiles <- readRDS("data/dj_profiles.rds")
 } else {
-  show_urls <- dj_ids |>
+  show_urls <- show_names$DJ |>
     map_dfr(get_show_links) |>
     distinct()
+  show_urls <- show_urls |>
+    filter(!(DJ %in% excludeDJs))
   saveRDS(show_urls, "data/wfmu_show_urls.rds")
+  compute_parquet(show_urls, "data/playlistURLs.parquet")
   saveRDS(dj_profiles, "data/dj_profiles.rds")
 }
 

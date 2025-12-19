@@ -100,10 +100,10 @@ get_playlist <- function(show_info) {
   # methods_restore()
   dj <- show_info$DJ
   airDate <- show_info$date
-
+  show_url <- paste0(ROOT_URL, "/playlists/", show_info$show_id)
 
   wholepage <- tryCatch(
-    read_html(paste0(ROOT_URL, "/playlists/",show_info$show_id)),
+    read_html(show_url),
     error = function(e) {
       NA
     }
@@ -202,7 +202,7 @@ get_playlist <- function(show_info) {
   # final clean up if we have something
   if (is.null(plraw)) {
     playlist <- NULL
-    print("DUD")
+    print(paste("DUD", show_url))
   } else {
     if (TRUE %in% is.na(names(plraw))) {
       plraw <- plraw[, -which(is.na(names(plraw)))]
@@ -224,11 +224,11 @@ get_playlist <- function(show_info) {
       filter(Artist != '') |>
       filter(!is.na(Artist))
     # just to track progress
-    # if (is.null(playlist)) {
-    #  print("No Playlist")
-    #} else {
-    #  print(playlist[1:5, ])
-    #}
+    if (is.null(playlist)) {
+      print(paste("No Playlist", show_url))
+    } else {
+      print(playlist[1:5, ])
+    }
   }
   # methods_overwrite()
   return(playlist)
@@ -242,49 +242,48 @@ playlists_raw <- read_parquet_duckdb("data/playlists_raw.parquet") |>
 #careful not to trash intermediate results!
 UPDATE_ONLY = TRUE
 if (UPDATE_ONLY) {
-  existing_shows <-  playlists_raw |>
+  existing_shows <- playlists_raw |>
     select(DJ, AirDate) |>
     distinct()
 
   missing_shows <- playlistURLs |>
     anti_join(existing_shows, by = "DJ")
 
-
-playlists_temp <- tibble(
-  DJ = character(),
-  AirDate = as.Date(character()),
-  Artist = character(),
-  Title = character()
-)
-  # progress bar for scraping missing shows
-  pb <- progress::progress_bar$new(
-    total = nrow(missing_shows),
-    format = "  Scraping [:bar] :current/:total (:percent) - :eta left - :message",
-    clear = FALSE
+  playlists_temp <- tibble(
+    DJ = character(),
+    AirDate = as.Date(character()),
+    Artist = character(),
+    Title = character()
   )
+  # progress bar for scraping missing shows
+  #pb <- progress::progress_bar$new(
+  #  total = nrow(missing_shows),
+  #  format = "  Scraping [:bar] :current/:total (:percent) - :eta left - :message",
+  #  clear = FALSE
+  #)
   methods_restore()
   for (n in 1:nrow(missing_shows)) {
     # advance bar and set message for current DJ
-    pb$tick(tokens = list(message = paste0(missing_shows[n,]$DJ, " ", missing_shows[n,]$show_id)))
+    # pb$tick(tokens = list(message = paste0(missing_shows[n,]$DJ, " ", missing_shows[n,]$show_id)))
 
-    dj <- missing_shows[n,]$DJ
-    show_id <- missing_shows[n,]$show_id
-    # print(paste(n,dj,show_id,Sys.time()))
-    playlist <- get_playlist(missing_shows[n,])
-      if (!is.null(playlist)) {
-        playlists_temp <- bind_rows(playlists_temp, playlist)
-      }
-    
-    if (is.null(playlist)) {
-      pb$terminate()
-      break # done with this DJ
+    dj <- missing_shows[n, ]$DJ
+    show_id <- missing_shows[n, ]$show_id
+    print(paste(n, dj, show_id, Sys.time()))
+    playlist <- get_playlist(missing_shows[n, ])
+    if (!is.null(playlist)) {
+      playlists_temp <- bind_rows(playlists_temp, playlist)
     }
+
+    #    if (is.null(playlist)) {
+    #  pb$terminate()
+    #     break # done with this DJ
+    #   }
   }
   #save to disk after each dj
-  compute_parquet(playlists_temp, "data/playlists_temp.parquet")
+  # compute_parquet(playlists_temp, "data/playlists_temp.parquet")
 }
 
-bad_Tables <- anti_join(tibble(DJ = djList), playlists_temp) |>
+bad_Tables <- anti_join(tibble(DJ = djKey$DJ), playlists_temp) |>
   left_join(djKey)
 
 save(bad_Tables, file = "data/bad_tables.rdata")
@@ -296,6 +295,6 @@ playlists_temp <- playlists_temp |>
 
 # playlists_temp <- read_parquet_duckdb("data/playlists_temp.parquet")
 playlists_raw <- bind_rows(playlists_raw, playlists_temp) |>
-  distinct()
+  # distinct()
 
-compute_parquet(playlists_raw, "data/playlists_raw.parquet")
+  compute_parquet(playlists_raw, "data/playlists_raw.parquet")
