@@ -10,7 +10,8 @@ set_collapse(mask = NULL)
 
 #clean up raw playlists
 
-djKey <- read_parquet_duckdb("data/djKey_prelim.parquet")
+# first and last show were already determined in playlistURLs
+# djKey <- read_parquet_duckdb("data/djKey_prelim.parquet")
 playlists_raw <- read_parquet_duckdb("data/playlists_raw.parquet")
 
 #Clean up inconsistent artist names
@@ -400,31 +401,35 @@ playlists <- playlists %>%
   mutate_if(is.character, str_remove_all, "[\u236-\u400E]") %>%
   mutate_if(is.character, str_squish)
 
+# replace any empty artist tokens with "Unknown"
+playlists <- playlists |>
+  mutate(ArtistToken = ifelse(ArtistToken == "", "Unknown", ArtistToken)) |>
+  mutate(Title = ifelse(Title == "", "Unknown", Title))
+
 # save(playlists,file = "data/playlists.rdata")
 # write_csv(playlists,path="playlists.csv")
 
-# add first show and last show to djKey
-FirstShow <- playlists %>%
-  select(DJ, AirDate) %>%
-  distinct() %>%
-  slice_min(order_by = AirDate, n = 1, with_ties = FALSE, by = "DJ") %>%
-  rename(FirstShow = AirDate)
+# # add first show and last show to djKey
+# FirstShow <- playlists %>%
+#   select(DJ, AirDate) %>%
+#   distinct() %>%
+#   slice_min(order_by = AirDate, n = 1, with_ties = FALSE, by = "DJ") %>%
+#   rename(FirstShow = AirDate)
 
-LastShow <- playlists %>%
-  select(DJ, AirDate) %>%
-  distinct() %>%
-  slice_max(order_by = AirDate, n = 1, with_ties = FALSE, by = "DJ") %>%
-  rename(LastShow = AirDate)
+# LastShow <- playlists %>%
+#   select(DJ, AirDate) %>%
+#   distinct() %>%
+#   slice_max(order_by = AirDate, n = 1, with_ties = FALSE, by = "DJ") %>%
+#   rename(LastShow = AirDate)
 
+# djKey <- djKey %>%
+#   #  select(DJ,ShowName,onSched,showCount) %>%
+#   left_join(FirstShow, by = c("DJ")) %>%
+#   left_join(LastShow, by = c("DJ"))
 
-djKey <- djKey %>%
-  #  select(DJ,ShowName,onSched,showCount) %>%
-  left_join(FirstShow, by = c("DJ")) %>%
-  left_join(LastShow, by = c("DJ"))
-
-djKey <- select(playlists, DJ) |>
-  distinct() |>
-  left_join(djKey)
+# djKey <- select(playlists, DJ) |>
+#   distinct() |>
+#   left_join(djKey)
 
 # save unique artisttokens as parquet
 cat("Saving unique artist tokens as rdata\n")
@@ -436,9 +441,9 @@ all_artisttokens <- playlists |>
 # save as rdata
 save(all_artisttokens, file = "data/all_artisttokens.rdata")
 
-cat("Saving djKey.parquet\n")
-# save djKey as parquet
-compute_parquet(djKey, "data/djKey.parquet")
+# cat("Saving djKey.parquet\n")
+# # save djKey as parquet
+# compute_parquet(djKey, "data/djKey.parquet")
 
 # save as parquet
 cat("Saving playlists as parquet\n")
