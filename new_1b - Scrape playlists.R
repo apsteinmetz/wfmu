@@ -295,6 +295,6 @@ playlists_temp <- playlists_temp |>
 
 # playlists_temp <- read_parquet_duckdb("data/playlists_temp.parquet")
 playlists_raw <- bind_rows(playlists_raw, playlists_temp) |>
-  # distinct()
+  distinct()
 
-  compute_parquet(playlists_raw, "data/playlists_raw.parquet")
+compute_parquet(playlists_raw, "data/playlists_raw.parquet")
