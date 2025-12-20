@@ -32,9 +32,11 @@ get_other_shownames <- function(url) {
 # Function to get show links for a given DJ ID
 # A side effect is to populate dj_profiles with profile URLs and other shownames
 # as a global variable
-get_show_links <- function(dj_id, back_playlist = NULL) {
+# set update_only to FALSE if we are just doing an update and don't want to recurse into prior years. This will be faster.
+# set update_only to TRUE if any shows from last year were not fetched or to do a complete refresh
+get_show_links <- function(dj_id, update_only = FALSE, back_playlist = NULL) {
   empty <- tibble(
-    DJ= character(0),
+    DJ = character(0),
     show_id = character(0),
     date = as.Date(character(0))
   )
@@ -82,7 +84,7 @@ get_show_links <- function(dj_id, back_playlist = NULL) {
   }
 
   all_items <- tibble(
-    DJ= dj_id,
+    DJ = dj_id,
     date = dates_chr[keep] |>
       parse_date_time(orders = "BdY", quiet = TRUE) |>
       as.Date(),
@@ -103,7 +105,7 @@ get_show_links <- function(dj_id, back_playlist = NULL) {
     prior_years <- prior_years |>
       str_remove("/playlists/")
 
-    if (length(prior_years) > 0) {
+    if (length(prior_years) > 0 & !(update_only)) {
       back_playlist <- map(prior_years, \(back_year) {
         get_show_links(dj_id, back_year)
       }) |>
@@ -134,17 +136,18 @@ get_show_links <- function(dj_id, back_playlist = NULL) {
           profileURL = profileURL,
           other_shownames = other_shownames
         )
-      )
+      ) |>
+      distinct()
   }
 
   # final cleanup
   playlist_rows <- playlist_rows |>
     # links to fill in djs which will be found elsewhere
-    filter(!str_detect(href, "wfmu.org/playlists")) |>
+    filter(!str_detect(show_id, "wfmu.org/playlists")) |>
     mutate(
-      show_id = str_remove(href, "^/playlists/")
+      show_id = str_remove(show_id, "^/playlists/")
     ) |>
-    select(dj, date, show_id)
+    select(DJ, date, show_id)
 
   return(playlist_rows)
 }
