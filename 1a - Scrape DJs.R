@@ -80,13 +80,22 @@ excludeDJs <-
     'NW',
     'GJ',
     'NP',
+    'UP',
     'ZZ',
+    'R6',
     'FC',
     'SY',
     'TI',
     'LK',
     'RC',
     'TD',
+    'TH',
+    'PZ',
+    'NC',
+    'AZ',
+    'PW',
+    'WV',
+    'SE',
     'B3'
   ))
 
@@ -101,7 +110,7 @@ show_names <- all_show_names %>%
   filter(!(DJ %in% excludeDJs)) |>
   arrange(DJ)
 
-NO_REFRESH <- TRUE
+NO_REFRESH <- FALSE
 # do we need to scrape prior years or just update existing shows?
 UPDATE_ONLY <- TRUE
 
@@ -115,8 +124,8 @@ if (file.exists("data/wfmu_show_urls.rds") & NO_REFRESH) {
   if (UPDATE_ONLY) {
     show_urls <- readRDS("data/wfmu_show_urls.rds")
     show_urls_new <- show_names$DJ |>
-      map_dfr(\(x) get_show_links(x, update_only = TRUE)) |>
-      bind_rows(show_urls) |>
+      map_dfr(\(x) get_show_links(x, update_only = TRUE))
+    show_urls <- bind_rows(show_urls_new, show_urls) |>
       distinct()
     dj_profiles <- readRDS("data/dj_profiles.rds") |>
       bind_rows(dj_profiles) |>

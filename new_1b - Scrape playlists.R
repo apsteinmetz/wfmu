@@ -235,7 +235,8 @@ get_playlist <- function(show_info) {
 }
 #-------------- MAIN -----------------
 djKey <- read_parquet_duckdb("data/djKey.parquet")
-playlistURLs <- read_parquet_duckdb("data/playlistURLs.parquet")
+playlistURLs <- read_parquet_duckdb("data/playlistURLs.parquet") |>
+  rename(AirDate = date)
 playlists_raw <- read_parquet_duckdb("data/playlists_raw.parquet") |>
   as_tibble()
 
@@ -246,8 +247,9 @@ if (UPDATE_ONLY) {
     select(DJ, AirDate) |>
     distinct()
 
+  # find shows in playlistURLs that are not in playlists_raw
   missing_shows <- playlistURLs |>
-    anti_join(existing_shows, by = "DJ")
+    anti_join(existing_shows, by = c("DJ", "AirDate"))
 
   playlists_temp <- tibble(
     DJ = character(),
