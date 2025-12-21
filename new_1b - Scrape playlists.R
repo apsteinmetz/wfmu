@@ -2,12 +2,27 @@
 
 library(tidyverse)
 library(rvest)
+library(httr)
 library(xml2)
 library(progress)
 library(duckplyr)
 
 # ----------------------------------------------
 ROOT_URL <- "http://wfmu.org"
+
+ua <- httr::user_agent(
+  "wfmu-comment-counter/1.0 (contact: aspteinmetz@yahoo.com)"
+)
+
+safe_get_html <- function(url) {
+  res <- tryCatch(httr::GET(url, ua, httr::timeout(30)), error = function(e) {
+    NULL
+  })
+  if (is.null(res) || httr::http_error(res)) {
+    return(NULL)
+  }
+  tryCatch(read_html(res), error = function(e) NULL)
+}
 
 # --------------------------------------------------------------------------
 altArtistNames <- c(
@@ -99,15 +114,11 @@ get_playlist <- function(show_info) {
   # turn off duckplyr
   # methods_restore()
   dj <- show_info$DJ
-  airDate <- show_info$date
+  airDate <- show_info$AirDate
   show_url <- paste0(ROOT_URL, "/playlists/", show_info$show_id)
 
-  wholepage <- tryCatch(
-    read_html(show_url),
-    error = function(e) {
-      NA
-    }
-  ) #handle 404 errors
+  wholepage <- safe_get_html(show_url)
+
   if (is.na(wholepage)) {
     return(tibble(DJ = "", AirDate = as.Date(NA), Artist = "", Title = ""))
   }
@@ -221,6 +232,8 @@ get_playlist <- function(show_info) {
       mutate(Title = gsub("[\r\n].*$", "", Title)) |>
       mutate(Title = gsub("\\(.*$", "", Title)) |>
       mutate(Title = gsub("^\\s+|\\s+$", "", Title)) |>
+      # strip quotes from Title
+      mutate(Title = gsub('"', "", Title)) |>
       filter(Artist != '') |>
       filter(!is.na(Artist))
     # just to track progress
@@ -264,26 +277,31 @@ if (UPDATE_ONLY) {
   #  clear = FALSE
   #)
   methods_restore()
+  start_time <- Sys.time()
   for (n in 1:nrow(missing_shows)) {
-    # advance bar and set message for current DJ
-    # pb$tick(tokens = list(message = paste0(missing_shows[n,]$DJ, " ", missing_shows[n,]$show_id)))
-
     dj <- missing_shows[n, ]$DJ
     show_id <- missing_shows[n, ]$show_id
-    print(paste(n, dj, show_id, Sys.time()))
+    AirDate <- missing_shows[n, ]$AirDate
+    print(paste(
+      n,
+      dj,
+      show_id,
+      Sys.time() - start_time,
+      "min elapsed"
+    ))
     playlist <- get_playlist(missing_shows[n, ])
     if (!is.null(playlist)) {
       playlists_temp <- bind_rows(playlists_temp, playlist)
     }
 
-    #    if (is.null(playlist)) {
-    #  pb$terminate()
-    #     break # done with this DJ
-    #   }
+    #save to disk after each 100 playlists
+    if (n %% 100 == 0) {
+      print("Saving intermediate results to data/playlists_temp.parquet")
+      compute_parquet(playlists_temp, "data/playlists_temp.parquet")
+    }
   }
-  #save to disk after each dj
-  # compute_parquet(playlists_temp, "data/playlists_temp.parquet")
 }
+compute_parquet(playlists_temp, "data/playlists_temp.parquet")
 
 bad_Tables <- anti_join(tibble(DJ = djKey$DJ), playlists_temp) |>
   left_join(djKey)
