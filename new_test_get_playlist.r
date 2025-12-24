@@ -247,15 +247,16 @@ extract_playlist <- function(show_info) {
   }
 
   # Return empty tibble if no valid playlist found
-  tibble(
+  return(tibble(
     DJ = show_info$DJ,
     AirDate = show_info$AirDate,
-    Artist = character(),
-    Title = character()
-  )
+    Artist = "",
+    Title = ""
+  ))
 }
 
-#   slice_sample(n = 100)
+test_pages <- missing_shows |>
+  slice_sample(n = 100)
 
 methods_restore()
 all_playlists <- test_pages |>
