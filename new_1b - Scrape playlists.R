@@ -4,7 +4,6 @@ library(tidyverse)
 library(rvest)
 library(httr)
 library(xml2)
-library(progress)
 library(duckplyr)
 
 # ----------------------------------------------
@@ -109,18 +108,55 @@ fixHeaders <- function(pl) {
   return(pl)
 }
 
+expand_show_id <- function(show_id) {
+  # scalar input expected; returns full url string or NULL for 1-2 letter ids
+  if (is.null(show_id)) {
+    return(NULL)
+  }
+  id <- as.character(show_id)
+  id <- trimws(id)
+  if (identical(id, "")) {
+    return(id)
+  }
+
+  # if just one or two letters (only letters), treat as fragment and return NULL
+  if (nchar(id) %in% c(1, 2) && grepl("^[A-Za-z]{1,2}$", id)) {
+    return(id)
+  }
+
+  # fully qualified http(s) URL -> return as-is
+  if (grepl("^https?://", id, ignore.case = TRUE)) {
+    return(id)
+  }
+
+  # starts with /playlists or /Playlists -> prepend ROOT_URL (keep leading slash)
+  if (grepl("^/(?i:playlists)", id, perl = TRUE)) {
+    return(paste0(ROOT_URL, id))
+  }
+
+  # otherwise prepend ROOT_URL/playlists/ and strip any leading slashes from id
+  paste0(ROOT_URL, "/playlists/", sub("^/+", "", id))
+}
+
 #--------------------------------------------------------------------
 get_playlist <- function(show_info) {
   # turn off duckplyr
   # methods_restore()
   dj <- show_info$DJ
   airDate <- show_info$AirDate
-  show_url <- paste0(ROOT_URL, "/playlists/", show_info$show_id)
 
+  # most common case
+  show_url <- show_info$show_url
   wholepage <- safe_get_html(show_url)
 
-  if (is.na(wholepage)) {
-    return(tibble(DJ = "", AirDate = as.Date(NA), Artist = "", Title = ""))
+  # we got nuthin'
+  if (is.null(wholepage)) {
+    return(tibble(
+      DJ = dj,
+      AirDate = airDate,
+      Artist = "no_list",
+      Title = "no_list"
+    ))
   }
   plraw <- NULL
   #hand-rolled
@@ -214,6 +250,12 @@ get_playlist <- function(show_info) {
   if (is.null(plraw)) {
     playlist <- NULL
     print(paste("DUD", show_url))
+    return(tibble(
+      DJ = dj,
+      AirDate = airDate,
+      Artist = "no_list",
+      Title = "no_list"
+    ))
   } else {
     if (TRUE %in% is.na(names(plraw))) {
       plraw <- plraw[, -which(is.na(names(plraw)))]
@@ -262,7 +304,11 @@ if (UPDATE_ONLY) {
 
   # find shows in playlistURLs that are not in playlists_raw
   missing_shows <- playlistURLs |>
-    anti_join(existing_shows, by = c("DJ", "AirDate"))
+    anti_join(existing_shows, by = c("DJ", "AirDate")) |>
+    as_tibble() |>
+    mutate(show_url = map_chr(show_id, expand_show_id)) |>
+    # get rid of 1-2 letter show_ids that are pointers to fill-ins
+    filter(!str_detect(show_url, "^[A-Za-z]{2,3}$"))
 
   playlists_temp <- tibble(
     DJ = character(),
@@ -278,7 +324,8 @@ if (UPDATE_ONLY) {
   #)
   methods_restore()
   start_time <- Sys.time()
-  for (n in 1:nrow(missing_shows)) {
+  #  for (n in 1:nrow(missing_shows)) {
+  for (n in 963:nrow(missing_shows)) {
     dj <- missing_shows[n, ]$DJ
     show_id <- missing_shows[n, ]$show_id
     AirDate <- missing_shows[n, ]$AirDate

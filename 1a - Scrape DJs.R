@@ -96,6 +96,7 @@ excludeDJs <-
     'PW',
     'WV',
     'SE',
+    'AP',
     'B3'
   ))
 
