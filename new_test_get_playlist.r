@@ -36,9 +36,11 @@ altArtistNames <- c(
   'THE STOOGE',
   'Band',
   'Singer',
-  'Artist'
+  'Artist',
+  'artist',
+  'ARTIST'
 )
-altTitleNames <- c('THE SONG', 'Track', 'Song', 'Title')
+altTitleNames <- c('THE SONG', 'Track', 'Song', 'Title', 'TITLE', 'title')
 
 djKey <- read_parquet_duckdb("data/djKey.parquet")
 playlistURLs <- read_parquet_duckdb("data/playlistURLs.parquet") |>
@@ -58,6 +60,7 @@ missing_shows <- playlistURLs |>
   filter(!str_detect(show_url, "^[A-Za-z]{2,3}$"))
 
 
+# case where hypen is the separator within one table column
 BK_case <- function(table_2) {
   playlist <- table_2 |>
     str_split("\n\n") |>
@@ -91,6 +94,28 @@ extract_playlist <- function(show_info) {
       Title = character()
     )
     return(result)
+  }
+  # preprocess. If the page has frames get the first frame
+  frames <- html_doc |> html_elements("frame")
+  if (length(frames) > 0) {
+    frame_src <- frames |> html_attr("src") |> first()
+
+    if (!is.na(frame_src) && frame_src != "") {
+      # construct full URL if needed
+      if (!str_detect(frame_src, "^http")) {
+        frame_src <- paste0(ROOT_URL, frame_src)
+      }
+      html_doc <- safe_get_html(frame_src)
+      if (is.null(html_doc)) {
+        result <- tibble(
+          DJ = show_info$DJ,
+          AirDate = show_info$AirDate,
+          Artist = character(),
+          Title = character()
+        )
+        return(result)
+      }
+    }
   }
 
   # First try: Look for td elements with specific classes
@@ -144,10 +169,9 @@ extract_playlist <- function(show_info) {
   if (length(tables) > 0) {
     # Try each table until we find one with playlist data
     for (tbl in tables) {
-      if (ncol(tbl) == 0 || nrow(tbl) == 0) {
+      if (ncol(tbl) == 0 || nrow(tbl) < 2) {
         next
       }
-
       # Convert to tibble and fix column names
       tbl <- as_tibble(tbl, .name_repair = "unique")
 
@@ -158,7 +182,7 @@ extract_playlist <- function(show_info) {
       # Check for artist column (case-insensitive)
       # Only match if the column name/first row value looks like a real header
       artist_col <- NULL
-      for (name in c(altArtistNames, "ARTIST", "artist")) {
+      for (name in altArtistNames) {
         # Skip auto-generated column names like X1, X2, etc.
         valid_cols <- which(!str_detect(col_names, "^X\\d+$"))
         idx <- which(
@@ -180,7 +204,7 @@ extract_playlist <- function(show_info) {
 
       # Check for title column (case-insensitive)
       title_col <- NULL
-      for (name in c(altTitleNames, "TITLE", "title")) {
+      for (name in altTitleNames) {
         # Skip auto-generated column names like X1, X2, etc.
         valid_cols <- which(!str_detect(col_names, "^X\\d+$"))
         idx <- which(
@@ -332,8 +356,53 @@ extract_playlist <- function(show_info) {
   #tables <- html_doc |>
   #  html_elements("table") |>
   #  map(html_table)
+  # print(show_info$AirDate)
   if (length(tables) >= 2) {
-    result <- BK_case(tables[[2]][2])
+    table_2 <- tables[[2]][2]
+    # when no playlist sometimes the second table is  listener comments
+    if (nrow(table_2) > 0 & !str_detect(table_2[1, 1], "Listener")) {
+      result <- BK_case(tables[[2]][2])
+      if (nrow(result) > 0) {
+        result <- result |>
+          select(Artist, Title) |>
+          mutate(
+            .before = "Artist",
+            DJ = show_info$DJ,
+            AirDate = show_info$AirDate
+          )
+        return(result)
+      }
+    }
+  }
+  # sixth try. there are no tables at all. look for  lines with a colon, bar  or quotes separating artist and title
+  # e.g dj DK, BT
+  text_content <-
+    html_doc |> html_text()
+  lines <- str_split(text_content, "\n") |> unlist() |> str_trim()
+  # keep only lines with a colon, starting and ending with non-space characters
+  playlist_lines <- lines[str_detect(lines, "^[A-Za-z ]+ : [A-Za-z ]+")]
+  if (length(playlist_lines) == 0) {
+    #keep lines with an unquoted string followed by a quoted string
+    playlist_lines <- lines[str_detect(lines, '.+ \\".+\\"')]
+  }
+  if (length(playlist_lines) == 0) {
+    #keep lines with a bar followed by a bar
+    playlist_lines <- lines[str_detect(lines, '.+ \\|.+\\|')]
+  }
+  if (length(playlist_lines) > 0) {
+    result <- tibble(line = playlist_lines) |>
+      separate(
+        line,
+        into = c("Artist", "Title"),
+        sep = ':|\\"|\\|',
+        extra = "drop"
+      ) |>
+      mutate(
+        Artist = str_trim(Artist),
+        Title = str_trim(Title)
+      ) |>
+      filter(!is.na(Artist) & !is.na(Title) & Artist != "" & Title != "")
+
     if (nrow(result) > 0) {
       result <- result |>
         select(Artist, Title) |>
@@ -388,3 +457,10 @@ all_playlists <- problem_pages |>
       show_url = show_url
     ))
   })
+
+for (n in 1:nrow(problem_pages)) {
+  problem_pages[n, 4] |>
+    pull(show_url) |>
+    # open external browser to inspect
+    browseURL()
+}
