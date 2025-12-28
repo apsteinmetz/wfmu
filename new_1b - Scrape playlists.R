@@ -1,3 +1,5 @@
+# scrape playlists from WFMU show pages
+
 library(tidyverse)
 library(rvest)
 library(httr)
