@@ -1,346 +1,518 @@
-# scrape playlists
+# scrape playlists from WFMU show pages
 
-library(rvest)
-library(stringr)
-library(xml2)
 library(tidyverse)
-library(progress)
+library(rvest)
+library(httr)
+library(xml2)
 library(duckplyr)
 
 # ----------------------------------------------
-ROOT_URL<-"http://wfmu.org"
+ROOT_URL <- "http://wfmu.org"
 
-#-------------------------------------------------
-# # Get all Artists ever played by a DJ
-# #WFMU maintains this as a separate page
-# getDJArtistNames<-function(DJURLs) {
-#   # scrape artist names for all DJs from the link at the bottom of each DJ page
-#   allDJArtists<-data.frame()
-#   URL_BRANCH<- "/artistkeywords.php/"
-#   for (page in DJURLs) {
-#     singleDJ<- read_html(page)
-#     showName <- html_node(singleDJ,"title")|>html_text()
-#     showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
-#     DJ <- sub("http://wfmu.org/playlists/","",page)
-#     djKey<-rbind(djKey,data.frame(DJ=DJ,ShowName=showName))
-#     print(showName)
-#     artistListPage <- paste(ROOT_URL,URL_BRANCH,DJ, sep="")
-#     artistList<-read_html(artistListPage)|>html_node(xpath="//body/div")|>html_text()|>str_split("\n")
-#     DJArtists<-data.frame(DJ,artistRaw=unlist(artistList))
-#     if (nrow(DJArtists) >0) allDJArtists = rbind(allDJArtists,DJArtists)
-#     #remove factor level of DJs with no artists
-#     save(allDJArtists,file = "data/allDJArtists.rdata")
-#   }
-#   return(allDJArtists)
-# }  
-
-#--------------------------------------------------------------------------
-altArtistNames <- c('THE STOOGE', 'Band', 'Singer', 'Artist')
-altTitleNames <- c('THE SONG', 'Track', 'Song','Title')
-altHeaderNames <- c(altArtistNames, altTitleNames)
-MAXLEN = 60L #how long should we let artist and title names be. Truncate longer
-header_th_xpath <- paste(
-  "//th='Track'",
-  "or //th='Title'",
-  "or //th='Song'",
-  "or //th='THE SONG'"
-)
-header_td_xpath <- paste(
-  "//td='Track'",
-  "or //td='Title'",
-  "or //td='Song'",
-  "or //td='THE SONG'",
-  "or //td='Artist'",
-  "or //td='THE SONG'",
-  "or //td='THE STOOGE'"
+ua <- httr::user_agent(
+  "wfmu-comment-counter/1.0 (contact: aspteinmetz@yahoo.com)"
 )
 
-
-#------------------------------------------------------------------
-try_BK<-function(wp){
-  #assume first field is title and second is artist separated by dash
-  #doing it it two steps assure same number of artists and titles
-  title_artist<-wp |> 
-    html_nodes(xpath="//table[2]") |> 
-    html_text() |> 
-    str_extract_all("\n[\\S ]+\n-\n[\\S ]+\n") |> 
-    pluck(1)
-  
-  
-  Title<-title_artist |> 
-    str_extract_all("\n[\\S ]+\n-") |> 
-    str_replace_all("\n(-)?","")
-  
-  Artist<-title_artist |> 
-    str_extract_all("\n-\n[\\S ]+\n") |> 
-    str_replace_all("\n(-)?","")
-  plraw<-tibble(Artist,Title)
-  
-}
-#------------------------------------------------------------------
-try_HN<-function(wp){
-  #assume first field is title and second is artist separated by colon
-  #doing it it two steps assure same number of artists and titles
-  title_artist<-wp |> 
-    html_nodes(xpath="//table[2]") |> 
-    html_text() |> 
-    str_extract_all("\n[\\S ]+: [\\S ]+\n") |> 
-    pluck(1)
-  
-  
-  Artist<-title_artist |> 
-    str_extract_all("\n[\\S ]+: ") |> 
-    str_replace_all("(\n)|(: )","")
-  
-  Title<-title_artist |> 
-    str_extract_all(": [\\S ]+\n") |> 
-    str_replace_all("(\n)|(: )","")
-  plraw<-tibble(Artist,Title)
-  
-}#------------------------------------------------------------------
-
-fixHeaders <- function(pl) {
-  #takes a data frame
-  nm<-which(names(pl) %in% altArtistNames)
-  tt<-which(names(pl) %in% altTitleNames)
-  if (length(nm)>0){
-    names(pl)[nm] <- "Artist"
-  } else{
-    pl=NULL
-    return(pl)
-  } 
-  if (length(tt)>0){
-    names(pl)[tt] <- "Title"
-  } else{
-    pl$Title=NA
-  }
-  
-  return(pl)
-}
-
-#--------------------------------------------------------------------
-get_playlist <- function(plURL="/playlists/shows/155534", dj = "WA") {
-  # turn off duckplyr
-  methods_restore()
-  
-  
-  wholepage <- tryCatch(
-    read_html(paste0(ROOT_URL, plURL)),
-    error = function(e){NA}) #handle 404 errors
-  if(is.na(wholepage)){
-    return(tibble(DJ="",AirDate=as.Date(NA),Artist="",Title=""))
-  }
-  #try to pull out the show date.  assume first date in text on page is the show date
-  airDate <- wholepage |>
-    html_text() |>
-    str_extract('[A-Za-z]+ [0-9]{1,2}, [0-9]{4}') |>
-    as.Date("%B %d, %Y")
-  if (is.na(airDate)) {
-    #try something else
-    airDate <- wholepage |>
-      html_text() |>
-      str_extract('[0-9]{1,2} [A-Za-z]+ [0-9]{4}') |>
-      as.Date("%d %B %Y")
-    
-  }
-  if (airDate < most_recent_date-7) {
-    print("Back Far Enough")
+safe_get_html_raw <- function(url) {
+  res <- tryCatch(httr::GET(url, ua, httr::timeout(30)), error = function(e) {
+    NULL
+  })
+  if (is.null(res) || httr::http_error(res)) {
     return(NULL)
   }
-  plraw <- NULL
-  #hand-rolled
-  #simplest case. A table with obvious header names
-  if (!is.na(wholepage |> html_node(xpath = "//th[@class='song']"))) {
-    table_shell<-xml_new_root("table")
-    #remove single column rows, I hope nothing else.
-    wholepage |> html_nodes(xpath="//td[@colspan='8']") |> xml_remove(free=T)
-    plraw<-wholepage|> 
-      html_nodes(xpa="//tr[td[@class ='song']] | //tr[th[@class ='song']]")
-    for (node in plraw)  xml_add_child(table_shell,node)
-    plraw<-table_shell |> 
-      html_node(xpath="//table") |> 
-      html_table(fill=TRUE)
-    
-  } else {
-    # no 'th' but are there rows in a table with td of class=song?  get the table
-    if (!is.na(wholepage |> html_node(xpath = "//td[@class='song']"))) {
-      plraw <- wholepage |>
-        html_node(xpath = "//td[@class='song']/ancestor::table") |>
-        html_table(fill = T)
-      #now find the row that has the header
-      for (n in 1:nrow(plraw)) {
-        if (TRUE %in% (plraw[n, ] %in% altHeaderNames)) {
-          names(plraw) <- plraw[n, ]
-          plraw <- plraw[n + 1:nrow(plraw), ]
-          break
-        }
-        if (n == nrow(plraw)) {
-          plraw <- NULL
-        }
-      }
-    }
+  tryCatch(res, error = function(e) NULL)
+}
+
+safe_get_html <- function(url) {
+  res <- tryCatch(httr::GET(url, ua, httr::timeout(30)), error = function(e) {
+    NULL
+  })
+  if (is.null(res) || httr::http_error(res)) {
+    return(NULL)
   }
-  
-  if (is.null(plraw)) {
-    # no song class, now what? is it a table? try to  find header
-    #seems like cellspacing means its a row column thing
-    pl_table<-wholepage |> html_node(xpath = "//table[@cellspacing and @cellpadding]")
-    num_rows<-pl_table |> html_nodes("tr") |> length()
-    if (num_rows>2) {
-      pl_table<-html_table(pl_table,fill = TRUE)
-      if (any(names(pl_table) %in% altHeaderNames)) {
-        plraw<-pl_table
-      } else{
-        # try one more ``
-        #scan until we find the playlist header
-        for (n in 1:nrow(pl_table)) {
-          if (TRUE %in% (pl_table[n,] %in% altHeaderNames)) {
-            names(pl_table) <- pl_table[n, ]
-            plraw <- pl_table[n + 1:nrow(pl_table), ]
-            break
-          }
-        }
-      }
-    }
+  tryCatch(read_html(res), error = function(e) NULL)
+}
+
+safe_html_table <- possibly(html_table, otherwise = NULL)
+
+altArtistNames <- c(
+  'THE STOOGE',
+  'Band',
+  'Singer',
+  'Artist',
+  'artist',
+  'ARTIST'
+)
+altTitleNames <- c('THE SONG', 'Track', 'Song', 'Title', 'TITLE', 'title')
+
+expand_show_id <- function(show_id) {
+  # scalar input expected; returns full url string or NULL for 1-2 letter ids
+  if (is.null(show_id)) {
+    return(NULL)
   }
-      
-# SPECIAL DJ TREATMENT
-  if (is.null(plraw)){
-    #try idiosyncratic djs
-    if (dj=="TW") plraw<-try_BK(wholepage)
-    if (dj=="HN") plraw<-try_HN(wholepage)
-    }
-    
-# new 2020 style headers.  Nobody told me about it!
-  if (is.null(plraw)){
-    artists <- wholepage |> 
-      html_nodes(xpath = "//td[@class='song col_artist']") |> 
-      html_text() |> 
-      str_remove_all("\\n") |> 
-      str_trim()
-    titles <- wholepage |> 
-      html_nodes(xpath = "//td[@class='song col_song_title']") |> 
-      html_elements("font") |> 
-      html_text() |> 
-      str_remove_all("\\n")
-    
-    plraw <- tibble(Artist = artists,Title = titles)
-    if (nrow(plraw) == 0) plraw <- NULL
-  }  
-  
-  plraw<-fixHeaders(plraw)
-  # final clean up if we have something
-  if (is.null(plraw)) {
-    playlist <- NULL
-    print("DUD")
-  } else {
-    if (TRUE %in% is.na(names(plraw)))
-      plraw <- plraw[, -which(is.na(names(plraw)))] #sometimes an NA column
-    
-    playlist <- plraw |>
-      select(Artist,Title) |> 
-      na.omit() |> 
-      mutate(DJ = dj, AirDate = airDate,Artist = substr(Artist, 1L, MAXLEN)) |> 
-      mutate(Artist = str_to_title(Artist)) |>        # not a duckplyr function
-      mutate(Artist = gsub("[\r\n].*$", "", Artist)) |> 
-      mutate(Artist = gsub("\\(.*$", "", Artist)) |> 
-      mutate(Artist = gsub("^\\s+|\\s+$", "", Artist)) |> 
-      mutate(Title = substr(Title, 1L, MAXLEN)) |> 
-      mutate(Title = str_to_title(Title)) |>        # not a duckplyr function
-      mutate(Title = gsub("[\r\n].*$", "", Title)) |> 
-      mutate(Title = gsub("\\(.*$", "", Title)) |> 
-      mutate(Title = gsub("^\\s+|\\s+$", "", Title)) |> 
-      filter(Artist != '') |> 
-      filter(!is.na(Artist))
-    # just to track progress
-    if (is.null(playlist)){
-      print("No Playlist")
-    } else {
-      print(playlist[1:5, ]) 
-    }
+  id <- as.character(show_id)
+  id <- trimws(id)
+  if (identical(id, "")) {
+    return(id)
   }
-  methods_overwrite()
+
+  # if just one or two letters (only letters), treat as fragment and return NULL
+  if (nchar(id) %in% c(1, 2) && grepl("^[A-Za-z]{1,2}$", id)) {
+    return(id)
+  }
+
+  # fully qualified http(s) URL -> return as-is
+  if (grepl("^https?://", id, ignore.case = TRUE)) {
+    return(id)
+  }
+
+  # starts with /playlists or /Playlists -> prepend ROOT_URL (keep leading slash)
+  if (grepl("^/(?i:playlists)", id, perl = TRUE)) {
+    return(paste0(ROOT_URL, id))
+  }
+
+  # otherwise prepend ROOT_URL/playlists/ and strip any leading slashes from id
+  paste0(ROOT_URL, "/playlists/", sub("^/+", "", id))
+}
+
+
+# case where hypen is the separator within one table column
+BK_case <- function(table_2) {
+  playlist <- table_2 |>
+    str_split("\n\n") |>
+    unlist() |>
+    as_tibble() |>
+    filter(value != "") |>
+    separate(
+      value,
+      into = c("Artist", "Title"),
+      sep = "\n-\n",
+      extra = "merge"
+    ) |>
+    mutate(
+      Artist = str_squish(Artist),
+      Title = str_replace_all(str_squish(Title), '\\"', " ")
+    )
+
   return(playlist)
 }
-#-------------- MAIN -----------------
-djKey<- read_parquet_duckdb("data/djKey_prelim.parquet")
-playlistURLs<-read_parquet_duckdb("data/playlistURLs.parquet")
-playlists_raw <- read_parquet_duckdb("data/playlists_raw.parquet") |> 
-  as_tibble()
 
-djList <- djKey |> 
-  pull(DJ)
-
-#careful not to trash intermediate results!
-# load("data/playlists_raw.rdata")
-UPDATE_ONLY =TRUE
-if (UPDATE_ONLY) {
-  #assume at most 5 shows per week
-  #most shows are 1/week except the morning show
-  most_recent_dates<-playlists_raw |> 
-    arrange(AirDate) |> 
-    summarise(.by= "DJ",most_recent = max(AirDate))
-  most_recent_date<-max(playlists_raw$AirDate,na.rm = TRUE)
-  #go_back_num<- as.integer(round ((Sys.Date() - most_recent_date) * 5/7))
-  #print(paste("Updating ONLY last",go_back_num,"Shows"))
-} else{
-  go_back_num<- Sys.Date() - as.Date("1900-01-01") #arbitrarily far back so it's not a binding constraint
-}
- 
-djList_temp<-djList
-
-playlists_temp <- tibble(DJ = character(), 
-                        AirDate = as.Date(character()), 
-                        Artist = character(), 
-                        Title = character())
-
-
-
-#example way to restart if failure occurs in middle of list at,say dj "VR"
-#djList_temp<-djList[match("RQ",djList):length(djList)]
-for (dj in djList_temp) {
-  plURLs <- playlistURLs |>
-    filter(DJ == dj) |>
-    rowid_to_column() |> 
-    select(playlistURL)
-  if (UPDATE_ONLY) {
-    go_back_num<- round(as.integer(Sys.Date() - filter(most_recent_dates,DJ==dj)$most_recent) * 5/7)
-    if (length(go_back_num) == 0) {
-      #this means dJ is not in playlist_raw so initiate an new DJ
-      go_back_num <- 100
-    }
-    print(paste("Updating ONLY last",go_back_num,"Shows"))
-  } else{
-    go_back_num<-nrow(plURLs)
+get_playlist <- function(show_info) {
+  html_doc <- safe_get_html(show_info$show_url)
+  if (is.null(html_doc)) {
+    result <- tibble(
+      DJ = show_info$DJ,
+      AirDate = show_info$AirDate,
+      Artist = character(),
+      Title = character()
+    )
+    return(result)
   }
-  for (n in 1:go_back_num){
-    plURL<-plURLs[min(n,nrow(plURLs)),1]
-    print(paste(dj, n, plURL,Sys.time()))
-    if (!is.na(pull(plURLs[1,1]))){
-      playlist<-get_playlist(plURL, dj)
-      if(!is.null(playlist)){
-        playlists_temp <- bind_rows(playlists_temp, playlist)
+  # preprocess. If the page has frames get the first frame
+  frames <- html_doc |> html_elements("frame")
+  if (length(frames) > 0) {
+    frame_src <- frames |> html_attr("src") |> first()
+
+    if (!is.na(frame_src) && frame_src != "") {
+      # construct full URL if needed
+      if (!str_detect(frame_src, "^http")) {
+        frame_src <- paste0(ROOT_URL, frame_src)
+      }
+      html_doc <- safe_get_html(frame_src)
+      if (is.null(html_doc)) {
+        result <- tibble(
+          DJ = show_info$DJ,
+          AirDate = show_info$AirDate,
+          Artist = character(),
+          Title = character()
+        )
+        return(result)
       }
     }
-    if (is.null(playlist)) break #done with this DJ
   }
-  #save to disk after each dj
-  compute_parquet(playlists_temp, "data/playlists_temp.parquet")
+
+  # First try: Look for td elements with specific classes
+  artist_nodes <- html_doc |> html_elements("td.col_artist")
+  title_nodes <- html_doc |> html_elements("td.col_song_title")
+
+  if (length(artist_nodes) > 0 && length(artist_nodes) == length(title_nodes)) {
+    # Extract only the direct text content, not from child elements
+    artists <- artist_nodes |>
+      map_chr(
+        ~ {
+          # Get all text nodes and take the first non-empty one
+          text_content <- xml_text(.x, trim = TRUE)
+          str_trim(str_split_i(text_content, "→", 1))
+        }
+      )
+
+    titles <- title_nodes |>
+      map_chr(
+        ~ {
+          # Get all text nodes and take the first non-empty one
+          text_content <- xml_text(.x, trim = TRUE)
+          str_trim(str_split_i(text_content, "→|\n", 1))
+        }
+      )
+
+    result <- tibble(
+      Artist = artists,
+      Title = titles
+    ) |>
+      filter(!is.na(Artist) & !is.na(Title) & Artist != "" & Title != "")
+
+    if (nrow(result) > 0) {
+      result <- result |>
+        mutate(
+          .before = "Artist",
+          DJ = show_info$DJ,
+          AirDate = show_info$AirDate
+        )
+      return(result)
+    }
+  }
+  # second try: Look for tables in the HTML that have "Artist" and "Title" headers
+  tables <- html_doc |>
+    html_elements("table") |>
+    map(safe_html_table) |>
+    compact()
+
+  if (length(tables) > 0) {
+    # Try each table until we find one with playlist data
+    for (tbl in tables) {
+      if (ncol(tbl) == 0 || nrow(tbl) < 2) {
+        next
+      }
+      # Convert to tibble and fix column names
+      tbl <- as_tibble(tbl, .name_repair = "unique")
+
+      # Get column names (may be in first row if no header)
+      col_names <- names(tbl)
+      first_row <- if (nrow(tbl) > 0) as.character(tbl[1, ]) else character()
+
+      # Check for artist column (case-insensitive)
+      # Only match if the column name/first row value looks like a real header
+      artist_col <- NULL
+      for (name in altArtistNames) {
+        # Skip auto-generated column names like X1, X2, etc.
+        valid_cols <- which(!str_detect(col_names, "^X\\d+$"))
+        idx <- which(
+          (str_detect(
+            col_names,
+            regex(paste0("^", name, "$"), ignore_case = TRUE)
+          ) |
+            str_detect(
+              first_row,
+              regex(paste0("^", name, "$"), ignore_case = TRUE)
+            )) &
+            seq_along(col_names) %in% valid_cols
+        )
+        if (length(idx) > 0) {
+          artist_col <- idx[1]
+          break
+        }
+      }
+
+      # Check for title column (case-insensitive)
+      title_col <- NULL
+      for (name in altTitleNames) {
+        # Skip auto-generated column names like X1, X2, etc.
+        valid_cols <- which(!str_detect(col_names, "^X\\d+$"))
+        idx <- which(
+          (str_detect(
+            col_names,
+            regex(paste0("^", name, "$"), ignore_case = TRUE)
+          ) |
+            str_detect(
+              first_row,
+              regex(paste0("^", name, "$"), ignore_case = TRUE)
+            )) &
+            seq_along(col_names) %in% valid_cols
+        )
+        if (length(idx) > 0) {
+          title_col <- idx[1]
+          break
+        }
+      }
+
+      # If we found both columns
+      if (!is.null(artist_col) && !is.null(title_col)) {
+        # Check if first row is header
+        start_row <- if (
+          any(str_detect(
+            first_row[artist_col],
+            regex(
+              paste(c(altArtistNames, "ARTIST", "artist"), collapse = "|"),
+              ignore_case = TRUE
+            )
+          ))
+        ) {
+          2
+        } else {
+          1
+        }
+
+        result <- tbl |>
+          slice(start_row:n()) |>
+          select(Artist = all_of(artist_col), Title = all_of(title_col)) |>
+          mutate(
+            Artist = str_trim(str_split_i(as.character(Artist), "\\n", 1)),
+            Title = str_trim(str_split_i(as.character(Title), "\\n", 1))
+          ) |>
+          filter(!is.na(Artist) & !is.na(Title) & Artist != "" & Title != "")
+
+        if (nrow(result) > 0) {
+          result <- result |>
+            mutate(
+              .before = "Artist",
+              DJ = show_info$DJ,
+              AirDate = show_info$AirDate
+            )
+          return(result)
+        }
+      }
+    }
+  }
+
+  # third try: look for tables with at least two columns and assume first two columns are Artist and Title
+  if (length(tables) > 0) {
+    # limit to first two tables
+    tables <- tables[1:min(2, length(tables))]
+
+    for (tbl in tables) {
+      if (ncol(tbl) < 2 || nrow(tbl) < 2) {
+        next
+      }
+      # Convert to tibble and fix column names
+      tbl <- as_tibble(tbl, .name_repair = "unique")
+
+      # Try assuming first two columns are Artist and Title
+      result <- tbl |>
+        select(Artist = 1, Title = 2) |>
+        mutate(
+          Artist = str_trim(str_split_i(as.character(Artist), "\\n", 1)),
+          Title = str_trim(str_split_i(as.character(Title), "\\n", 1))
+        ) |>
+        filter(!is.na(Artist) & !is.na(Title) & Artist != "" & Title != "")
+
+      # Check if this looks like valid playlist data
+      # (at least 3 rows and not too many identical values)
+      if (nrow(result) >= 3) {
+        # Check that we don't have the same artist/title repeated for all rows
+        unique_artists <- n_distinct(result$Artist)
+        unique_titles <- n_distinct(result$Title)
+
+        if (unique_artists > 1 || unique_titles > 1) {
+          result <- result |>
+            mutate(
+              .before = "Artist",
+              DJ = show_info$DJ,
+              AirDate = show_info$AirDate
+            )
+          return(result)
+        }
+      }
+    }
+  }
+
+  # fourth try: Look for td.song elements (combined artist - title format)
+  song_nodes <- html_doc |> html_elements("td.song")
+
+  if (length(song_nodes) > 0) {
+    print(paste("Found td.song elements for", show_info$DJ, show_info$AirDate))
+    songs <- song_nodes |>
+      map_chr(
+        ~ {
+          text_content <- xml_text(.x, trim = TRUE)
+          # Take only the first line
+          str_trim(str_split_i(text_content, "\\n", 1))
+        }
+      )
+
+    # Filter out empty entries and those without the separator
+    songs_clean <- songs[songs != "" & str_detect(songs, " - ")]
+
+    if (length(songs_clean) > 0) {
+      result <- tibble(combined = songs_clean) |>
+        separate(
+          combined,
+          into = c("Title", "Artist"),
+          sep = " - ",
+          extra = "merge"
+        ) |>
+        mutate(
+          Artist = str_trim(Artist),
+          Title = str_trim(Title)
+        ) |>
+        filter(!is.na(Artist) & !is.na(Title) & Artist != "" & Title != "")
+
+      if (nrow(result) > 0) {
+        result <- result |>
+          select(Artist, Title) |>
+          mutate(
+            .before = "Artist",
+            DJ = show_info$DJ,
+            AirDate = show_info$AirDate
+          )
+        return(result)
+      }
+    }
+  }
+
+  # fifth try: BK_case for table layouts where second table has playlist and artist - title is one table column
+  #tables <- html_doc |>
+  #  html_elements("table") |>
+  #  map(html_table)
+  # print(show_info$AirDate)
+  if (length(tables) >= 2) {
+    table_2 <- tables[[2]][2]
+    # when no playlist sometimes the second table is  listener comments
+    if (
+      nrow(table_2) > 0 &
+        !is.na(table_2[1, 1]) &
+        !str_detect(table_2[1, 1], "Listener")
+    ) {
+      result <- BK_case(table_2)
+      if (nrow(result) > 0) {
+        result <- result |>
+          select(Artist, Title) |>
+          mutate(
+            .before = "Artist",
+            DJ = show_info$DJ,
+            AirDate = show_info$AirDate
+          )
+        return(result)
+      }
+    }
+  }
+  # sixth try. there are no tables at all. look for  lines with a colon, bar  or quotes separating artist and title
+  # e.g dj DK, BT
+  text_content <-
+    html_doc |> html_text()
+  lines <- str_split(text_content, "\n") |> unlist() |> str_trim()
+  # keep only lines with a colon, starting and ending with non-space characters
+  playlist_lines <- lines[str_detect(lines, "^[A-Za-z ]+ : [A-Za-z ]+")]
+  if (length(playlist_lines) == 0) {
+    #keep lines with an unquoted string followed by a quoted string
+    playlist_lines <- lines[str_detect(lines, '.+ \\".+\\"')]
+  }
+  # see if this is actually garbage
+  if (length(playlist_lines) > 0) {
+    if (str_detect(playlist_lines[1], "window\\.open")) {
+      playlist_lines <- character(0)
+    }
+  }
+  if (length(playlist_lines) == 0) {
+    #keep lines with a bar followed by a bar
+    playlist_lines <- lines[str_detect(lines, '.+ \\|.+\\|')]
+  }
+  if (length(playlist_lines) > 0) {
+    result <- tibble(line = playlist_lines) |>
+      separate(
+        line,
+        into = c("Artist", "Title"),
+        sep = ':|\\"|\\|',
+        extra = "drop"
+      ) |>
+      mutate(
+        Artist = str_trim(Artist),
+        Title = str_trim(Title)
+      ) |>
+      filter(!is.na(Artist) & !is.na(Title) & Artist != "" & Title != "")
+
+    if (nrow(result) > 0) {
+      result <- result |>
+        select(Artist, Title) |>
+        mutate(
+          .before = "Artist",
+          DJ = show_info$DJ,
+          AirDate = show_info$AirDate
+        )
+      return(result)
+    }
+  }
+
+  # Return empty tibble if no valid playlist found
+  tibble(
+    DJ = show_info$DJ,
+    AirDate = show_info$AirDate,
+    Artist = "",
+    Title = ""
+  )
+}
+#-------------- MAIN -----------------
+djKey <- read_parquet_duckdb("data/djKey.parquet")
+playlistURLs <- read_parquet_duckdb("data/playlistURLs.parquet") |>
+  rename(AirDate = date)
+playlists_raw <- read_parquet_duckdb("data/playlists_raw.parquet") |>
+  as_tibble()
+
+methods_restore()
+
+#careful not to trash intermediate results!
+UPDATE_ONLY = TRUE
+if (UPDATE_ONLY) {
+  existing_shows <- playlists_raw |>
+    select(DJ, AirDate) |>
+    distinct()
+
+  # find shows in playlistURLs that are not in playlists_raw
+  missing_shows <- playlistURLs |>
+    anti_join(existing_shows, by = c("DJ", "AirDate")) |>
+    as_tibble() |>
+    mutate(show_url = map_chr(show_id, expand_show_id)) |>
+    # get rid of 1-2 letter show_ids that are pointers to fill-ins
+    filter(!str_detect(show_url, "^[A-Za-z]{2,3}$"))
+
+  playlists_temp <- tibble(
+    DJ = character(),
+    AirDate = as.Date(character()),
+    Artist = character(),
+    Title = character()
+  )
+
+  test_shows <- sample.int(nrow(missing_shows), size = 100)
+  start_time <- Sys.time()
+  for (n in 1:nrow(missing_shows)) {
+    #    for (n in test_shows) {
+
+    show_id <- missing_shows[n, ]$show_id
+    AirDate <- missing_shows[n, ]$AirDate
+    dj <- missing_shows[n, ]$DJ
+    print(paste(
+      n,
+      dj,
+      show_id,
+      round(Sys.time() - start_time, 1),
+      "time elapsed"
+    ))
+    playlist <- get_playlist(missing_shows[n, ])
+    if (!is.null(playlist)) {
+      playlists_temp <- bind_rows(playlists_temp, playlist)
+    }
+
+    #save to disk after each 100 playlists
+    if (n %% 100 == 0) {
+      print("Saving intermediate results to data/playlists_temp.parquet")
+      compute_parquet(playlists_temp, "data/playlists_temp.parquet")
+    }
+  }
 }
 
-bad_Tables<-anti_join(tibble(DJ=djList),playlists_temp) |> 
-  left_join(djKey)
+compute_parquet(playlists_temp, "data/playlists_temp.parquet")
 
-save(bad_Tables,file = "data/bad_tables.rdata")
+# bad_Tables <- anti_join(tibble(DJ = djKey$DJ), playlists_temp) |>
+#  left_join(djKey)
 
-  
-playlists_temp<-playlists_temp |> 
-  filter(Artist != Title) |> #single column span across table.  Not a song.
-  distinct()
+# save(bad_Tables, file = "data/bad_tables.rdata")
+
+#playlists_temp <- playlists_temp |>
+#  filter(Artist != Title) |> #single column span across table.  Not a song.
+#  distinct()
 
 # playlists_temp <- read_parquet_duckdb("data/playlists_temp.parquet")
-playlists_raw <- bind_rows(playlists_raw, playlists_temp) |> 
+
+playlists_raw <- bind_rows(playlists_raw, playlists_temp) |>
   distinct()
 
 compute_parquet(playlists_raw, "data/playlists_raw.parquet")
-
