@@ -113,7 +113,7 @@ show_names <- all_show_names %>%
 
 NO_REFRESH <- FALSE
 # do we need to scrape prior years or just update existing shows?
-UPDATE_ONLY <- TRUE
+UPDATE_ONLY <- FALSE
 
 # get all show URLs for all music DJs
 # if show_urls.rds exists, load it instead of re-fetching
@@ -153,8 +153,8 @@ showCount <- show_urls %>%
 showDates <- show_urls %>%
   summarise(
     .by = "DJ",
-    FirstShow = min(date, na.rm = TRUE),
-    LastShow = max(date, na.rm = TRUE)
+    FirstShow = min(AirDate, na.rm = TRUE),
+    LastShow = max(AirDate, na.rm = TRUE)
   ) %>%
   arrange(DJ)
 

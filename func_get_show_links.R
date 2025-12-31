@@ -38,7 +38,7 @@ get_show_links <- function(dj_id, update_only = FALSE, back_playlist = NULL) {
   empty <- tibble(
     DJ = character(0),
     show_id = character(0),
-    date = as.Date(character(0))
+    AirDate = as.Date(character(0))
   )
 
   # remember whether this is the top-level call (so we don't clobber the parameter)
@@ -85,7 +85,7 @@ get_show_links <- function(dj_id, update_only = FALSE, back_playlist = NULL) {
 
   all_items <- tibble(
     DJ = dj_id,
-    date = dates_chr[keep] |>
+    AirDate = dates_chr[keep] |>
       parse_date_time(orders = "BdY", quiet = TRUE) |>
       as.Date(),
     show_id = hrefs[keep]
@@ -147,7 +147,7 @@ get_show_links <- function(dj_id, update_only = FALSE, back_playlist = NULL) {
     mutate(
       show_id = str_remove(show_id, "^/playlists/")
     ) |>
-    select(DJ, date, show_id)
+    select(DJ, AirDate, show_id)
 
   return(playlist_rows)
 }

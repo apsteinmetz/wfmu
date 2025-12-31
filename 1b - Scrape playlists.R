@@ -442,8 +442,7 @@ get_playlist <- function(show_info) {
 }
 #-------------- MAIN -----------------
 djKey <- read_parquet_duckdb("data/djKey.parquet")
-playlistURLs <- read_parquet_duckdb("data/playlistURLs.parquet") |>
-  rename(AirDate = date)
+playlistURLs <- read_parquet_duckdb("data/playlistURLs.parquet")
 playlists_raw <- read_parquet_duckdb("data/playlists_raw.parquet") |>
   as_tibble()
 
