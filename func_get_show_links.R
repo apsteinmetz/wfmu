@@ -107,7 +107,7 @@ get_show_links <- function(dj_id, update_only = FALSE, back_playlist = NULL) {
 
     if (length(prior_years) > 0 & !(update_only)) {
       back_playlist <- map(prior_years, \(back_year) {
-        get_show_links(dj_id, back_year)
+        get_show_links(dj_id, update_only = FALSE, back_year)
       }) |>
         bind_rows()
       playlist_rows <- bind_rows(playlist_rows, back_playlist)
