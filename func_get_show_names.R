@@ -52,7 +52,7 @@ get_show_names <- function() {
     mutate(onSched = TRUE) |>
     bind_rows(
       make_dj_table(off_rows) |>
-        mutate(onSched = FALSE)
+        mutate(onSched = FALSE, Channel = "Archive")
     ) |>
     distinct()
 
