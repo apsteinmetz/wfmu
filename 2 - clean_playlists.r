@@ -10,7 +10,20 @@ set_collapse(mask = NULL)
 
 playlists_raw <- read_parquet_duckdb("data/playlists_raw.parquet")
 
-playlists <- playlists_raw |> as_tibble() %>% distinct()
+# remove shows with only one row
+bad_shows <- playlists_raw |>
+  summarise(.by = c(DJ, AirDate), n = n()) |>
+  filter(n == 1)
+
+playlists <- playlists_raw |>
+  anti_join(bad_shows) |>
+  distinct()
+
+# so many fancy string manupulation functions from dplyr that
+# don't translate to duckplyr. Too bad but speed is not of the essence here.
+playlists <- playlists |>
+  as_tibble()
+
 
 #filter out squirrelly dates
 #only Diane "Kamikaze" has archived playlists stretching back to the '80s.  Yay, Diane!
