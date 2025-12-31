@@ -21,12 +21,13 @@ playlists <- playlists %>% filter(AirDate > as.Date("1982-01-01"))
 playlists <- playlists %>%
   filter(!(AirDate < as.Date("1997-01-01") & DJ == "CL"))
 
-# get rid of breaks
-playlists <- playlists |> filter(!str_detect(Title, "Dj.Speaks"))
-
 
 #Clean up inconsistent artist names
 playlists$ArtistToken <- playlists$Artist
+
+# get rid of breaks
+playlists <- playlists |> filter(!str_detect(ArtistToken, "Speaks$"))
+
 # one artist is all punctuation so give !!! special treatment
 playlists$ArtistToken <- str_replace(
   playlists$ArtistToken,

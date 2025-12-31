@@ -11,11 +11,9 @@ library(duckplyr)
 playlists <- read_parquet_duckdb("data/playlists.parquet") |>
   collect()
 methods_restore()
+
 #Analyze similarity
 #-------------------------------------------------------------
-# ...existing code...
-
-# --- Replace previous DTM / dj_similarity block with recency-weighted Artist+Title tokens ---
 cat(
   "Building recency-weighted Artist+Title tf-idf matrix and computing cosine similarity\n"
 )
