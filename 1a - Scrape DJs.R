@@ -113,7 +113,7 @@ show_names <- all_show_names %>%
 
 NO_REFRESH <- FALSE
 # do we need to scrape prior years or just update existing shows?
-UPDATE_ONLY <- FALSE
+UPDATE_ONLY <- TRUE
 
 # get all show URLs for all music DJs
 # if show_urls.rds exists, load it instead of re-fetching
