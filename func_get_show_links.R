@@ -62,7 +62,7 @@ get_show_links <- function(dj_id, update_only = FALSE, back_playlist = NULL) {
     xpath = ".//a[(contains(translate(@href,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/playlist/')) or (contains(translate(@href,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/playlists/'))]"
   )
   if (length(anchors) == 0) {
-    return(tibble(date = as.Date(character()), show_id = character()))
+    return(tibble(AirDate = as.Date(character()), show_id = character()))
   }
 
   hrefs <- html_attr(anchors, "href")

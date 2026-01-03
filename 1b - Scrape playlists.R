@@ -470,7 +470,7 @@ if (UPDATE_ONLY) {
     Title = character()
   )
 
-  test_shows <- sample.int(nrow(missing_shows), size = 100)
+  # test_shows <- sample.int(nrow(missing_shows), size = 100)
   start_time <- Sys.time()
   for (n in 1:nrow(missing_shows)) {
     #    for (n in test_shows) {
