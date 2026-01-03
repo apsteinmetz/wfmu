@@ -6,6 +6,8 @@ library(lubridate)
 library(tidytext)
 library(vegan) #similarity measures
 library(duckplyr)
+# library(Matrix)
+
 # load("data/playlists.rdata")
 # load playlists with duckplyr
 playlists <- read_parquet_duckdb("data/playlists.parquet") |>
@@ -79,21 +81,18 @@ terms_long <- bind_rows(artist_terms, title_terms) |>
 dj_tf_idf_combined <- terms_long |>
   bind_tf_idf(term, DJ, weight_n)
 
-# pivot to wide matrix (DJs x terms) using tf-idf values
-dtm_wide <- dj_tf_idf_combined |>
+# build sparse DJ x term matrix (dgCMatrix) — much smaller than dense pivot_wider
+sparse_dtm <- dj_tf_idf_combined |>
   select(DJ, term, tf_idf) |>
-  pivot_wider(names_from = term, values_from = tf_idf, values_fill = 0) |>
-  arrange(DJ)
+  cast_sparse(DJ, term, tf_idf)
 
-mat <- as.matrix(dtm_wide[, -1])
-rownames(mat) <- dtm_wide$DJ
-
-# compute cosine similarity matrix
-row_norms <- sqrt(rowSums(mat * mat))
+# normalize rows (L2) for cosine
+row_norms <- sqrt(Matrix::rowSums(sparse_dtm^2))
 row_norms[row_norms == 0] <- 1
-mat_norm <- mat / row_norms
-sim_mat <- mat_norm %*% t(mat_norm)
-sim_mat[is.na(sim_mat)] <- 0
+sparse_dtm_norm <- sparse_dtm / row_norms
+
+# compute cosine similarity.
+sim_mat <- as.matrix(Matrix::tcrossprod(sparse_dtm_norm))
 
 # tidy similarity table (exclude self-similarity)
 dj_similarity <- as_tibble(sim_mat, rownames = "DJ1") |>
@@ -127,14 +126,14 @@ distinctive_artists <- dj_tf_idf |>
 # save as parquet
 cat("Saving distinctive_artists as parquet\n")
 compute_parquet(distinctive_artists, "data/distinctive_artists.parquet")
-djSimilarity <- read_parquet_duckdb("data/djsimilarity.parquet")
+dj_similarity <- read_parquet_duckdb("data/djsimilarity.parquet")
 
 
 # djSimilarity <- djSimilarity |> filter(Similarity>0)
 # let's prerender the plot
 gg_sim <- ggplot() +
   geom_histogram(
-    data = as_tibble(djSimilarity),
+    data = as_tibble(dj_similarity),
     aes(Similarity, after_stat(count) + 1),
     color = "red",
     bins = 30
