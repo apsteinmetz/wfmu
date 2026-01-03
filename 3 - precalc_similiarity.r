@@ -96,7 +96,7 @@ sim_mat <- mat_norm %*% t(mat_norm)
 sim_mat[is.na(sim_mat)] <- 0
 
 # tidy similarity table (exclude self-similarity)
-dj_similarity_tidy <- as_tibble(sim_mat, rownames = "DJ1") |>
+dj_similarity <- as_tibble(sim_mat, rownames = "DJ1") |>
   pivot_longer(-DJ1, names_to = "DJ2", values_to = "Similarity") |>
   filter(DJ1 != DJ2) |>
   group_by(DJ1) |>
@@ -105,7 +105,7 @@ dj_similarity_tidy <- as_tibble(sim_mat, rownames = "DJ1") |>
 
 # save results
 cat("Saving djsimilarity as parquet\n")
-compute_parquet(dj_similarity_tidy, "data/djsimilarity.parquet")
+compute_parquet(dj_similarity, "data/djsimilarity.parquet")
 
 # what artists make a dj different from another
 cat("Computing distinctive artists\n")
@@ -127,3 +127,42 @@ distinctive_artists <- dj_tf_idf |>
 # save as parquet
 cat("Saving distinctive_artists as parquet\n")
 compute_parquet(distinctive_artists, "data/distinctive_artists.parquet")
+djSimilarity <- read_parquet_duckdb("data/djsimilarity.parquet")
+
+
+# djSimilarity <- djSimilarity |> filter(Similarity>0)
+# let's prerender the plot
+gg_sim <- ggplot() +
+  geom_histogram(
+    data = as_tibble(djSimilarity),
+    aes(Similarity, after_stat(count) + 1),
+    color = "red",
+    bins = 30
+  ) +
+  scale_y_log10(labels = function(x) format(x, scientific = FALSE)) +
+  # show axis labels in white
+  theme(
+    axis.text = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    panel.grid = element_blank(),
+  ) +
+  # make background theme blue
+  theme(plot.background = element_rect(fill = "black")) +
+  theme(
+    panel.background = element_rect(
+      fill = "#337ab7"
+    )
+  ) +
+  labs(
+    title = "Histogram of DJ Similarities",
+    x = "Cosine Similarity Using Artist and Title",
+    y = "DJ Pair Count (log scale)"
+  ) +
+  # increase font size
+  theme(
+    axis.text = element_text(size = 16),
+    axis.title = element_text(size = 16),
+  )
+gg_sim
+# save gg as a ggplot object
+save(gg_sim, file = "data/similarity_histogram_gg.rdata")
