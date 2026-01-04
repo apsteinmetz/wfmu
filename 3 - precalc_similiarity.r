@@ -6,7 +6,6 @@ library(lubridate)
 library(tidytext)
 library(vegan) #similarity measures
 library(duckplyr)
-# library(Matrix)
 
 # load("data/playlists.rdata")
 # load playlists with duckplyr
