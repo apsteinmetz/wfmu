@@ -158,10 +158,39 @@ showDates <- show_urls %>%
   ) %>%
   arrange(DJ)
 
+numWords <- 2
+show_name_tokens <- show_names %>%
+  mutate(
+    ShowToken = str_squish(ShowName), # collapse multiple spaces
+    ShowToken = str_to_title(ShowToken), # title case
+    ShowToken = stringr::word(ShowToken, 1, numWords, sep = " ") # first two words
+  ) |>
+  select(DJ, ShowName_tokens)
+
+# # testing
+# show_name_tokens <- djkey %>%
+#   mutate(
+#     ShowToken = str_squish(ShowName), # collapse multiple spaces
+#     ShowToken = tolower(ShowToken), # lower case
+#     ShowToken = gsub("and | of | the ", " ", ShowToken),
+#     ShowToken = str_to_title(ShowToken), # title case
+#     ShowToken = gsub("[^A-Za-z0-9 ]", "", ShowToken),
+#     ShowToken = gsub(paste0("^\\s*(\\S+(?:\\s+\\S+){0,", numWords - 1, "}).*$"),
+#     "\\1",
+#     ShowToken
+#   )) |>
+#   select(DJ, ShowToken)
+
+# #testing
+# djKey <- djKey |>
+#   select(-ShowToken) |>
+#   left_join(show_name_tokens, by = "DJ")
+
 djKey <- dj_profiles |>
   left_join(show_names, by = "DJ") |>
   left_join(showCount, by = "DJ") %>%
   left_join(showDates, by = "DJ") |>
+  left_join(show_name_tokens, by = "DJ") |>
   # remove ShowName string from other_shownames
   mutate(
     other_shownames = str_trim(str_remove(other_shownames, ShowName))
@@ -184,7 +213,8 @@ djKey <- dj_profiles |>
     showCount,
     FirstShow,
     LastShow,
-    profileURL
+    profileURL,
+    ShowToken
   )
 
 #limit analysis to DJs with at least numShows shows.

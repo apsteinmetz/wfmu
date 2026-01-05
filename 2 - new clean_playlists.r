@@ -5,8 +5,8 @@ library(xts)
 library(duckplyr)
 
 # try the collapse package
-library(collapse)
-set_collapse(mask = NULL)
+# library(collapse)
+# set_collapse(mask = NULL)
 
 # clean only the most recently fetched playlists
 UPDATE_ONLY <- FALSE
@@ -268,7 +268,7 @@ clean_playlists <- function(playlists) {
 
   #now some connecting words that might be spelled/used variantly
   playlists <- playlists |>
-    mutate(ArtistToken = gsub("and | of | the ", " ", ArtistToken))
+    (ArtistToken = gsub("and | of | the ", " ", ArtistmutateToken))
 
   #and leading "the"
   playlists <- playlists |>
@@ -361,9 +361,19 @@ clean_playlists <- function(playlists) {
     mutate(Title = gsub("\\s+", " ", Title)) |>
     mutate(ArtistToken = gsub("\\s+$", "", ArtistToken))
 
-  if (CONDENSE_ARTISTS) {
-    condense_artist_tokens(playlists)
-  }
+  # now filter out any entries where the artist token matches the show token
+  playlists <- playlists |>
+    anti_join(
+      djKey |> select(DJ, ShowToken) |> distinct(),
+      by = c("DJ", "ArtistToken" = "ShowToken")
+    )
+
+  #filter(ArtistToken == ShowToken) #  |>
+  #select(-ShowToken)
+
+  # if (CONDENSE_ARTISTS) {
+  #  condense_artist_tokens(playlists)
+  #}
 
   # ------------------------------------------------------------
   #OPTIONAL
@@ -378,7 +388,7 @@ clean_playlists <- function(playlists) {
 }
 
 djKey <- read_parquet_duckdb("data/djKey.parquet")
-
+playlists <- read_parquet_duckdb("data/playlists.parquet")
 if (UPDATE_ONLY) {
   # load only recently fetched raw playlists
   playlists_raw <- read_parquet_duckdb("data/playlists_temp.parquet")
@@ -393,6 +403,7 @@ if (UPDATE_ONLY) {
 if (UPDATE_ONLY) {
   # load existing playlists
   existing_playlists <- read_parquet_duckdb("data/playlists.parquet")
+  # playlists <- read_parquet_duckdb("data/playlists.parquet")
   # combine with new playlists
   playlists <- union(playlists_update, existing_playlists) |>
     distinct()
