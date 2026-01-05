@@ -9,11 +9,30 @@ library(collapse)
 set_collapse(mask = NULL)
 
 # clean only the most recently fetched playlists
-UPDATE_ONLY <- TRUE
+UPDATE_ONLY <- FALSE
 STRIP_SIG <- TRUE
-#TEST
-playlists <- read_parquet_duckdb("data/playlists.parquet")
+CONDENSE_ARTISTS <- FALSE
+# this doesn't do what it used to do. DORMANT
+condense_artist_tokens <- function(playlists) {
+  #use artisttoken to select the most common version of the artist name and make that the token.
+  top_artist_version <- playlists |>
+    select(ArtistToken, Artist) |>
+    summarise(.by = c(ArtistToken, Artist), tokens = n()) |>
+    collect() |>
+    summarise(
+      .by = ArtistToken,
+      tokens = sum(tokens),
+      Artist = first(Artist)
+    ) |>
+    slice_max(order_by = tokens, n = 1, by = "ArtistToken") |>
+    rename(base_artist = Artist)
 
+  playlists <- top_artist_version |>
+    right_join(playlists, by = 'ArtistToken', relationship = "many-to-many") |>
+    select(-ArtistToken, -tokens) |>
+    rename(ArtistToken = base_artist)
+  return(playlists)
+}
 
 strip_signature_songs <- function(playlists) {
   cat("Stripping signature opening and closing songs\n")
@@ -183,18 +202,19 @@ clean_playlists <- function(playlists) {
     mutate(ArtistToken = gsub("^\\? And", "Question Mark And ", ArtistToken))
   playlists <- playlists |> mutate(ArtistToken = gsub("\\&", " ", ArtistToken))
 
-  # COMPUTE
-  playlists <- playlists |>
-    compute(prudence = "lavish") |>
-    mutate(ArtistToken = tolower(ArtistToken)) |>
-    compute(prudence = "stingy")
-  # I choose to strip out the stuff below though dealing with it might get better analysis
-  #remove any text in parentheses
   cat("Stripping filler words\n")
   # get rid of anything between parenthesis
   #tricky regex to handle cases of multiple parentheticals in one artist
   playlists <- playlists |>
     mutate(ArtistToken = gsub("\\([^()]+\\)", "", ArtistToken))
+
+  # COMPUTE
+  # I choose to strip out the stuff below though dealing with it might get better analysis
+  #remove any text in parentheses
+  cat("drop out of duckplyr")
+  playlists <- playlists |>
+    compute(prudence = "lavish") |>
+    mutate(ArtistToken = tolower(ArtistToken))
 
   # remove 'featuring' or 'with' artists
   # I chose not to remove "Versus" because that is a band name
@@ -263,27 +283,40 @@ clean_playlists <- function(playlists) {
   playlists <- filter(playlists, Artist != "")
   playlists <- filter(playlists, Artist != "Artist")
 
+  cat("Using only first two words as artist token\n")
   numWords = 2 #is two enough for uniqueness?
   # we replaced all punctuation with spaces
   #maybe strip spaces and combine all artist Words
   #combine first two words
-  cat("Trying to make sense of artist names\n")
   #does this break if numWords> number of words?
-  playlists$ArtistToken <- playlists$ArtistToken |>
-    str_to_title()
-  t <- str_split_fixed(
-    playlists$ArtistToken,
-    pattern = "[ ]+",
-    n = numWords + 1
-  )[, 1:numWords]
-  playlists$ArtistToken <- apply(t, MARGIN = 1, FUN = paste, collapse = " ")
+  # ...existing code...
+  cat("Using only first two words as artist token\n")
+  numWords = 2 #is two enough for uniqueness?
+
+  playlists <- playlists |>
+    mutate(
+      ArtistToken = str_squish(ArtistToken), # collapse multiple spaces
+      ArtistToken = str_to_title(ArtistToken), # title case
+      # keep up to `numWords` words (works when there is only one word)
+      ArtistToken = sub(
+        paste0("^\\s*(\\S+(?:\\s+\\S+){0,", numWords - 1, "}).*$"),
+        "\\1",
+        ArtistToken,
+        perl = TRUE
+      )
+    )
 
   # move back into duckplyr
   methods_overwrite()
   playlists <- playlists |> compute(prudence = "stingy")
 
-  playlists <- playlists |>
-    mutate(ArtistToken = gsub("Rolling Stones", "Stones", ArtistToken))
+  # strip cases where Show name got into artist field
+
+  cat(
+    "Combining iconic 2-name artists into one name to save space in wordcloud\n"
+  )
+  #  playlists <- playlists |>
+  #    mutate(ArtistToken = gsub("Rolling Stones", "Stones", ArtistToken))
   playlists <- playlists |>
     mutate(ArtistToken = gsub("Ennio Morricone", "Morricone", ArtistToken)) #only on WFMU!
   playlists <- playlists |>
@@ -291,9 +324,10 @@ clean_playlists <- function(playlists) {
   playlists <- playlists |>
     mutate(ArtistToken = gsub("Bob Dylan", "Dylan", ArtistToken))
   playlists <- playlists |>
-    mutate(ArtistToken = gsub("Yo La", "Yo La Tengo", ArtistToken))
-  playlists <- playlists |>
     mutate(ArtistToken = gsub("Elvis Presley", "Elvis", ArtistToken))
+  # expand common artists where 3 words are needed
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("Yo La", "Yo La Tengo", ArtistToken))
   playlists <- playlists |>
     mutate(ArtistToken = gsub("Guided By", "Guided By Voices", ArtistToken))
 
@@ -301,16 +335,11 @@ clean_playlists <- function(playlists) {
   playlists <- playlists |>
     mutate(ArtistToken = gsub("Unkown", "Unknown", ArtistToken))
 
-  stop("break here")
-
   # There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
-  playlists <- playlists |>
-    mutate(
-      ArtistToken = gsub('BruceSp.+', "Springsteen", ArtistToken)
-    )
-  cat(
-    "Combining iconic 2-name artists into one name to save space in wordcloud\n"
-  )
+  # playlists <- playlists |>
+  # mutate(
+  #   ArtistToken = gsub('BruceSp.+', "Springsteen", ArtistToken)
+  # )
 
   # any empties left?
   playlists <- playlists |>
@@ -329,25 +358,12 @@ clean_playlists <- function(playlists) {
   playlists <- playlists |>
     mutate(ArtistToken = gsub("\\s+", " ", ArtistToken)) |>
     mutate(Artist = gsub("\\s+", " ", Artist)) |>
-    mutate(Title = gsub("\\s+", " ", Title))
+    mutate(Title = gsub("\\s+", " ", Title)) |>
+    mutate(ArtistToken = gsub("\\s+$", "", ArtistToken))
 
-  #use artisttoken to select the most common version of the artist name and make that the token.
-  top_artist_version <- playlists |>
-    select(ArtistToken, Artist) |>
-    summarise(.by = c(ArtistToken, Artist), tokens = n()) |>
-    collect() |>
-    summarise(
-      .by = ArtistToken,
-      tokens = sum(tokens),
-      Artist = first(Artist)
-    ) |>
-    slice_max(order_by = tokens, n = 1, by = "ArtistToken") |>
-    rename(base_artist = Artist)
-
-  playlists <- top_artist_version |>
-    right_join(playlists, by = 'ArtistToken', relationship = "many-to-many") |>
-    select(-ArtistToken, -tokens) |>
-    rename(ArtistToken = base_artist)
+  if (CONDENSE_ARTISTS) {
+    condense_artist_tokens(playlists)
+  }
 
   # ------------------------------------------------------------
   #OPTIONAL
@@ -360,6 +376,8 @@ clean_playlists <- function(playlists) {
 
   return(playlists)
 }
+
+djKey <- read_parquet_duckdb("data/djKey.parquet")
 
 if (UPDATE_ONLY) {
   # load only recently fetched raw playlists
@@ -391,5 +409,5 @@ all_artisttokens <- playlists |>
 save(all_artisttokens, file = "data/all_artisttokens.rdata")
 
 # save as parquet
-cat("Saving playlists as parquet\n")
+# cat("Saving playlists as parquet\n")
 compute_parquet(playlists, "data/playlists.parquet")
