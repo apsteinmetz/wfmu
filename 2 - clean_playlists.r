@@ -1,312 +1,65 @@
+# clean playlists within duckplyr
 library(tidyverse)
 library(ineq) #inequality measures
 library(xts)
 library(duckplyr)
 
 # try the collapse package
-library(collapse)
-set_collapse(mask = NULL)
+# library(collapse)
+# set_collapse(mask = NULL)
 
 # clean only the most recently fetched playlists
-UPDATE_ONLY <- TRUE
+UPDATE_ONLY <- FALSE
+STRIP_SIG <- TRUE
+CONDENSE_ARTISTS <- TRUE
+condense_artist_tokens <- function(playlists) {
+  #use artisttoken to select the most common version of the artist name and make that the token.
+  token_artist_counts <- playlists |>
+    select(ArtistToken, Artist) |>
+    summarise(.by = c(ArtistToken, Artist), tokens = n())
 
-clean_playlists <- function(playlists) {
-  methods_restore()
-  # remove shows with only one row
-  bad_shows <- playlists_raw |>
-    summarise(.by = c(DJ, AirDate), n = n()) |>
-    filter(n == 1)
+  # compute max count per ArtistToken (duck-friendly: summarise, not windowed mutate)
+  token_max <- token_artist_counts |>
+    summarise(.by = ArtistToken, max_tokens = max(tokens))
 
-  playlists <- playlists_raw |>
-    anti_join(bad_shows) |>
-    distinct()
+  # keep only artists that reach the per-token max, then break ties deterministically
+  top_artist_map <- token_artist_counts |>
+    inner_join(token_max, by = "ArtistToken") |>
+    filter(tokens == max_tokens) |>
+    summarise(.by = ArtistToken, base_artist = min(Artist))
 
-  # so many fancy string manupulation functions from dplyr that
-  # don't translate to duckplyr. Too bad but speed is not of the essence here.
-  playlists <- playlists |>
-    as_tibble()
-
-  #filter out squirrelly dates
-  #only Diane "Kamikaze" has archived playlists stretching back to the '80s.  Yay, Diane!
-  # Charlie Lewis has playlists going back to 1997 but for some reason the dates I scraped
-  # go way too far back for about 10 shows.  I chose to lose them since Charlie has mucho
-  # episodes
-  playlists <- playlists %>% filter(AirDate > as.Date("1982-01-01"))
-  playlists <- playlists %>%
-    filter(!(AirDate < as.Date("1997-01-01") & DJ == "CL"))
-
-  #Clean up inconsistent artist names
-  playlists$ArtistToken <- playlists$Artist
-
-  # get rid of breaks
-  playlists <- playlists |> filter(!str_detect(ArtistToken, "Speaks$"))
-
-  # one artist is all punctuation so give !!! special treatment
-  playlists$ArtistToken <- str_replace(
-    playlists$ArtistToken,
-    "^!!!$",
-    "chkchkchk"
-  )
-  playlists$ArtistToken <- str_replace(
-    playlists$ArtistToken,
-    "^\\.\\.\\.$",
-    "Unknown"
-  )
-  playlists$ArtistToken <- str_replace(
-    playlists$ArtistToken,
-    "Uknown",
-    "Unknown"
-  )
-  # now change some common punctuation to space
-  cat("Stripping Punctuation\n")
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "^\\? \\&",
-    "Question Mark And "
-  )
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "^\\? And",
-    "Question Mark And "
-  )
-  playlists$ArtistToken <- str_replace_all(playlists$ArtistToken, "\\&", " ")
-
-  playlists$ArtistToken <- str_to_lower(playlists$ArtistToken)
-  # I choose to strip out the stuff below though dealing with it might get better analysis
-  #remove any text in parentheses
-  cat("Stripping filler words\n")
-  # get rid of anything between parenthesis
-  #tricky regex to handle cases of multiple parentheticals in one artist
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "(\\([^(]+\\))",
-    ""
-  )
-  # remove 'featuring' or 'with' artists
-  # I chose not to remove "Versus" because that is a band name
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "(feat |featuring |and the |with |vs |vs\\.).+",
-    ""
-  )
-  # get rid of 'live' identifier
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "(live @ |live on|@).+",
-    ""
-  )
-
-  #now get rid of remaining non-word characters except space
-
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "[^A-Z^a-z^ ^0-9]",
-    ""
-  )
-
-  #while we are at it, strip punctuantion from songs, as well
-  playlists$Title <- str_replace_all(playlists$Title, "[^A-Z^a-z^ ^0-9]", "")
-
-  # get rid of 'interview'
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "(interview w|interview)",
-    ""
-  )
-
-  # remove call-in
-  playlists |> filter(str_detect(Artist, "Call 201"))
-  playlists |> filter(str_detect(Title, "Call 201"))
-
-  # get rid of unspecified artists
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "unknown artist(s| )|unknown",
-    "Unknown"
-  )
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "various artists|various",
-    "Unknown"
-  )
-
-  #get rid of the marathon finale
-  playlists <- playlists %>%
-    filter(!str_detect(Artist, "hoof[a-zA-Z ]+sinfonia"))
-
-  #make "new york" one word.  Lots of bands start with the term
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "new york",
-    "newyork"
-  )
-
-  #make "x ray" one word. hopefully we've stripped out the dash already.Lots of bands start with the term
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "x ray",
-    "xray"
-  )
-
-  #now some connecting words that might be spelled/used variantly
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "and | of | the ",
-    " "
-  )
-
-  #and leading "the"
-  playlists$ArtistToken <- str_replace_all(playlists$ArtistToken, "^the ", " ")
-  # strip leading/trailing whitespace
-  playlists$ArtistToken <- str_trim(playlists$ArtistToken)
-
-  #did we create any null entries
-  playlists <- filter(playlists, Artist != "")
-  playlists <- filter(playlists, Artist != "Artist")
-
-  playlists <- filter(playlists, !str_detect(Artist, "Music (B|b)ehind"))
-  playlists <- filter(playlists, !str_detect(Title, "Music (B|b)ehind"))
-  playlists <- filter(playlists, !str_detect(Artist, "Wake N Bake"))
-  playlists <- filter(playlists, !str_detect(Title, "Wfmu"))
-  playlists <- filter(playlists, !str_detect(Title, "Primavera"))
-  playlists <- filter(playlists, !str_detect(Artist, "^Your Dj"))
-  playlists <- filter(playlists, !str_detect(Title, "^Your Dj"))
-  playlists <- filter(
-    playlists,
-    !str_detect(str_to_lower(Title), "^taking calls")
-  )
-
-  playlists <- filter(playlists, !str_detect(Artist, "^Bob Barth"))
-
-  #g et rid of wake n bake non-music plays
-  claylists <- playlists %>% filter(DJ == "WA")
-  playlists <- playlists %>% filter(DJ != "WA")
-
-  claylists <- filter(claylists, !str_detect(Artist, "^Wake "))
-  claylists <- filter(claylists, !str_detect(Artist, "^Pidge ")) # note space after Pidge so "Pidgeon" not affected
-  claylists <- filter(claylists, !str_detect(Artist, "^Clay "))
-  playlists <- bind_rows(playlists, claylists)
-
-  numWords = 2 #is two enough for uniqueness?
-
-  # we replaced all punctuation with spaces
-  #maybe strip spaces and combine all artist Words
-  #combine first two words
-  cat("Trying to make sense of artist names\n")
-  #does this break if numWords> number of words?
-  playlists$ArtistToken <- playlists$ArtistToken %>% str_to_title()
-  t <- str_split_fixed(
-    playlists$ArtistToken,
-    pattern = "[ ]+",
-    n = numWords + 1
-  )[, 1:numWords]
-  playlists$ArtistToken <- apply(t, MARGIN = 1, FUN = paste, collapse = " ")
-
-  # There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
-  playlists <- playlists %>%
+  top_artist_map <- top_artist_map |>
     mutate(
-      ArtistToken = replace(
-        ArtistToken,
-        str_detect(ArtistToken, 'BruceSp'),
-        "Springsteen"
-      )
+      base_artist = gsub("^The ", "", base_artist),
+      base_artist = gsub("^the ", "", base_artist),
+      base_artist = gsub(", The$", "", base_artist),
+      base_artist = gsub(", the$", "", base_artist)
     )
 
-  #Code below used for unique list of artists. Not used here.
-  #now that tokens are created extract unique ones for each dj so mulitples don't occur
-  # the zillion flavors of "Sun Ra..." will show up for each DJ only once
-  # not perfect.  There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
-  #print("Create list of unique artist names for each DJ")
-  #artistTokens<-playlists%>%select(DJ,artistToken)%>%group_by(DJ)%>%distinct(artistToken)
+  # join the one-row-per-token mapping and replace tokens without expanding rows
+  playlists <- playlists |>
+    left_join(top_artist_map, by = "ArtistToken") |>
+    mutate(ArtistToken = coalesce(base_artist, ArtistToken)) |>
+    select(-base_artist)
 
-  cat(
-    "Combining iconic 2-name artists into one name to save space in wordcloud\n"
-  )
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "Rolling Stones",
-    "Stones"
-  )
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "Ennio Morricone",
-    "Morricone"
-  ) #only on WFMU!
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "David Bowie",
-    "Bowie"
-  )
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "Bob Dylan",
-    "Dylan"
-  )
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "Yo La",
-    "Yo La Tengo"
-  )
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "Elvis Presley",
-    "Elvis"
-  )
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "Guided By",
-    "Guided By Voices"
-  )
+  return(playlists)
+}
 
-  #make some empty cases uniform
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "Unkown",
-    "Unknown"
-  )
-  #str_replace can't handle empty string pattern, so work around
-  playlists <- playlists %>%
-    mutate(Title = ifelse(Title == "", "Unknown", Title))
-  playlists <- playlists %>%
-    mutate(ArtistToken = ifelse(ArtistToken == "", "Unknown", ArtistToken))
-
-  playlists <- playlists %>%
-    filter(ArtistToken != "Your Dj") %>%
-    filter(Title != "Your Dj") %>%
-    filter(ArtistToken != "Hoof Mouth") %>%
-    filter(ArtistToken != "Tom Wilson") %>% #not songs
-    filter(ArtistToken != "Hank Levine") %>% #not songs
-    filter(ArtistToken != "Commercial") %>% #not songs
-    distinct() #why would there be dupes?  Don't know, but there are
-
-  playlists <- playlists %>% mutate(across(where(is.character), str_squish))
-  # playlists_full<-playlists
-
-  # save(playlists_full,file = "data/playlists_full.rdata")
-  # write_csv(playlists,file = "data/playlists_full.csv")
-
-  # ------------------------------------------------------------
-  #OPTIONAL
-  #using judgement to pare legitimate entries that distort analysis
-  cat(
-    'Stripping signature songs that would distort analysis.  This takes a few minutes\n'
-  )
+strip_signature_songs <- function(playlists) {
+  cat("Stripping signature opening and closing songs\n")
   #strip out signature opening songs where one opens a show more than 20 times
   #this will strip the song entirely from the database.
   #should strip the artist/title pair, not the title
   STRIP_THRESHOLD <- 20
-  # playlists <- playlists_full %>%
-  #   mutate(artist_song=paste(ArtistToken,Title)) %>%
-  #   group_by(DJ,AirDate)
-  playlists <- playlists %>%
+  playlists <- playlists |>
     mutate(artist_song = paste(ArtistToken, Title))
 
   strip_songs <- function(playlist) {
-    playlist <- playlist %>%
-      summarize(.by = c("DJ", "AirDate"), FirstSong = first(artist_song)) %>%
-      summarise(.by = "FirstSong", FirstPlayCount = n()) %>%
-      arrange(desc(FirstPlayCount)) %>%
-      filter(FirstPlayCount > STRIP_THRESHOLD) %>%
+    playlist <- playlist |>
+      summarize(.by = c("DJ", "AirDate"), FirstSong = first(artist_song)) |>
+      summarise(.by = "FirstSong", FirstPlayCount = n()) |>
+      arrange(desc(FirstPlayCount)) |>
+      filter(FirstPlayCount > STRIP_THRESHOLD) |>
       pull(FirstSong)
     return(playlist)
   }
@@ -318,18 +71,18 @@ clean_playlists <- function(playlists) {
   # a few DJs play TWO signature songs to open the show.  Get rid of the second one by doing it again
   songs_to_strip <- strip_songs(playlists)
   print(songs_to_strip)
-  playlists <- playlists %>%
+  playlists <- playlists |>
     filter(!(artist_song %in% songs_to_strip))
 
   #now strip closing songs
-  songs_to_strip <- playlists %>%
-    summarize(.by = c("DJ", "AirDate"), FirstSong = last(artist_song)) %>%
-    summarise(.by = "FirstSong", FirstPlayCount = n()) %>%
-    arrange(desc(FirstPlayCount)) %>%
-    filter(FirstPlayCount > STRIP_THRESHOLD) %>%
+  songs_to_strip <- playlists |>
+    summarize(.by = c("DJ", "AirDate"), FirstSong = last(artist_song)) |>
+    summarise(.by = "FirstSong", FirstPlayCount = n()) |>
+    arrange(desc(FirstPlayCount)) |>
+    filter(FirstPlayCount > STRIP_THRESHOLD) |>
     pull(FirstSong)
   print(songs_to_strip)
-  playlists <- playlists %>%
+  playlists <- playlists |>
     filter(!(artist_song %in% songs_to_strip))
 
   #Songs where only one DJ plays it - over and over even though it might not be a signature song
@@ -345,22 +98,22 @@ clean_playlists <- function(playlists) {
   NUM_DJS <- length(unique(playlists$DJ))
 
   song_conc <- function(song) {
-    g <- playlists %>%
-      filter(artist_song == song) %>%
-      select(DJ, artist_song) %>%
-      summarise(.by = "DJ", n = n()) %>%
-      arrange(desc(n)) %>%
-      pull(n) %>%
+    g <- playlists |>
+      filter(artist_song == song) |>
+      select(DJ, artist_song) |>
+      summarise(.by = "DJ", n = n()) |>
+      arrange(desc(n)) |>
+      pull(n) |>
       c(rep(0, NUM_DJS))
 
-    g <- g[1:NUM_DJS] %>% #pad to include no-play DJs in Gini calc
+    g <- g[1:NUM_DJS] |> #pad to include no-play DJs in Gini calc
       ineq::Gini()
     return(g)
   }
 
-  count_by_song <- playlists %>%
-    ungroup() %>%
-    summarise(.by = "artist_song", Song_Count = n()) %>%
+  count_by_song <- playlists |>
+    ungroup() |>
+    summarise(.by = "artist_song", Song_Count = n()) |>
     arrange(desc(Song_Count))
 
   cat('Computing DJ concentration of most-played songs\n')
@@ -377,55 +130,272 @@ clean_playlists <- function(playlists) {
   cat("Stripping\n")
   print(songs_to_strip)
 
-  playlists <- playlists %>%
+  playlists <- playlists |>
     filter(!(artist_song %in% songs_to_strip))
 
   # save the results
-  playlists <- playlists %>%
-    select(-artist_song) # remove before saving. much smaller file
-
-  #get a better show count tally
-  show_count <- playlists %>%
-    distinct(DJ, AirDate) %>%
-    summarise(.by = "DJ", showCount = n())
-
-  #use artisttoken to select the most common version of the artist name and make that the token.
-
-  top_artist_version <- playlists %>%
-    select(ArtistToken, Artist) %>%
-    summarise(.by = c(ArtistToken, Artist), tokens = n()) |>
-    slice_max(order_by = tokens, n = 1, by = "ArtistToken") %>%
-    rename(base_artist = Artist)
-
-  playlists <- top_artist_version %>%
-    right_join(playlists, by = 'ArtistToken', relationship = "many-to-many") %>%
-    select(-ArtistToken, -tokens) %>%
-    rename(ArtistToken = base_artist)
-
-  #test section
-  #clean it again
-  #get rid of punctuation
-  playlists$ArtistToken <- str_replace_all(
-    playlists$ArtistToken,
-    "[^A-Z^a-z^ ^0-9]",
-    ""
-  )
-  #and leading "the"
-  playlists$ArtistToken <- str_replace_all(playlists$ArtistToken, "^The ", "")
-
-  # strip leading/trailing whitespace and unicode that LaTex balks at
-  playlists <- playlists %>%
-    mutate_if(is.character, str_remove_all, "[\u236-\u400E]") %>%
-    mutate_if(is.character, str_squish)
-
-  # replace any empty artist tokens with "Unknown"
   playlists <- playlists |>
-    mutate(ArtistToken = ifelse(ArtistToken == "", "Unknown", ArtistToken)) |>
-    mutate(Title = ifelse(Title == "", "Unknown", Title))
-  methods_overwrite()
+    select(-artist_song) # remove before saving. much smaller file
   return(playlists)
 }
 
+clean_playlists <- function(playlists_raw) {
+  #  methods_restore()
+  # remove shows with only one row
+  bad_shows <- playlists_raw |>
+    summarise(.by = c(DJ, AirDate), n = n()) |>
+    filter(n == 1)
+
+  playlists <- playlists_raw |>
+    anti_join(bad_shows) |>
+    distinct()
+
+  # so many fancy string manupulation functions from dplyr that
+  # don't translate to duckplyr. Too bad but speed is not of the essence here.
+  # playlists <- playlists |>
+  #   as_tibble()
+
+  #filter out squirrelly dates
+  #only Diane "Kamikaze" has archived playlists stretching back to the '80s.  Yay, Diane!
+  # Charlie Lewis has playlists going back to 1997 but for some reason the dates I scraped
+  # go way too far back for about 10 shows.  I chose to lose them since Charlie has mucho
+  # episodes
+  cutoff_date <- as.Date("1982-01-01")
+  playlists <- playlists |> filter(AirDate > cutoff_date)
+
+  cutoff_date <- as.Date("1997-01-01")
+  playlists <- playlists |>
+    filter(!(AirDate < cutoff_date & DJ == "CL"))
+
+  playlists <- filter(playlists, !grepl("Music (B|b)ehind", Artist))
+  playlists <- filter(playlists, !grepl("Music (B|b)ehind", Title))
+  playlists <- filter(playlists, !grepl("Wake N Bake", Artist))
+  playlists <- filter(playlists, !grepl("Wfmu", Title))
+  playlists <- filter(playlists, !grepl("Primavera", Title))
+  playlists <- filter(playlists, !grepl("^[tT]aking [Cc]alls", Title))
+  playlists <- filter(playlists, !grepl("^Bob Barth", Artist))
+  # remove call-in (kept for inspection)
+  playlists <- playlists |> filter(!grepl("Call 201", Artist))
+  playlists <- playlists |> filter(!grepl("Call 201", Title))
+
+  playlists <- playlists |>
+    mutate(Title = gsub("^$", "Unknown", Title))
+
+  #get rid of wake n bake non-music plays
+  claylists <- playlists |> filter(DJ == "WA")
+  playlists <- playlists |> filter(DJ != "WA")
+
+  claylists <- filter(claylists, !grepl("^Wake ", Artist))
+  claylists <- filter(claylists, !grepl("^Pidge ", Artist)) # note space after Pidge so "Pidgeon" not affected
+  claylists <- filter(claylists, !grepl("^Clay ", Artist))
+  playlists <- union(playlists, claylists)
+
+  # Create ArtistToken column to hold cleaned artist names
+  playlists <- playlists |> mutate(ArtistToken = Artist)
+
+  # get rid of breaks
+  playlists <- playlists |> filter(!grepl("Speaks$", ArtistToken))
+  playlists <- playlists |> filter(!grepl("D[Jj] Speaks", ArtistToken))
+
+  # one artist is all punctuation so give !!! special treatment
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("^!!!$", "chkchkchk", ArtistToken))
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("^\\.\\.\\.$", "Unknown", ArtistToken))
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("Uknown", "Unknown", ArtistToken))
+
+  # now change some common punctuation to space
+  cat("Stripping Punctuation\n")
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("^\\? \\&", "Question Mark And ", ArtistToken))
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("^\\? And", "Question Mark And ", ArtistToken))
+  playlists <- playlists |> mutate(ArtistToken = gsub("\\&", " ", ArtistToken))
+
+  cat("Stripping filler words\n")
+  # get rid of anything between parenthesis
+  #tricky regex to handle cases of multiple parentheticals in one artist
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("\\([^()]+\\)", "", ArtistToken))
+
+  # COMPUTE
+  # I choose to strip out the stuff below though dealing with it might get better analysis
+  #remove any text in parentheses
+  cat("drop out of duckplyr")
+  playlists <- playlists |>
+    compute(prudence = "lavish") |>
+    mutate(ArtistToken = tolower(ArtistToken))
+
+  # remove 'featuring' or 'with' artists
+  # I chose not to remove "Versus" because that is a band name
+  playlists <- playlists |>
+    mutate(
+      ArtistToken = gsub(
+        "(feat |featuring |and the |with |vs |vs\\.).+",
+        "",
+        ArtistToken
+      )
+    )
+
+  # get rid of 'live' identifier
+  playlists <- playlists |>
+    mutate(
+      ArtistToken = gsub("(live @ |live on|@).+", "", ArtistToken)
+    )
+
+  #now get rid of remaining non-word characters except space
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("[^A-Za-z0-9 ]", "", ArtistToken))
+
+  #while we are at it, strip punctuantion from songs, as well
+  playlists <- playlists |> mutate(Title = gsub("[^A-Za-z0-9 ]", "", Title))
+
+  # get rid of 'interview'
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("(interview w|interview)", "", ArtistToken))
+
+  # get rid of unspecified artists
+  playlists <- playlists |>
+    mutate(
+      ArtistToken = gsub("unknown artist(s| )|unknown", "Unknown", ArtistToken)
+    )
+  playlists <- playlists |>
+    mutate(
+      ArtistToken = gsub("various artists|various", "Unknown", ArtistToken)
+    )
+
+  #get rid of the marathon finale
+  playlists <- playlists |>
+    filter(!grepl("hoof[a-zA-Z ]+sinfonia", Artist))
+
+  #make "new york" one word.  Lots of bands start with the term
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("new york", "newyork", ArtistToken))
+
+  #make "x ray" one word. hopefully we've stripped out the dash already.Lots of bands start with the term
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("x ray", "xray", ArtistToken))
+
+  #now some connecting words that might be spelled/used variantly
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("and | of | the ", " ", ArtistToken))
+
+  #and leading "the"
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("^the ", " ", ArtistToken))
+
+  # strip leading/trailing whitespace
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("^\\s+", "", ArtistToken)) |>
+    mutate(ArtistToken = gsub("\\s+$", "", ArtistToken))
+
+  #did we create any null entries
+  playlists <- filter(playlists, Artist != "")
+  playlists <- filter(playlists, Artist != "Artist")
+
+  cat("Using only first two words as artist token\n")
+  numWords = 2 #is two enough for uniqueness?
+  # we replaced all punctuation with spaces
+  #maybe strip spaces and combine all artist Words
+  #combine first two words
+
+  playlists <- playlists |>
+    mutate(
+      ArtistToken = str_squish(ArtistToken), # collapse multiple spaces
+      ArtistToken = str_to_title(ArtistToken), # title case
+      # keep up to `numWords` words (works when there is only one word)
+      ArtistToken = sub(
+        paste0("^\\s*(\\S+(?:\\s+\\S+){0,", numWords - 1, "}).*$"),
+        "\\1",
+        ArtistToken,
+        perl = TRUE
+      )
+    )
+
+  # move back into duckplyr
+  methods_overwrite()
+  playlists <- playlists |> compute(prudence = "stingy")
+
+  # strip cases where Show name got into artist field
+
+  cat(
+    "Combining iconic 2-name artists into one name to save space in wordcloud\n"
+  )
+  #  playlists <- playlists |>
+  #    mutate(ArtistToken = gsub("Rolling Stones", "Stones", ArtistToken))
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("Ennio Morricone", "Morricone", ArtistToken)) #only on WFMU!
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("David Bowie", "Bowie", ArtistToken))
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("Bob Dylan", "Dylan", ArtistToken))
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("Elvis Presley", "Elvis", ArtistToken))
+  # expand common artists where 3 words are needed
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("Yo La", "Yo La Tengo", ArtistToken))
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("Guided By", "Guided By Voices", ArtistToken))
+
+  #make some empty cases uniform
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("Unkown", "Unknown", ArtistToken))
+
+  # There are a dozen ways Andy Breckman can misspell "Bruce Springsteen."
+  # playlists <- playlists |>
+  # mutate(
+  #   ArtistToken = gsub('BruceSp.+', "Springsteen", ArtistToken)
+  # )
+
+  # any empties left?
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("^$", "Unknown", ArtistToken))
+
+  playlists <- playlists |>
+    filter(ArtistToken != "Your Dj") |>
+    filter(Title != "Your Dj") |>
+    filter(ArtistToken != "Hoof Mouth") |>
+    filter(ArtistToken != "Tom Wilson") |> #not songs
+    filter(ArtistToken != "Hank Levine") |> #not songs
+    filter(ArtistToken != "Commercial") |> #not songs
+    distinct() #why would there be dupes?  Don't know, but there are
+
+  # squish: trim + collapse multiple spaces to single space for all character columns
+  playlists <- playlists |>
+    mutate(ArtistToken = gsub("\\s+", " ", ArtistToken)) |>
+    mutate(Artist = gsub("\\s+", " ", Artist)) |>
+    mutate(Title = gsub("\\s+", " ", Title)) |>
+    mutate(ArtistToken = gsub("\\s+$", "", ArtistToken))
+
+  # now filter out any entries where the artist token matches the show token
+  playlists <- playlists |>
+    anti_join(
+      djKey |> select(DJ, ShowToken) |> distinct(),
+      by = c("DJ", "ArtistToken" = "ShowToken")
+    )
+
+  #filter(ArtistToken == ShowToken) #  |>
+  #select(-ShowToken)
+
+  if (CONDENSE_ARTISTS) {
+    playlists <- condense_artist_tokens(playlists)
+  }
+
+  # ------------------------------------------------------------
+  #OPTIONAL
+  #using judgement to pare legitimate entries that distort analysis
+  if (STRIP_SIG) {
+    methods_restore()
+    playlists <- strip_signature_songs(as_tibble(playlists))
+    methods_overwrite()
+  }
+
+  return(playlists)
+}
+
+djKey <- read_parquet_duckdb("data/djKey.parquet")
+playlists <- read_parquet_duckdb("data/playlists.parquet")
 if (UPDATE_ONLY) {
   # load only recently fetched raw playlists
   playlists_raw <- read_parquet_duckdb("data/playlists_temp.parquet")
@@ -440,6 +410,7 @@ if (UPDATE_ONLY) {
 if (UPDATE_ONLY) {
   # load existing playlists
   existing_playlists <- read_parquet_duckdb("data/playlists.parquet")
+  # playlists <- read_parquet_duckdb("data/playlists.parquet")
   # combine with new playlists
   playlists <- union(playlists_update, existing_playlists) |>
     distinct()
@@ -456,5 +427,5 @@ all_artisttokens <- playlists |>
 save(all_artisttokens, file = "data/all_artisttokens.rdata")
 
 # save as parquet
-cat("Saving playlists as parquet\n")
+# cat("Saving playlists as parquet\n")
 compute_parquet(playlists, "data/playlists.parquet")
