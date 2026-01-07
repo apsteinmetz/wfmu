@@ -97,7 +97,8 @@ excludeDJs <-
     'WV',
     'SE',
     'AP',
-    'B3'
+    'B3',
+    'WC'
   ))
 
 all_show_names <- get_show_names()

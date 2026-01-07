@@ -313,6 +313,13 @@ clean_playlists <- function(playlists_raw) {
       )
     )
 
+  # get rid of super long artist names that are probably garbage
+  playlists <- playlists |>
+    as_tibble() |>
+    mutate(len = nchar(ArtistToken)) |>
+    filter(len < 100) |>
+    select(-len)
+
   # move back into duckplyr
   methods_overwrite()
   playlists <- playlists |> compute(prudence = "stingy")
