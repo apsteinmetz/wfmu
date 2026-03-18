@@ -436,3 +436,40 @@ save(all_artisttokens, file = "data/all_artisttokens.rdata")
 # save as parquet
 # cat("Saving playlists as parquet\n")
 compute_parquet(playlists, "data/playlists.parquet")
+
+#summary stats
+summarize_playlists_duck <- function(df) {
+  library(dplyr)
+  library(rlang)
+  library(tidyr)
+
+  summary_df <- df |>
+    summarise(
+      total_rows = n(),
+      earliest = min(AirDate, na.rm = TRUE),
+      latest = max(AirDate, na.rm = TRUE)
+    )
+
+  shows_df <- df |> select(DJ, AirDate) |> distinct() |> summarise(Shows = n())
+
+  # collect small results
+  summary_combined <- bind_cols(collect(summary_df), collect(shows_df))
+
+  cols <- names(df)
+  uniq_exprs <- setNames(
+    lapply(cols, function(c) rlang::expr(n_distinct(!!rlang::sym(c)))),
+    cols
+  )
+  uniques_row <- df |> summarise(!!!uniq_exprs) |> collect()
+
+  uniques <- uniques_row |>
+    tidyr::pivot_longer(
+      everything(),
+      names_to = "column",
+      values_to = "n_unique"
+    ) |>
+    arrange(desc(n_unique))
+
+  list(summary = summary_combined, uniques = uniques)
+}
+summarize_playlists_duck(playlists)

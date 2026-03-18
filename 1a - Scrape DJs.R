@@ -10,6 +10,9 @@ library(rlang)
 
 # ==================================================
 # setup
+source("func_get_show_links.R")
+source("func_get_show_names.R")
+
 base_url = "https://www.wfmu.org/playlists"
 date_regex <- "\\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\\.?\\s+\\d{1,2},\\s+\\d{4}\\b"
 pause = 0.5
@@ -47,14 +50,12 @@ abs <- function(href, base) {
   }
   xml2::url_absolute(href, base)
 }
-source("func_get_show_links.R")
-source("func_get_show_names.R")
-
 #-------------- MAIN -----------------
 # spoken word shows
 # This also excludes DJs where we couldn't extract valid playlist URLs.
 excludeDJs <-
   sort(c(
+    'AQ',
     'JM',
     'IP',
     'AC',
@@ -114,7 +115,7 @@ show_names <- all_show_names %>%
 
 NO_REFRESH <- FALSE
 # do we need to scrape prior years or just update existing shows?
-UPDATE_ONLY <- TRUE
+UPDATE_ONLY <- FALSE
 
 # get all show URLs for all music DJs
 # if show_urls.rds exists, load it instead of re-fetching
@@ -160,13 +161,12 @@ showDates <- show_urls %>%
   arrange(DJ)
 
 numWords <- 2
-show_name_tokens <- show_names %>%
+show_names <- show_names %>%
   mutate(
     ShowToken = str_squish(ShowName), # collapse multiple spaces
     ShowToken = str_to_title(ShowToken), # title case
     ShowToken = stringr::word(ShowToken, 1, numWords, sep = " ") # first two words
-  ) |>
-  select(DJ, ShowName_tokens)
+  )
 
 # # testing
 # show_name_tokens <- djkey %>%
@@ -191,7 +191,6 @@ djKey <- dj_profiles |>
   left_join(show_names, by = "DJ") |>
   left_join(showCount, by = "DJ") %>%
   left_join(showDates, by = "DJ") |>
-  left_join(show_name_tokens, by = "DJ") |>
   # remove ShowName string from other_shownames
   mutate(
     other_shownames = str_trim(str_remove(other_shownames, ShowName))
