@@ -1,0 +1,205 @@
+---
+title: "WFMU Marathon 2026: Pledge Performance Report"
+date: today
+format:
+  html:
+    toc: false
+    toc-depth: 3
+    theme: flatly
+    fig-width: 10
+    fig-height: 8
+    code-fold: true
+  typst:
+    toc: false
+    fig-width: 10
+    fig-height: 8
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+library(tidyverse)
+library(duckplyr)
+
+show_urls <- read_parquet_duckdb("data/playlistURLs.parquet")
+dj_key    <- read_parquet_duckdb("data/djkey.parquet")
+
+all_pledges <- readRDS("data/pledge_info.rds")
+```
+
+## Overview
+
+This report summarizes pledge performance across WFMU programs during the **Marathon 2026** fundraising campaign. Data are pulled from the WFMU pledge widget and reflect cumulative totals at the time of last collection. Programs classified as "Archive" are excluded.
+
+The station raised a combined total across `r nrow(all_pledges)` programs. The sections below examine goal attainment, raw dollars raised, average pledge size, and the distribution of pledge counts — each broken down by program and broadcast channel.
+
+{{< pagebreak >}}
+
+## Goal Attainment
+
+The chart below shows each program's total amount raised as a percentage of its stated goal. Programs without a goal are excluded. The dashed line marks 100% attainment. Programs to the right have exceeded their goal.
+
+About half the shows don't have a goal shown in the pledge widget.
+
+Bar colors indicate absolute dollar rank (lighter = higher total raised).
+
+```{r pct-goal}
+all_pledges |>
+  filter(goal_amount > 0) |>
+  mutate(
+    pct = progress_amount / goal_amount,
+    program_name = fct_reorder(program_name, pct)
+  ) |>
+  filter(pct <= quantile(pct, 0.99)) |>
+  ggplot(aes(x = pct, y = program_name, fill = pledge_rank)) +
+  geom_col() +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "grey30") +
+  scale_x_continuous(
+    labels = scales::percent_format(),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  scale_fill_viridis_c(direction = -1) +
+#  annotate(
+#    "rect",
+#    xmin = 0, xmax = 1.81, ymin = 59.5, ymax = 60.5,
+#    fill = NA, color = "black", linewidth = 0.8
+#  ) +
+#  annotate(
+#    "text",
+#    x = .1, y = 60,
+#    label = "Where the Action Is!",
+#    hjust = 0, size = 5, color = "black"
+#  ) +
+  labs(
+    title = "WFMU Marathon 2026: Amount Raised as % of Goal",
+    subtitle = "Dashed line = 100% goal | Suspect data (top 1%) excluded",
+    x = "% of Goal Raised",
+    y = NULL,
+    fill = "Dollar Rank"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+```
+
+{{< pagebreak >}}
+
+## Total Dollars Raised by Program
+
+This chart ranks programs by total dollars raised, faceted by broadcast channel. The Wake show is excluded here because its totals are large enough to compress the scale for every other program — it is analyzed separately in the final section.
+
+The dashed line at \$1,000 helps normalize the scale across channels.Virtually every broadcast show has raised over $1000 while few of the web-only shows did.
+
+```{r dollars-raised}
+all_pledges |>
+  collect() |>
+  filter(!is.na(Channel), Channel != "Archive", program_name != "Wake") |>
+  mutate(program_name = fct_reorder(program_name, progress_amount)) |>
+  ggplot(aes(x = progress_amount, y = program_name, fill = Channel)) +
+  geom_col() +
+  scale_x_continuous(
+    labels = scales::dollar_format(),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  geom_vline(xintercept = 1000, linetype = "dashed", color = "grey30") +
+  scale_fill_brewer(palette = "Set2") +
+  facet_wrap(~ Channel, scales = "free", ncol = 2) +
+  labs(
+    title = "WFMU Marathon 2026: Amount Raised by Program by Channel",
+    subtitle = "Dashed line = $1,000 | Excludes Archives and Wake Show",
+    x = "Amount Raised ($)",
+    y = NULL,
+    fill = "Channel"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+```
+
+{{< pagebreak >}}
+
+## Average Pledge Size by Program
+
+The dashed line at \$25 helps normalize the scale across channels.
+
+```{r avg-pledge}
+all_pledges |>
+  collect() |>
+  filter(!is.na(Channel), Channel != "Archive") |>
+  mutate(program_name = fct_reorder(program_name, progress_amount / pledge_count)) |>
+  ggplot(aes(x = progress_amount / pledge_count, y = program_name, fill = Channel)) +
+  geom_col() +
+  scale_x_continuous(
+    labels = scales::dollar_format(),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  geom_vline(xintercept = 25, linetype = "dashed", color = "grey30") +
+  scale_fill_brewer(palette = "Set2") +
+  facet_wrap(~ Channel, scales = "free", ncol = 2) +
+  labs(
+    title = "WFMU Marathon 2026: Average Pledge Amount by Program by Channel",
+    subtitle = "Dashed line = $25 | Excludes Archives",
+    x = "Average Pledge Amount ($)",
+    y = NULL,
+    fill = "Channel"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+```
+
+{{< pagebreak >}}
+
+## Wake vs. the Rest of the Station
+
+```{r wake-stats}
+wake <- all_pledges |>
+  filter(program_name == "Wake") |>
+  mutate(avg_pledge = progress_amount / pledge_count) |>
+  collect()
+
+station_ex_wake <- all_pledges |>
+  filter(program_name != "Wake") |>
+  summarise(
+    total_raised   = sum(progress_amount, na.rm = TRUE),
+    total_pledges  = sum(pledge_count,    na.rm = TRUE)
+  ) |>
+  mutate(avg_pledge = total_raised / total_pledges) |>
+  collect()
+
+station_all <- all_pledges |>
+  summarise(
+    total_raised   = sum(progress_amount, na.rm = TRUE),
+    total_pledges  = sum(pledge_count,    na.rm = TRUE)
+  ) |>
+  mutate(avg_pledge = total_raised / total_pledges) |>
+  collect()
+
+wake_share <- wake$progress_amount / station_all$total_raised
+```
+
+**Wake** skews a lot of the data due to it's daily appearance and longer-than-average duration, so we expect it to earn more pledges but the average pledge size is also very strong.
+
+| Metric | Wake | Station (ex. Wake) | Station (all) |
+|---|---|---|---|
+| Total raised | `r scales::dollar(wake$progress_amount)` | `r scales::dollar(station_ex_wake$total_raised)` | `r scales::dollar(station_all$total_raised)` |
+| Pledge count | `r scales::comma(wake$pledge_count)` | `r scales::comma(station_ex_wake$total_pledges)` | `r scales::comma(station_all$total_pledges)` |
+| Avg pledge size | `r scales::dollar(wake$avg_pledge, accuracy = 0.01)` | `r scales::dollar(station_ex_wake$avg_pledge, accuracy = 0.01)` | `r scales::dollar(station_all$avg_pledge, accuracy = 0.01)` |
+| Share of total raised | `r scales::percent(wake_share, accuracy = 0.1)` | — | 100% |
+
+### Key observations
+
+- **Outsized total**: Wake accounted for `r scales::percent(wake_share, accuracy = 0.1)` of all dollars raised station-wide. Its `r scales::dollar(wake$progress_amount)` total dwarfs any individual program.
+
+- **Higher average pledge**: At `r scales::dollar(wake$avg_pledge, accuracy = 0.01)` per pledge, Wake's donors give substantially more per transaction than the station average of `r scales::dollar(station_all$avg_pledge, accuracy = 0.01)`. The station average excluding Wake drops to `r scales::dollar(station_ex_wake$avg_pledge, accuracy = 0.01)`, meaning Wake is pulling the overall average up considerably.
