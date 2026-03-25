@@ -5,6 +5,7 @@ library(duckplyr)
 show_urls <- read_parquet_duckdb("data/playlistURLs.parquet")
 dj_key <- read_parquet_duckdb("data/djkey.parquet")
 
+source("func_get_time_slots.R")
 base_url = "https://www.wfmu.org/playlists"
 
 latest_shows <- show_urls |>
