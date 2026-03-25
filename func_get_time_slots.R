@@ -4,6 +4,20 @@
 
 
 pause = 0.25
+
+ua <- httr::user_agent(
+  "wfmu-comment-counter/1.0 (contact: aspteinmetz@yahoo.com)"
+)
+safe_get_html <- function(url) {
+  res <- tryCatch(httr::GET(url, ua, httr::timeout(30)), error = function(e) {
+    NULL
+  })
+  if (is.null(res) || httr::http_error(res)) {
+    return(NULL)
+  }
+  tryCatch(read_html(res), error = function(e) NULL)
+}
+
 get_time_slots <- function() {
   djKey <- arrow::read_parquet("data/djKey.parquet") |>
     filter(onSched == TRUE)
@@ -57,8 +71,6 @@ get_time_slots <- function() {
     text <- html_text2(everything_div)
     match <- str_match(text, time_pattern)
     if (is.na(match[1])) return(NULL)
-    # show progress
-    print(djcode,match[1])
 
     day_str <- match[2]
     start_str <- match[3]
@@ -76,22 +88,26 @@ get_time_slots <- function() {
     start_hour <- parse_hour(start_str, am_pm_hint = end_ampm)
     end_hour <- parse_hour(end_str)
 
+    # Round to nearest hour
+    start_hour_rounded <- round(start_hour) %% 24
+    end_hour_rounded <- round(end_hour) %% 24
+
     duration <- end_hour - start_hour
     if (duration <= 0) duration <- duration + 24
 
     tibble(
       DJ = dj_code,
       day = day_str,
-      start_time = start_str,
-      end_time = end_str,
-      duration = duration
+      start_time = sprintf("%02d:00", start_hour_rounded),
+      end_time = sprintf("%02d:00", end_hour_rounded),
+      duration = round(duration)
     )
   }
 
   results <- map(djKey$DJ, \(dj) {
     Sys.sleep(pause)
     scrape_one(dj)
-  }) |>
+  }, .progress = "Scraping time slots") |>
     bind_rows()
 
   return(results)
