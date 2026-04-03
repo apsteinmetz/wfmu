@@ -1,10 +1,10 @@
 # scrape DJs
 
+library(tidyverse)
 library(rvest)
 library(httr)
 library(stringr)
 library(xml2)
-library(tidyverse)
 library(duckplyr)
 library(rlang)
 

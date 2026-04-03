@@ -1,19 +1,21 @@
 # load show urls
 library(tidyverse)
 library(duckplyr)
+library(rvest)
 # load show urls
-show_urls <- read_parquet_duckdb("data/playlistURLs.parquet")
-dj_key <- read_parquet_duckdb("data/djkey.parquet")
+# show_urls <- read_parquet_duckdb("data/playlistURLs.parquet")
+dj_key <- read_parquet_duckdb("data/djKey.parquet")
 
+source("func_get_time_slots.R")
+time_slots <- get_time_slots()
+saveRDS(time_slots,"data/time_slots.rds")
+
+time_slots <- readRDS("data/time_slots.rds")
 base_url = "https://www.wfmu.org/playlists"
 
-latest_shows <- show_urls |>
-  dplyr::group_by(DJ) |>
-  dplyr::slice_max(AirDate, n = 1, with_ties = FALSE) |>
-  dplyr::ungroup() |>
-  dplyr::mutate(url = paste0(base_url, "/", show_id)) |>
-  dplyr::select(DJ, AirDate, show_id, url) |>
-  dplyr::arrange(DJ)
+latest_shows <- dj_key |> 
+  filter(onSched == TRUE) |> 
+  select(DJ,ShowName,Channel)
 
 get_pledge_info <- function(dj_id) {
   url <- paste0(
@@ -31,15 +33,17 @@ get_pledge_info <- function(dj_id) {
 
 # get pledge info for all DJs
 all_pledges <- latest_shows$DJ |>
-  purrr::map(purrr::possibly(get_pledge_info, otherwise = NULL)) |>
+  purrr::map(purrr::possibly(get_pledge_info, otherwise = NULL), .progress = "Fetching pledge info") |>
   purrr::compact() |>
   dplyr::bind_rows()
+
 
 all_pledges <- all_pledges %>%
   # set goal == progress for shows with no goal
   # mutate(goal_amount = ifelse(goal_amount == 0, progress_amount, goal_amount)) %>%
   mutate(pledge_rank = dense_rank(desc(progress_amount))) |> 
-  left_join(select(dj_key,DJ,Channel),by = "DJ")
+  left_join(select(dj_key,DJ,Channel),by = "DJ") |> 
+  left_join(time_slots,by = "DJ")
 
 # save all pledges
 saveRDS(all_pledges, "data/pledge_info.rds")
