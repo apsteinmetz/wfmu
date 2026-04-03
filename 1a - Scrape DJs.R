@@ -113,9 +113,9 @@ show_names <- all_show_names %>%
   filter(!(DJ %in% excludeDJs)) |>
   arrange(DJ)
 
-NO_REFRESH <- FALSE
+NO_REFRESH <- TRUE
 # do we need to scrape prior years or just update existing shows?
-UPDATE_ONLY <- FALSE
+UPDATE_ONLY <- TRUE
 
 # get all show URLs for all music DJs
 # if show_urls.rds exists, load it instead of re-fetching
@@ -165,7 +165,7 @@ show_names <- show_names %>%
   mutate(
     ShowToken = str_squish(ShowName), # collapse multiple spaces
     ShowToken = str_to_title(ShowToken), # title case
-    ShowToken = stringr::word(ShowToken, 1, numWords, sep = " ") # first two words
+    ShowToken = stringr::word(ShowToken, 1, pmin(numWords, str_count(ShowToken, "\\S+")), sep = " ") # first two words
   )
 
 # # testing
@@ -189,8 +189,8 @@ show_names <- show_names %>%
 
 djKey <- dj_profiles |>
   left_join(show_names, by = "DJ") |>
-  left_join(showCount, by = "DJ") %>%
-  left_join(showDates, by = "DJ") |>
+  left_join(showCount, by = "DJ") |> 
+  left_join(showDates, by = "DJ")  |>
   # remove ShowName string from other_shownames
   mutate(
     other_shownames = str_trim(str_remove(other_shownames, ShowName))
