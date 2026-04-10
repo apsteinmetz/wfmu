@@ -288,7 +288,9 @@ clean_playlists <- function(playlists_raw) {
 
   playlists <- playlists |>
     filter(ArtistToken != "Your Dj") |>
+    filter(ArtistToken != "Your DJ") |>
     filter(Title != "Your Dj") |>
+    filter(Title != "Your DJ") |>
     filter(ArtistToken != "Hoof Mouth") |>
     filter(ArtistToken != "Tom Wilson") |> #not songs
     filter(ArtistToken != "Hank Levine") |> #not songs
