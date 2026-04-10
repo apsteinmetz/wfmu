@@ -1,6 +1,3 @@
-# clean playlists within duckplyr
-library(tidyverse)
-library(ineq) #inequality measures
 library(xts)
 library(duckplyr)
 
@@ -45,98 +42,28 @@ condense_artist_tokens <- function(playlists) {
   return(playlists)
 }
 
-strip_signature_songs <- function(playlists) {
-  cat("Stripping signature opening and closing songs\n")
-  #strip out signature opening songs where one opens a show more than 20 times
-  #this will strip the song entirely from the database.
-  #should strip the artist/title pair, not the title
-  STRIP_THRESHOLD <- 20
-  playlists <- playlists |>
-    mutate(artist_song = paste(ArtistToken, Title))
+strip_signature_songs <- function(playlists, strip_threshold = 0.5) {
+  stopifnot(strip_threshold > 0, strip_threshold < 1)
 
-  strip_songs <- function(playlist) {
-    playlist <- playlist |>
-      summarize(.by = c("DJ", "AirDate"), FirstSong = first(artist_song)) |>
-      summarise(.by = "FirstSong", FirstPlayCount = n()) |>
-      arrange(desc(FirstPlayCount)) |>
-      filter(FirstPlayCount > STRIP_THRESHOLD) |>
-      pull(FirstSong)
-    return(playlist)
-  }
+  # count distinct shows per DJ
+  dj_shows <- playlists |>
+    summarise(.by = DJ, show_count = n_distinct(AirDate))
 
-  songs_to_strip <- strip_songs(playlists)
-  print(songs_to_strip)
-  playlists <- playlists |>
-    filter(!(artist_song %in% songs_to_strip))
-  # a few DJs play TWO signature songs to open the show.  Get rid of the second one by doing it again
-  songs_to_strip <- strip_songs(playlists)
-  print(songs_to_strip)
-  playlists <- playlists |>
-    filter(!(artist_song %in% songs_to_strip))
+  # count each title per DJ
+  dj_title_counts <- playlists |>
+    summarise(.by = c(DJ, Title), title_count = n())
 
-  #now strip closing songs
-  songs_to_strip <- playlists |>
-    summarize(.by = c("DJ", "AirDate"), FirstSong = last(artist_song)) |>
-    summarise(.by = "FirstSong", FirstPlayCount = n()) |>
-    arrange(desc(FirstPlayCount)) |>
-    filter(FirstPlayCount > STRIP_THRESHOLD) |>
-    pull(FirstSong)
-  print(songs_to_strip)
-  playlists <- playlists |>
-    filter(!(artist_song %in% songs_to_strip))
-
-  #Songs where only one DJ plays it - over and over even though it might not be a signature song
-  #distort the analysis.  I use the Gini coefficent (used for measuring income inequality) to
-  # test for song/DJ concentration.  If the Gini is over 0.990, just one DJ has overwhelmingly played it.  If it
-  #is also in the top 200 ranking of songs over all, I strip it out.
-
-  #how aggressive should we be in scrubbing artists with lopsided appeal?
-  #Setting TOLERANCE to 1.000 would only filter songs with exactly one DJ accounting for all plays.
-  # I have set this to 0.997 which essentially deprecates the function because the show, Greasy
-  # Kid stuff played a few songs an awful lot but I didn't want to lose the greatest hits.
-  TOLERANCE <- 0.997
-  NUM_DJS <- length(unique(playlists$DJ))
-
-  song_conc <- function(song) {
-    g <- playlists |>
-      filter(artist_song == song) |>
-      select(DJ, artist_song) |>
-      summarise(.by = "DJ", n = n()) |>
-      arrange(desc(n)) |>
-      pull(n) |>
-      c(rep(0, NUM_DJS))
-
-    g <- g[1:NUM_DJS] |> #pad to include no-play DJs in Gini calc
-      ineq::Gini()
-    return(g)
-  }
-
-  count_by_song <- playlists |>
-    ungroup() |>
-    summarise(.by = "artist_song", Song_Count = n()) |>
-    arrange(desc(Song_Count))
-
-  cat('Computing DJ concentration of most-played songs\n')
-  songs_to_strip <- NULL
-  for (n in 1:200) {
-    cat(n, " ")
-    song <- count_by_song$artist_song[n]
-    gini <- song_conc(song)
-    if (gini > TOLERANCE) {
-      songs_to_strip <- c(songs_to_strip, song)
-    }
-  }
-  cat("\n")
-  cat("Stripping\n")
-  print(songs_to_strip)
-
-  playlists <- playlists |>
-    filter(!(artist_song %in% songs_to_strip))
-
-  # save the results
-  playlists <- playlists |>
-    select(-artist_song) # remove before saving. much smaller file
-  return(playlists)
+  # find titles that exceed the threshold for ANY DJ
+  titles_to_strip <- dj_title_counts |>
+    left_join(dj_shows, join_by(DJ)) |>
+    mutate(title_ratio = title_count / show_count) |>
+    filter(title_ratio > strip_threshold) |>
+    distinct(DJ, Title)
+  # DEBUG
+  print(titles_to_strip)
+  # anti-join to remove those DJ/Title combos
+  playlists |>
+    anti_join(titles_to_strip, join_by(DJ, Title))
 }
 
 clean_playlists <- function(playlists_raw) {
@@ -393,6 +320,7 @@ clean_playlists <- function(playlists_raw) {
   #OPTIONAL
   #using judgement to pare legitimate entries that distort analysis
   if (STRIP_SIG) {
+    print("stripping signature songs that are played in most episodes by a given DJ, which distort analysis of most common artists and songs")
     methods_restore()
     playlists <- strip_signature_songs(as_tibble(playlists))
     methods_overwrite()
@@ -403,6 +331,7 @@ clean_playlists <- function(playlists_raw) {
 
 djKey <- read_parquet_duckdb("data/djKey.parquet")
 playlists <- read_parquet_duckdb("data/playlists.parquet")
+
 if (UPDATE_ONLY) {
   # load only recently fetched raw playlists
   playlists_raw <- read_parquet_duckdb("data/playlists_temp.parquet")
@@ -436,6 +365,20 @@ save(all_artisttokens, file = "data/all_artisttokens.rdata")
 # save as parquet
 # cat("Saving playlists as parquet\n")
 compute_parquet(playlists, "data/playlists.parquet")
+
+# compute showCount, FirstShow and LastShow from playlists for each DJ and update djKey
+show_stats <- playlists |>
+  summarise(
+    .by = DJ,
+    showCount = n_distinct(AirDate),
+    FirstShow = min(AirDate, na.rm = TRUE),
+    LastShow = max(AirDate, na.rm = TRUE)
+  )
+djKey <- djKey |>
+  rows_update(show_stats, by = "DJ", unmatched = "ignore") |>
+  arrange(DJ)
+compute_parquet(djKey, "data/djKey.parquet")
+
 
 #summary stats
 summarize_playlists_duck <- function(df) {

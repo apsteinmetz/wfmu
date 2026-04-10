@@ -113,9 +113,9 @@ show_names <- all_show_names %>%
   filter(!(DJ %in% excludeDJs)) |>
   arrange(DJ)
 
-NO_REFRESH <- TRUE
+NO_REFRESH <- FALSE
 # do we need to scrape prior years or just update existing shows?
-UPDATE_ONLY <- TRUE
+UPDATE_ONLY <- FALSE
 
 # get all show URLs for all music DJs
 # if show_urls.rds exists, load it instead of re-fetching
@@ -134,6 +134,7 @@ if (file.exists("data/wfmu_show_urls.rds") & NO_REFRESH) {
       bind_rows(dj_profiles) |>
       distinct()
   } else {
+    print( "Scraping show URLs for all DJs. This may take a while...")
     show_urls <- show_names$DJ |>
       map_dfr(\(x) get_show_links(x, update_only = FALSE)) |>
       distinct()
@@ -202,7 +203,7 @@ djKey <- dj_profiles |>
     other_shownames = ifelse(other_shownames == "", "none", other_shownames)
   ) |>
   unique() |>
-  drop_na() |>
+  # drop_na() |>
   as_tibble() |>
   select(
     DJ,

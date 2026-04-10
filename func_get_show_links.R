@@ -57,6 +57,32 @@ get_show_links <- function(dj_id, update_only = FALSE, back_playlist = NULL) {
     return(empty)
   }
 
+# as long as we're at it, get profile URL and other shownames for this DJ
+  if (top_level) {
+    profileURL <- doc |>
+      html_nodes(xpath = "//a[contains(@href,'profile')]") %>%
+      html_attr("href") |>
+      pluck(1)
+    # if profile URL is not found, use the DJ URL
+    if (length(profileURL) == 0) {
+      profileURL <- dj_url
+      other_shownames <- "none"
+    } else {
+      other_shownames <- get_other_shownames(profileURL)
+      if (length(other_shownames) == 0) other_shownames <- "none"
+    }
+
+    dj_profiles <<- dj_profiles |>
+      bind_rows(
+        tibble(
+          DJ = dj_id,
+          profileURL = profileURL,
+          other_shownames = other_shownames
+        )
+      ) |>
+      distinct()
+  }
+
   anchors <- html_elements(
     doc,
     xpath = ".//a[(contains(translate(@href,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/playlist/')) or (contains(translate(@href,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/playlists/'))]"
@@ -68,6 +94,7 @@ get_show_links <- function(dj_id, update_only = FALSE, back_playlist = NULL) {
   hrefs <- html_attr(anchors, "href")
   anchor_text <- html_text2(anchors)
   parent_text <- map_chr(xml_parent(anchors), html_text2)
+
 
   dates_from_anchor <- str_extract(anchor_text, date_pattern)
   dates_from_parent <- str_extract(parent_text, date_pattern)
@@ -114,32 +141,7 @@ get_show_links <- function(dj_id, update_only = FALSE, back_playlist = NULL) {
     }
   }
 
-  # as long as we're at it, get profile URL and other shownames for this DJ
-  if (top_level) {
-    profileURL <- doc |>
-      html_nodes(xpath = "//a[contains(@href,'profile')]") %>%
-      html_attr("href") |>
-      pluck(1)
-    # if profile URL is not found, use the DJ URL
-    if (length(profileURL) == 0) {
-      profileURL <- dj_url
-      other_shownames <- "none"
-    } else {
-      other_shownames <- get_other_shownames(profileURL)
-      if (length(other_shownames) == 0) other_shownames <- "none"
-    }
-
-    dj_profiles <<- dj_profiles |>
-      bind_rows(
-        tibble(
-          DJ = dj_id,
-          profileURL = profileURL,
-          other_shownames = other_shownames
-        )
-      ) |>
-      distinct()
-  }
-
+  
   # final cleanup
   playlist_rows <- playlist_rows |>
     # links to fill in djs which will be found elsewhere
