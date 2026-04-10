@@ -287,9 +287,8 @@ clean_playlists <- function(playlists_raw) {
     mutate(ArtistToken = gsub("^$", "Unknown", ArtistToken))
 
   playlists <- playlists |>
-    filter(ArtistToken != "Your Dj") |>
+    filter(!grepl("Your DJ",Title)) |>
     filter(ArtistToken != "Your DJ") |>
-    filter(Title != "Your Dj") |>
     filter(Title != "Your DJ") |>
     filter(ArtistToken != "Hoof Mouth") |>
     filter(ArtistToken != "Tom Wilson") |> #not songs
