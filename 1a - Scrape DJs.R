@@ -113,9 +113,10 @@ show_names <- all_show_names %>%
   filter(!(DJ %in% excludeDJs)) |>
   arrange(DJ)
 
+# refreshed show URLs for all DJs, or just update existing ones?
 NO_REFRESH <- FALSE
 # do we need to scrape prior years or just update existing shows?
-UPDATE_ONLY <- FALSE
+UPDATE_ONLY <- TRUE
 
 # get all show URLs for all music DJs
 # if show_urls.rds exists, load it instead of re-fetching

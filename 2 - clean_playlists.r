@@ -288,12 +288,15 @@ clean_playlists <- function(playlists_raw) {
 
   playlists <- playlists |>
     filter(!grepl("Your DJ",Title)) |>
-    filter(ArtistToken != "Your DJ") |>
-    filter(Title != "Your DJ") |>
+    filter(!grepl("Your Dj",Title)) |>
+    filter(!grepl("Your DJ",ArtistToken)) |>
+    filter(!grepl("Your Dj",ArtistToken)) |>
+    filter(!grepl("Where The Action Is",Artist)) |>
     filter(ArtistToken != "Hoof Mouth") |>
     filter(ArtistToken != "Tom Wilson") |> #not songs
     filter(ArtistToken != "Hank Levine") |> #not songs
     filter(ArtistToken != "Commercial") |> #not songs
+    
     distinct() #why would there be dupes?  Don't know, but there are
 
   # squish: trim + collapse multiple spaces to single space for all character columns
@@ -321,7 +324,7 @@ clean_playlists <- function(playlists_raw) {
   #OPTIONAL
   #using judgement to pare legitimate entries that distort analysis
   if (STRIP_SIG) {
-    print("stripping signature songs that are played in most episodes by a given DJ, which distort analysis of most common artists and songs")
+    print("stripping signature songs that are played in > 50% episodes by a given DJ, which distort analysis of most common artists and songs")
     methods_restore()
     playlists <- strip_signature_songs(as_tibble(playlists))
     methods_overwrite()
