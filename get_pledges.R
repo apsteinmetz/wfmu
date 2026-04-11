@@ -10,7 +10,6 @@ source("func_get_time_slots.R")
 time_slots <- get_time_slots()
 saveRDS(time_slots,"data/time_slots.rds")
 
-time_slots <- readRDS("data/time_slots.rds")
 base_url = "https://www.wfmu.org/playlists"
 
 latest_shows <- dj_key |> 
@@ -49,7 +48,23 @@ all_pledges <- all_pledges %>%
 saveRDS(all_pledges, "data/pledge_info.rds")
 
 # =================================================================================
+# plot the pledge data
+
 all_pledges <- readRDS("data/pledge_info.rds")
+time_slots <- readRDS("data/time_slots.rds")
+
+# multiply duraton for dj WA by 5 since WA has 5 shows per week.
+time_slots <- time_slots |> 
+  mutate(duration = ifelse(DJ == "WA", duration * 5, duration))
+
+pledges_norm <- all_pledges |>
+  collect() |>
+  inner_join(time_slots |> select(DJ, duration), join_by(DJ)) |>
+  mutate(
+    pledges_per_hour = pledge_count / duration,
+    dollars_per_hour = progress_amount / duration
+  )
+
 
 all_pledges |>
   filter(goal_amount > 0) |>
@@ -165,6 +180,33 @@ all_pledges |>
     subtitle = "Excludes Archives",
     x = "Number of Pledges",
     y = "Count of Programs",
+    fill = "Channel"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+
+pledges_norm |>
+  filter(!is.na(Channel), Channel != "Archive") |>
+  mutate(program_name = fct_reorder(program_name, dollars_per_hour)) |>
+  ggplot(aes(x = dollars_per_hour, y = program_name, fill = Channel)) +
+  geom_col() +
+  scale_x_continuous(
+    labels = scales::dollar_format(),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  geom_vline(xintercept = 1000, linetype = "dashed", color = "grey30") +
+  scale_fill_brewer(palette = "Set2") +
+  facet_wrap(~ Channel, scales = "free", ncol = 2) +
+  labs(
+    title = "Marathon 2026: Dollars Raised per Hour by Program by Channel",
+    subtitle = "Dashed line = $1,000/hr | Excludes Archives",
+    x = "Dollars Raised per Hour",
+    y = NULL,
     fill = "Channel"
   ) +
   theme_minimal(base_size = 11) +

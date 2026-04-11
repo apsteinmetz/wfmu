@@ -203,3 +203,57 @@ wake_share <- wake$progress_amount / station_all$total_raised
 - **Outsized total**: Wake accounted for `r scales::percent(wake_share, accuracy = 0.1)` of all dollars raised station-wide. Its `r scales::dollar(wake$progress_amount)` total dwarfs any individual program.
 
 - **Higher average pledge**: At `r scales::dollar(wake$avg_pledge, accuracy = 0.01)` per pledge, Wake's donors give substantially more per transaction than the station average of `r scales::dollar(station_all$avg_pledge, accuracy = 0.01)`. The station average excluding Wake drops to `r scales::dollar(station_ex_wake$avg_pledge, accuracy = 0.01)`, meaning Wake is pulling the overall average up considerably.
+
+{{< pagebreak >}}
+
+## Duration-Normalized Performance
+
+The previous charts compare programs on raw totals, but shows vary widely in length. A 3-hour broadcast has   more time to attract pledges than a 1-hour slot. This chart shows dollars raised per hour of airtime and includes "Wake".
+
+Programs that could not be matched to a time slot are excluded.
+
+```{r norm-setup}
+time_slots <- readRDS("data/time_slots.rds")
+
+pledges_norm <- all_pledges |>
+  collect() |>
+  inner_join(time_slots |> select(DJ, duration), join_by(DJ)) |>
+  mutate(
+    pledges_per_hour = pledge_count / duration,
+    dollars_per_hour = progress_amount / duration
+  )
+```
+
+
+{{< pagebreak >}}
+
+### Dollars Raised per Hour by Program
+
+```{r norm-dollars}
+pledges_norm |>
+  filter(!is.na(Channel), Channel != "Archive") |>
+  mutate(program_name = fct_reorder(program_name, dollars_per_hour)) |>
+  ggplot(aes(x = dollars_per_hour, y = program_name, fill = Channel)) +
+  geom_col() +
+  scale_x_continuous(
+    labels = scales::dollar_format(),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  geom_vline(xintercept = 1000, linetype = "dashed", color = "grey30") +
+  scale_fill_brewer(palette = "Set2") +
+  facet_wrap(~ Channel, scales = "free", ncol = 2) +
+  labs(
+    title = "Marathon 2026: Dollars Raised per Hour by Program by Channel",
+    subtitle = "Dashed line = $1,000/hr | Excludes Archives",
+    x = "Dollars Raised per Hour",
+    y = NULL,
+    fill = "Channel"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+```
+
