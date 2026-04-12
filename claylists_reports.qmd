@@ -1,15 +1,15 @@
 ---
 title: "Playlist Summary for 'Wake and Bake' on WFMU"
 author: "Art Steinmetz"
-date: "January 2026"
+date: today
 # format: html
 format:
   typst:
     toc: true
     df-print: "paged"
-#  html:
-#    toc: true
-#    df-print: "paged"
+  html:
+    toc: true
+    df-print: "paged"
 execute:
   echo: false
   message: false
@@ -29,6 +29,16 @@ library(remotes)
 library(gt)
 library(duckdb)
 library(duckplyr)
+
+my_table_options <- function(tbl) {
+  tab_options(tbl,
+    table.font.size = px(10),
+    table.font.names = c("Segoe UI", "Arial"),
+    row_group.font.weight = "bold",
+    data_row.padding = px(1),
+    column_labels.font.weight = "bold"
+  )
+}
 
 # use duckplyr to load playlists
 playlists <- duckplyr_df_from_parquet("data/playlists.parquet")
@@ -79,10 +89,8 @@ print_month_table <- function(month_table) {
   month_table |>
     gt::gt(groupname_col = "year_month") %>%
     # gt set column widths
-    tab_options(table.font.size = px(10),
-                row_group.font.weight = "bold",
-                data_row.padding = px(1),
-                column_labels.font.weight = "bold") |> 
+    my_table_options() |>
+    
     # tab_header("Top Songs By Month for Wake and Bake, Last 12 Months") %>%
     cols_merge(c(artist_song, song_count), pattern = "{1} - {2}") %>%
     cols_label(artist_song = md("**Artist - Song - Play Count**"))
@@ -122,11 +130,8 @@ print_month_table <- function(month_table) {
   month_table |>
     gt::gt(groupname_col = "year_month") %>%
     # gt set column widths
-    tab_options(table.font.size = px(10),
-                data_row.padding = px(1),
-                row_group.font.weight = "bold",
-                column_labels.font.weight = "bold") |> 
-    cols_merge(c(Artist, artist_count), pattern = "{1} - {2}") %>%
+   my_table_options() |>
+       cols_merge(c(Artist, artist_count), pattern = "{1} - {2}") %>%
     cols_label(Artist = md("**Artist - Play Count**")) %>%
     tab_style(style = list(
       cell_text(weight = "bold", style = "italic")
@@ -160,13 +165,8 @@ panel_2 <- all_time[21:nrow(all_time),]
 print_all_time <- function(panel){
 panel %>%
   gt::gt() %>%
-  tab_options(
-    table.font.size = px(10),
-    row_group.font.weight = "bold",
-    column_labels.font.weight = "bold",
-    data_row.padding = px(1)
-  ) |>
-  cols_merge(c(artist_song, song_count), pattern = "{1} - {2}") %>%
+my_table_options() |>
+      cols_merge(c(artist_song, song_count), pattern = "{1} - {2}") %>%
   cols_label(artist_song = md("**Artist - Song - Play Count**"))
 }
 
@@ -192,12 +192,7 @@ panel_2 <- all_time[21:nrow(all_time),]
 print_all_time <- function(panel){
   panel %>%
     gt::gt() %>%
-    tab_options(
-      table.font.size = px(10),
-      row_group.font.weight = "bold",
-      column_labels.font.weight = "bold",
-      data_row.padding = px(1)
-    ) |>
+    my_table_options() |>
     cols_merge(c(Artist, artist_count), pattern = "{1} - {2}") %>%
     cols_label(Artist = md("**Artist - Play Count**"))
   

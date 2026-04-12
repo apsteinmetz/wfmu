@@ -83,7 +83,8 @@ all_pledges |>
   theme(
     legend.position = "none",
     panel.grid.major.y = element_blank(),
-    panel.grid.minor.x = element_blank()
+    panel.grid.minor.x = element_blank(),
+    axis.text.y = element_text(size = 5)
   )
 ```
 
@@ -120,7 +121,8 @@ all_pledges |>
   theme(
     legend.position = "none",
     panel.grid.major.y = element_blank(),
-    panel.grid.minor.x = element_blank()
+    panel.grid.minor.x = element_blank(),
+    axis.text.y = element_text(size = 5)
   )
 ```
 
@@ -155,7 +157,8 @@ all_pledges |>
   theme(
     legend.position = "none",
     panel.grid.major.y = element_blank(),
-    panel.grid.minor.x = element_blank()
+    panel.grid.minor.x = element_blank(),
+    axis.text.y = element_text(size = 5)
   )
 ```
 
@@ -208,7 +211,7 @@ wake_share <- wake$progress_amount / station_all$total_raised
 
 ## Duration-Normalized Performance
 
-The previous charts compare programs on raw totals, but shows vary widely in length. A 3-hour broadcast has   more time to attract pledges than a 1-hour slot. This chart shows dollars raised per hour of airtime and includes "Wake".
+The previous charts compare programs on raw totals, but shows vary widely in length. A 3-hour broadcast has more time to attract pledges than a 1-hour slot. This chart shows dollars raised per hour of airtime in a given week and includes "Wake".
 
 Programs that could not be matched to a time slot are excluded.
 
@@ -253,7 +256,7 @@ pledges_norm |>
   theme(
     legend.position = "none",
     panel.grid.major.y = element_blank(),
-    panel.grid.minor.x = element_blank()
+    panel.grid.minor.x = element_blank(),
+    axis.text.y = element_text(size = 5)
   )
 ```
-
