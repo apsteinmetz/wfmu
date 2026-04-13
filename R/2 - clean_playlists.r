@@ -1,3 +1,4 @@
+library(tidyverse)
 library(xts)
 library(duckplyr)
 
@@ -6,7 +7,7 @@ library(duckplyr)
 # set_collapse(mask = NULL)
 
 # clean only the most recently fetched playlists
-UPDATE_ONLY <- FALSE
+UPDATE_ONLY <- TRUE
 STRIP_SIG <- TRUE
 CONDENSE_ARTISTS <- TRUE
 condense_artist_tokens <- function(playlists) {

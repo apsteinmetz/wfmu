@@ -10,8 +10,8 @@ library(rlang)
 
 # ==================================================
 # setup
-source("func_get_show_links.R")
-source("func_get_show_names.R")
+source(here::here("R", "func_get_show_links.R"))
+source(here::here("R", "func_get_show_names.R"))
 
 base_url = "https://www.wfmu.org/playlists"
 date_regex <- "\\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\\.?\\s+\\d{1,2},\\s+\\d{4}\\b"

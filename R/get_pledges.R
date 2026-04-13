@@ -6,7 +6,7 @@ library(rvest)
 # show_urls <- read_parquet_duckdb("data/playlistURLs.parquet")
 dj_key <- read_parquet_duckdb("data/djKey.parquet")
 
-source("func_get_time_slots.R")
+source(here::here("R", "func_get_time_slots.R"))
 time_slots <- get_time_slots()
 saveRDS(time_slots,"data/time_slots.rds")
 

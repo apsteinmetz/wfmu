@@ -36,4 +36,4 @@ claylists_reports.pdf
 .quarto
 wfmu.Rproj
 /data
-marathon_2026_report_files/*
+output/marathon_2026_report_files/*

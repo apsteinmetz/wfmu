@@ -143,7 +143,7 @@ getDJArtistNames<-function(DJURLs) {
     DJArtists<-data.frame(DJ,artistRaw=unlist(artistList))
     if (nrow(DJArtists) >0) allDJArtists = rbind(allDJArtists,DJArtists)
     #remove factor level of DJs with no artists
-    save(allDJArtists,file="allDJArtists.RData")
+    save(allDJArtists,file="data/allDJArtists.RData")
   }
   return(allDJArtists)
 }  
@@ -359,7 +359,7 @@ get_playlist <- function(plURL, dj) {
 #-------------- MAIN -----------------
 DJURLs<-getDJURLs()
 DJKey<-getShowNames(DJURLs)
-save(DJKey,file="DJKey.RData")
+save(DJKey,file="data/DJKey.RData")
 #load(file='djkey.rdata')
 
 excludeDJs <-
@@ -407,7 +407,7 @@ djList <- DJKey %>%
   pull(DJ)
 
 #careful not to trash intermediate results!
-load("playlists_raw.rdata")
+load("data/playlists_raw.rdata")
 UPDATE_ONLY =TRUE
 if (UPDATE_ONLY) {
   #assume at most 5 shows per week
@@ -451,7 +451,7 @@ for (dj in djList_temp) {
     if (is.null(playlist)) break #done with this DJ
   }
   #save to disk after each dj
-  save(playlists_raw,file="playlists_raw.Rdata")
+  save(playlists_raw,file="data/playlists_raw.Rdata")
 }
 
 bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw)
@@ -460,6 +460,6 @@ playlists_raw<-playlists_raw %>%
   filter(Artist != Title) %>% #single column span across table.  Not a song.
   distinct()
 
-save(playlists_raw,file="playlists_raw.Rdata")
+save(playlists_raw,file="data/playlists_raw.Rdata")
 
 

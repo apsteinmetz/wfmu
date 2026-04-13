@@ -237,7 +237,7 @@ getDJArtistNames<-function(DJURLs) {
     DJArtists<-data.frame(DJ,artistRaw=unlist(artistList))
     if (nrow(DJArtists) >0) allDJArtists = rbind(allDJArtists,DJArtists)
     #remove factor level of DJs with no artists
-    save(allDJArtists,file="allDJArtists.rdata")
+    save(allDJArtists,file="data/allDJArtists.rdata")
   }
   return(allDJArtists)
 }  
@@ -420,7 +420,7 @@ get_playlist_GK_old <-function(plURL,DJ){
     {.}
   
   first_song_line <- text %>%
-    filter(value == "Greasy Kid Stuff") %>% 
+    filter(value
     pull(rownum) %>% -1
   if (length(text$value[first_song_line]) < 2) first_song_line <- first_song_line - 1
   

@@ -1,8 +1,8 @@
 #find umlauts in raw playlist
 library(tidyverse)
 umlauts <-"[öüËÄä]"
-load("~/R Projects/wfmu/playlists_raw.RData")
-load("~/R Projects/wfmu/djKey.RData")
+load(here::here("data", "playlists_raw.RData"))
+load(here::here("data", "djKey.RData"))
 
 
 # count distinct playlists
