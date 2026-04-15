@@ -27,7 +27,7 @@ refresh_data <- function(filepath){
 
 filepath <- "data/playlists.parquet"
 filepath <- "data/djSimilarity.parquet"
-filepath <- "data/DJKey.parquet"
+filepath <- "data/dj_key.parquet"
 filepath <- "data/djSimilarity.RData"
 refresh_data(filepath)
 

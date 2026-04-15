@@ -109,14 +109,18 @@ excluded_shows <- all_show_names %>%
   filter(DJ %in% excludeDJs) |>
   arrange(DJ)
 
+# save excluded shows for inspection
+saveRDS(excluded_shows, "data/excluded_shows.rds")
+
 show_names <- all_show_names %>%
-  filter(!(DJ %in% excludeDJs)) |>
+#  filter(!(DJ %in% excludeDJs)) |>
+  mutate(music_show = ifelse(DJ %in% excludeDJs, FALSE, TRUE)) |>
   arrange(DJ)
 
 # refreshed show URLs for all DJs, or just update existing ones?
 NO_REFRESH <- FALSE
 # do we need to scrape prior years or just update existing shows?
-UPDATE_ONLY <- TRUE
+UPDATE_ONLY <- FALSE
 
 # get all show URLs for all music DJs
 # if show_urls.rds exists, load it instead of re-fetching
@@ -185,13 +189,13 @@ show_names <- show_names %>%
 #   select(DJ, ShowToken)
 
 # #testing
-# djKey <- djKey |>
+# dj_key <- dj_key |>
 #   select(-ShowToken) |>
 #   left_join(show_name_tokens, by = "DJ")
 
-djKey <- dj_profiles |>
+dj_key <- dj_profiles |>
   left_join(show_names, by = "DJ") |>
-  left_join(showCount, by = "DJ") |> 
+  left_join(showCount, by = "DJ") | > 
   left_join(showDates, by = "DJ")  |>
   # remove ShowName string from other_shownames
   mutate(
@@ -211,6 +215,7 @@ djKey <- dj_profiles |>
     ShowName,
     onSched,
     Channel,
+    music_show,
     other_shownames,
     showCount,
     FirstShow,
@@ -221,9 +226,9 @@ djKey <- dj_profiles |>
 
 #limit analysis to DJs with at least numShows shows.
 # numShows <- 10
-# djKey <- djKey %>%
+# dj_key <- dj_key %>%
 #  filter(showCount > numShows)
 
-compute_parquet(djKey, "data/djKey.parquet")
+compute_parquet(dj_key, "data/dj_key.parquet")
 # save playlistURLs as parquet
 compute_parquet(show_urls, "data/playlistURLs.parquet")

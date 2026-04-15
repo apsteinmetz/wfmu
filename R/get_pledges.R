@@ -4,17 +4,24 @@ library(duckplyr)
 library(rvest)
 # load show urls
 # show_urls <- read_parquet_duckdb("data/playlistURLs.parquet")
-dj_key <- read_parquet_duckdb("data/djKey.parquet")
+dj_key <- read_parquet_duckdb("data/dj_key.parquet") |> as_tibble()
+excluded_shows <- readRDS("data/excluded_shows.rds")
 
-source(here::here("R", "func_get_time_slots.R"))
-time_slots <- get_time_slots()
-saveRDS(time_slots,"data/time_slots.rds")
+if (!file.exists("data/time_slots.rds")) {
+  source(here::here("R", "func_get_time_slots.R"))
+  time_slots <- get_time_slots()
+  saveRDS(time_slots,"data/time_slots.rds")
+} else {
+  time_slots <- readRDS("data/time_slots.rds")
+  }
 
 base_url = "https://www.wfmu.org/playlists"
 
 latest_shows <- dj_key |> 
-  filter(onSched == TRUE) |> 
-  select(DJ,ShowName,Channel)
+  select(DJ,ShowName,Channel,onSched) |> 
+  bind_rows(excluded_shows |> select(DJ,ShowName,Channel,onSched)) |>
+  filter(onSched == TRUE)
+  
 
 get_pledge_info <- function(dj_id) {
   url <- paste0(

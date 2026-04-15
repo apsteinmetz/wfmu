@@ -24,7 +24,7 @@ library(tidyverse)
 library(duckplyr)
 
 show_urls <- read_parquet_duckdb("data/playlistURLs.parquet")
-dj_key    <- read_parquet_duckdb("data/djkey.parquet")
+dj_key    <- read_parquet_duckdb("data/dj_key.parquet")
 
 all_pledges <- readRDS("data/pledge_info.rds")
 ```
@@ -52,7 +52,7 @@ all_pledges |>
     pct = progress_amount / goal_amount,
     program_name = fct_reorder(program_name, pct)
   ) |>
-  filter(pct <= quantile(pct, 0.99)) |>
+  # filter(pct <= quantile(pct, 0.99)) |>
   ggplot(aes(x = pct, y = program_name, fill = pledge_rank)) +
   geom_col() +
   geom_vline(xintercept = 1, linetype = "dashed", color = "grey30") +
@@ -74,7 +74,7 @@ all_pledges |>
 #  ) +
   labs(
     title = "WFMU Marathon 2026: Amount Raised as % of Goal",
-    subtitle = "Dashed line = 100% goal | Suspect data (top 1%) excluded",
+    subtitle = "Dashed line = 100% goal | Outlier "Music of Mind Control",
     x = "% of Goal Raised",
     y = NULL,
     fill = "Dollar Rank"

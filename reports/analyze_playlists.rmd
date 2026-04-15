@@ -36,8 +36,8 @@ library(circlize)
 library(RColorBrewer)
 
 load("playlists.rdata")
-load('djkey.rdata')
-DJKey$DJ<-as.character(DJKey$DJ)
+load('dj_key.RData')
+dj_key$DJ<-as.character(dj_key$DJ)
 ```
 Free form radio, WFMU.ORG, maintains a huge trove of past playlists from many DJ's radio shows.  More recently, web-only programming has been added to this.  This dataset offers lots of opportunities for analysis.  I scraped all the playlists I could from the web site and started asking questions.
 
@@ -153,7 +153,7 @@ The above analysis ignores how often an artist is played.  Now let's take that i
 scaleFactor=2
 maxWords = 200
   #most popular artists
-  top_artists<-DJKey %>% 
+  top_artists<-dj_key %>% 
     #filter(onSched=='YES') %>% #on Sched or off?
     left_join(playlists)%>%
     group_by(ArtistToken)%>%
@@ -180,7 +180,7 @@ We've gone back into ancient history but let's look at the recent past. Let's co
 scaleFactor=1.3
 maxWords = 200
   #most popular artists
-  top_artists<-DJKey %>% 
+  top_artists<-dj_key %>% 
     filter(onSched=='YES') %>% #on Sched or off?
     left_join(playlists)%>%
     group_by(ArtistToken)%>%
@@ -241,7 +241,7 @@ pc2<- play_count_by_DJ %>%
   mutate(ShowName='AllOther')
 
 play_count_by_DJ<-pc1 %>% 
-  left_join(DJKey) %>% 
+  left_join(dj_key) %>% 
   bind_rows(pc2) %>% 
   select(AirDate,ShowName,Spins)
 
@@ -276,7 +276,7 @@ pc2<- play_count_by_DJ %>%
   mutate(ShowName='AllOther')
 
 play_count_by_DJ<-pc1 %>% 
-  left_join(DJKey) %>% 
+  left_join(dj_key) %>% 
   bind_rows(pc2) %>% 
   select(AirDate,ShowName,Spins)
 
@@ -394,7 +394,7 @@ pc2<- play_count_by_DJ %>%
   mutate(ShowName='AllOther')
 
 play_count_by_DJ<-pc1 %>% 
-  left_join(DJKey) %>% 
+  left_join(dj_key) %>% 
   bind_rows(pc2) %>% 
   select(AirDate,ShowName,Spins)
 
@@ -562,7 +562,7 @@ I use some "big data" techniques here.  I join all the artists a DJ has played i
                                   pull(ArtistToken)%>% 
                                   paste(collapse=" ")%>%
                                   str_replace_all("[^A-Za-z ]","")%>%as.character() ,
-                                onSched=DJKey%>%filter(DJ==dj)%>%pull(onSched)
+                                onSched=dj_key%>%filter(DJ==dj)%>%pull(onSched)
                         ))
   }
   #artists should not have factor levels
@@ -579,7 +579,7 @@ djCorpus <- VCorpus(VectorSource(concat_artists$Artists))
 for (i in 1:length(djCorpus)) {
   meta(djCorpus[[i]], tag="id") <- concat_artists$DJ[i]  
   meta(djCorpus[[i]], tag="DJ") <- concat_artists$DJ[i]
-  meta(djCorpus[[i]], tag="onSched") <- (DJKey %>% 
+  meta(djCorpus[[i]], tag="onSched") <- (dj_key %>% 
     filter(DJ==concat_artists[1,1] %>% 
              pull()) %>% 
     pull(onSched))
@@ -644,12 +644,12 @@ CLUSTERS=4
   clust<-kdj$cluster
   #djCluster<-cbind(DJ=names(clust),data.frame(cluster=clust))
   
-  #if ("cluster" %in% names(DJKey)){
+  #if ("cluster" %in% names(dj_key)){
   #  # then remove the cluster column
-  #  DJKey<-select(DJKey,-cluster)
+  #  dj_key<-select(dj_key,-cluster)
   #}
   # now replace with new clustering
-  #DJKey<-inner_join(DJKey,djCluster)%>%arrange(cluster)
+  #dj_key<-inner_join(dj_key,djCluster)%>%arrange(cluster)
   
 # traditional way.  I like ggplot2 better
 # clusplot(as.matrix(j), clust, main="DJ Similiarity Clusters",color=T, shade=T, labels=2, lines=0) 
@@ -781,7 +781,7 @@ similar_DJS<-dj_similarity_tidy %>%
   arrange(desc(Similarity)) %>% 
   top_n(10) %>% pull(DJ2)
 
-DJKey %>% 
+dj_key %>% 
   filter(DJ %in% similar_DJS) %>% 
   kable(title="DJs most similar to Bill Kelly")
 
@@ -823,14 +823,14 @@ songs_in_common<-function(dj1,dj2){
 }
 
 for(dj2 in similar_DJS[1]){
-  print(paste("Bill Kelly and",DJKey %>% filter(DJ==dj2) %>% pull(ShowName)))
+  print(paste("Bill Kelly and",dj_key %>% filter(DJ==dj2) %>% pull(ShowName)))
   print(artists_in_common(dj1,dj2))
 }
 ```
 Here are the songs they most often have in common.
 ```{r, message=FALSE}
 for(dj2 in similar_DJS[1]){
-  print(paste("Bill Kelly and",DJKey %>% filter(DJ==dj2) %>% pull(ShowName)))
+  print(paste("Bill Kelly and",dj_key %>% filter(DJ==dj2) %>% pull(ShowName)))
   print(songs_in_common(dj1,dj2))
 }
 
@@ -839,7 +839,7 @@ Now lets choose a DJ that I also like but is not very similar, Sheila B. They st
 
 ```{r, message=FALSE}
 dj2="CF"
-print(paste("Bill Kelly and",DJKey %>% filter(DJ==dj2) %>% pull(ShowName)))
+print(paste("Bill Kelly and",dj_key %>% filter(DJ==dj2) %>% pull(ShowName)))
 print(artists_in_common(dj1,dj2))
 print(songs_in_common(dj1,dj2))
 
@@ -858,7 +858,7 @@ adj_mat1 = dj_mat %*% t(dj_mat)
 diag(adj_mat1) = 0
 
 #change from dJ to show name
-dimnames(adj_mat1)<-rep(list(Docs=filter(DJKey,DJ  %in% row.names(adj_mat1)) %>% pull(ShowName)),2)
+dimnames(adj_mat1)<-rep(list(Docs=filter(dj_key,DJ  %in% row.names(adj_mat1)) %>% pull(ShowName)),2)
 # create graph from adjacency matrix
 graph_artists1 = graph.adjacency(adj_mat1, mode="undirected", weighted=TRUE, diag=FALSE)
 # get edgelist 1

@@ -5,7 +5,7 @@ library(ggplot2)
 
 # copy precalculated data over to shiny app directory
 
-#load(file = "data/djKey.RData")
+#load(file = "data/dj_key.RData")
 # load(file = "data/playlists.Rdata")
 # load(file = "data/djSimilarity.RData")
 # load(file = "data/distinctive_artists.RData")
@@ -14,7 +14,7 @@ library(ggplot2)
 
 library(fs)
 
-tables = c("djKey", "playlists", "djsimilarity", "distinctive_artists")
+tables = c("dj_key", "playlists", "djsimilarity", "distinctive_artists")
 
 file_ext = ".parquet"
 
@@ -23,8 +23,8 @@ file_ext = ".parquet"
 #                       sink=paste0("data/",file_stem,file_ext))
 #}
 
-# fs::file_copy("data/djKey.RData",
-#              "../wfmu_explorer/data/djKey.RData",
+# fs::file_copy("data/dj_key.RData",
+#              "../wfmu_explorer/data/dj_key.RData",
 #              overwrite = TRUE)
 
 copy_parquet_to_shiny <- function(table) {

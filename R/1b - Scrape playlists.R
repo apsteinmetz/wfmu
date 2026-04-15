@@ -441,8 +441,10 @@ get_playlist <- function(show_info) {
   )
 }
 #-------------- MAIN -----------------
-djKey <- read_parquet_duckdb("data/djKey.parquet")
-playlistURLs <- read_parquet_duckdb("data/playlistURLs.parquet")
+dj_key <- read_parquet_duckdb("data/dj_key.parquet") |> 
+  filter(music_show == TRUE)
+playlistURLs <- read_parquet_duckdb("data/playlistURLs.parquet") |> 
+  filter(DJ %in% dj_key$DJ)
 playlists_raw <- read_parquet_duckdb("data/playlists_raw.parquet") |>
   as_tibble()
 
@@ -500,8 +502,8 @@ if (UPDATE_ONLY) {
 
 compute_parquet(playlists_temp, "data/playlists_temp.parquet")
 
-# bad_Tables <- anti_join(tibble(DJ = djKey$DJ), playlists_temp) |>
-#  left_join(djKey)
+# bad_Tables <- anti_join(tibble(DJ = dj_key$DJ), playlists_temp) |>
+#  left_join(dj_key)
 
 # save(bad_Tables, file = "data/bad_tables.rdata")
 

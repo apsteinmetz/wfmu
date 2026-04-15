@@ -19,7 +19,7 @@ safe_get_html <- function(url) {
 }
 
 get_time_slots <- function() {
-  djKey <- arrow::read_parquet("data/djKey.parquet") |>
+  dj_key <- arrow::read_parquet("data/dj_key.parquet") |>
     filter(onSched == TRUE)
 
   base_url <- "https://wfmu.org/playlists"
@@ -104,7 +104,7 @@ get_time_slots <- function() {
     )
   }
 
-  results <- map(djKey$DJ, \(dj) {
+  results <- map(dj_key$DJ, \(dj) {
     Sys.sleep(pause)
     scrape_one(dj)
   }, .progress = "Scraping time slots") |>

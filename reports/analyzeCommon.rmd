@@ -124,13 +124,13 @@ combineArtistWords <- function(allDJArtists,numWords){
   return(artistTokens)
 }
 #-------------------------------------------------------------------------------------
-addArtistCount<- function(DJKey,artistTokens) {
-  DJKey<-artistTokens%>%summarise(count=n())%>%inner_join(DJKey)%>%arrange(desc(count))
-  names(DJKey)<-c("DJ","artistCount","ShowName","onMic")
+addArtistCount<- function(dj_key,artistTokens) {
+  dj_key<-artistTokens%>%summarise(count=n())%>%inner_join(dj_key)%>%arrange(desc(count))
+  names(dj_key)<-c("DJ","artistCount","ShowName","onMic")
   # make DJs a factor
-  DJKey$ShowName<-factor(DJKey$ShowName,as.character(DJKey$ShowName))
-  DJKey$DJ<-factor(DJKey$DJ,as.character(DJKey$DJ))
-  return(DJKey)
+  dj_key$ShowName<-factor(dj_key$ShowName,as.character(dj_key$ShowName))
+  dj_key$DJ<-factor(dj_key$DJ,as.character(dj_key$DJ))
+  return(dj_key)
 }
 ```
 
@@ -138,7 +138,7 @@ addArtistCount<- function(DJKey,artistTokens) {
 The DJs are coded with two letter initials.  We also load a key file that includes the DJ's show name and whether they are currently on the air.
 ```{r, message=FALSE}
 allDJArtists<-read_csv("djs_and_artists.csv")
-DJKey<-read_csv("dj_key.csv")
+dj_key<-read_csv("data/dj_key.csv")
 ```
 # Clean the Data
 ```{r, message=FALSE}
@@ -152,10 +152,10 @@ allDJArtists<-cleanUpArtists(allDJArtists)
 # and "Joe Blow and the Big Wind" will both become "joeblow"
 artistTokens<-combineArtistWords(allDJArtists,numWords=2)
 # now that we have cleaned up band names count the number of bands each DJ has played
-DJKey<-addArtistCount(DJKey,artistTokens)
+dj_key<-addArtistCount(dj_key,artistTokens)
 # #get rid of DJs with less than 100 artists, ever.  Probably not a music show
-DJKey<-filter(DJKey,artistCount>100)
-artistTokens<-semi_join(artistTokens,DJKey)
+dj_key<-filter(dj_key,artistCount>100)
+artistTokens<-semi_join(artistTokens,dj_key)
 #regroup
 artistTokens<-artistTokens%>%group_by(DJ)
 # 
@@ -200,7 +200,7 @@ Stones!  Let's more more quantitative about the data.  What percentage of WFMU D
 ```{r}
 #make sure bars are in height order
 artist_count$artistToken<-reorder(artist_count$artistToken,artist_count$count)
-gg<-ggplot(artist_count[1:20,],aes(x=artistToken,y=count/nrow(DJKey)*100))+geom_col()
+gg<-ggplot(artist_count[1:20,],aes(x=artistToken,y=count/nrow(dj_key)*100))+geom_col()
 gg<-gg+labs(title='Most Widely Played Artists on WFMU',
             y='Pct of DJs Who Have Played Artist at Least Once',
             x= 'Artist')
@@ -211,8 +211,8 @@ print(gg)
 Which DJ has played the most artists?
 ```{r}
 #make sure bars are in height order
-#DJKey$DJ<-reorder(DJKey$DJ,DJKey$count)
-gg<-ggplot(DJKey[1:20,],aes(x=DJ,y=artist_count))+geom_col()
+#dj_key$DJ<-reorder(dj_key$DJ,dj_key$count)
+gg<-ggplot(dj_key[1:20,],aes(x=DJ,y=artist_count))+geom_col()
 gg<-gg+labs(title='Most Prolific DJs',
             y='Number of Unique Bands',
             x= 'DJ')

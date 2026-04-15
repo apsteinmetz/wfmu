@@ -2,7 +2,9 @@
 library(tidyverse)
 umlauts <-"[öüËÄä]"
 load(here::here("data", "playlists_raw.RData"))
-load(here::here("data", "djKey.RData"))
+load(here::here("data", "dj_key.RData"))
+dj_key <- dj_key  # loaded as dj_key from legacy RData; rename to canonical dj_key
+rm(dj_key)
 
 
 # count distinct playlists
@@ -28,7 +30,7 @@ umlauts_DJs <- playlists_raw %>%
   group_by(DJ) %>% 
   filter(str_detect(paste0(Title,Artist),umlauts)) %>% 
   summarize(umlaut_songs= n()) %>% 
-  left_join(DJKey) %>% 
+  left_join(dj_key) %>% 
   transmute(ShowName,umlaut_songs,avg_umlauts_per_show=umlaut_songs/showCount) %>%
   arrange(desc(avg_umlauts_per_show))
 

@@ -159,7 +159,7 @@ So, again using Bill Kelly as the example, he is in cluster 3.  Who else is?
 clust_table %>% 
   filter(Cluster==3) %>% 
   select(DJ) %>% 
-  left_join(DJKey) %>% 
+  left_join(dj_key) %>% 
   select(ShowName)
 ```
 This basically confirms the analysis we did earlier using a different technique.
@@ -169,7 +169,7 @@ Cluster 6 looks about the farthest away from cluster 3 so we might say those DJs
 clust_table %>% 
   filter(Cluster==6) %>% 
   select(DJ) %>% 
-  left_join(DJKey) %>% 
+  left_join(dj_key) %>% 
   select(ShowName)
 ```
 

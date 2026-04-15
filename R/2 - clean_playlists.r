@@ -310,7 +310,7 @@ clean_playlists <- function(playlists_raw) {
   # now filter out any entries where the artist token matches the show token
   playlists <- playlists |>
     anti_join(
-      djKey |> select(DJ, ShowToken) |> distinct(),
+      dj_key |> select(DJ, ShowToken) |> distinct(),
       by = c("DJ", "ArtistToken" = "ShowToken")
     )
 
@@ -334,7 +334,7 @@ clean_playlists <- function(playlists_raw) {
   return(playlists)
 }
 
-djKey <- read_parquet_duckdb("data/djKey.parquet")
+dj_key <- read_parquet_duckdb("data/dj_key.parquet")
 playlists <- read_parquet_duckdb("data/playlists.parquet")
 
 if (UPDATE_ONLY) {
@@ -371,7 +371,7 @@ save(all_artisttokens, file = "data/all_artisttokens.rdata")
 # cat("Saving playlists as parquet\n")
 compute_parquet(playlists, "data/playlists.parquet")
 
-# compute showCount, FirstShow and LastShow from playlists for each DJ and update djKey
+# compute showCount, FirstShow and LastShow from playlists for each DJ and update dj_key
 show_stats <- playlists |>
   summarise(
     .by = DJ,
@@ -379,10 +379,10 @@ show_stats <- playlists |>
     FirstShow = min(AirDate, na.rm = TRUE),
     LastShow = max(AirDate, na.rm = TRUE)
   )
-djKey <- djKey |>
+dj_key <- dj_key |>
   rows_update(show_stats, by = "DJ", unmatched = "ignore") |>
   arrange(DJ)
-compute_parquet(djKey, "data/djKey.parquet")
+compute_parquet(dj_key, "data/dj_key.parquet")
 
 
 #summary stats

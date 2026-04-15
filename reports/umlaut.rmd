@@ -10,7 +10,7 @@ library(tidyverse)
 library(knitr)
 umlauts <-"[öüËÄä]"
 load("~/R Projects/wfmu/playlists_raw.RData")
-load("~/R Projects/wfmu/djKey.RData")
+load("~/R Projects/wfmu/dj_key.RData")
 
 
 # count distinct playlists
@@ -39,7 +39,7 @@ umlauts_DJs <- playlists_raw %>%
   group_by(DJ) %>% 
   filter(str_detect(paste0(Title,Artist),umlauts)) %>% 
   summarize(umlaut_songs= n()) %>% 
-  left_join(DJKey) %>% 
+  left_join(dj_key) %>% 
   transmute(ShowName,umlaut_songs,
             avg_umlauts_per_show=round(umlaut_songs/showCount,2)) %>%
   arrange(desc(avg_umlauts_per_show))

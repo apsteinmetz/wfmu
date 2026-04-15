@@ -63,7 +63,7 @@ getDJsOffSched <- function(){
 #---------------------------------------------------
 # get the shownames for a DJ
 getShowNames<-function(DJURLs) {
-  DJKey <- data.frame()
+  dj_key <- data.frame()
   for (page in DJURLs) {
     singleDJ<- read_html(page)
     showName <- html_node(singleDJ,"title")%>%html_text()
@@ -71,23 +71,22 @@ getShowNames<-function(DJURLs) {
     showName<-str_replace(showName,'WFMU:',"")
     showName<-str_replace_all(showName,':Playlists and Archives',"")
     DJ <- sub("http://wfmu.org/playlists/","",page)
-    DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
+    dj_key<-rbind(dj_key,data.frame(DJ=DJ,ShowName=showName))
     print(showName)
   }
   # now identifty those DJs which are currently ON MIC
-  DJKey$onSched <- 'YES'
-  DJKey$onSched[which(DJKey$DJ %in% getDJsOffSched())]<-'NO'
+  dj_key$onSched <- 'YES'
+  dj_key$onSched[which(dj_key$DJ %in% getDJsOffSched())]<-'NO'
   #strip "WFMU" and "Playlists and Archives" and some punctuation
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylists (and|&) (A|a)rchives","")
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"-","")
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"(P|p)laylist|(R|r)ecent","")
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"WFMU|wfmu","")
-  DJKey$ShowName<-str_replace_all(DJKey$ShowName,"The ","")
-  DJKey$ShowName<-str_trim(DJKey$ShowName)
-  
+  dj_key$ShowName<-str_replace_all(dj_key$ShowName,"(P|p)laylists (and|&) (A|a)rchives","")
+  dj_key$ShowName<-str_replace_all(dj_key$ShowName,"-","")
+  dj_key$ShowName<-str_replace_all(dj_key$ShowName,"(P|p)laylist|(R|r)ecent","")
+  dj_key$ShowName<-str_replace_all(dj_key$ShowName,"WFMU|wfmu","")
+  dj_key$ShowName<-str_replace_all(dj_key$ShowName,"The ","")
+  dj_key$ShowName<-str_trim(dj_key$ShowName)
 
-  return (DJKey)  
-  #save(DJKey,file="DJKey.rdata")
+  return (dj_key)  
+  #save(dj_key,file="data/dj_key.rdata")
 }
 
 # -------------get the URLs of the playlist pages for a DJ ----------
@@ -134,7 +133,7 @@ getGKPlaylistURLs<-function(music_djs) {
   DJ_playlists = NULL
   dudList<-NULL
   xpath = "//a[contains(@href,'playlists/shows')]"
-  #DJKey = data.frame()
+  #dj_key = data.frame()
   for (dj in music_djs) {
     print(dj)
     url_suffixes<-get_playlist_page_URLs(dj)
@@ -186,7 +185,7 @@ getGKPlaylistURLs<-function(music_djs) {
 getDJPlaylistURLs<-function(music_djs) {
   DJ_playlists = NULL
   dudList<-NULL
-  #DJKey = data.frame()
+  #dj_key = data.frame()
   for (dj in music_djs) {
     print(dj)
     url_suffixes<-get_playlist_page_URLs(dj)
@@ -230,7 +229,7 @@ getDJArtistNames<-function(DJURLs) {
     showName <- html_node(singleDJ,"title")%>%html_text()
     showName <- gsub("\n","",sub("Playlists and Archives for ","",showName))
     DJ <- sub("http://wfmu.org/playlists/","",page)
-    DJKey<-rbind(DJKey,data.frame(DJ=DJ,ShowName=showName))
+    dj_key<-rbind(dj_key,data.frame(DJ=DJ,ShowName=showName))
     print(showName)
     artistListPage <- paste(ROOT_URL,URL_BRANCH,DJ, sep="")
     artistList<-read_html(artistListPage)%>%html_node(xpath="//body/div")%>%html_text()%>%str_split("\n")
@@ -651,8 +650,8 @@ get_playlist <- function(plURL, dj) {
 
 #-------------- MAIN -----------------
 #DJURLs<-getDJURLs()
-#DJKey<-getShowNames(DJURLs)
-# save(DJKey,file="DJKey.rdata")
+#dj_key<-getShowNames(DJURLs)
+# save(dj_key,file="dj_key.rdata")
 #load(file='djkey.rdata')
 
 
@@ -666,14 +665,14 @@ dj <- "GK"
 #  group_by(DJ) %>% 
 #  summarise(showCount=n()) %>% 
 #  arrange(desc(showCount))
-#DJKey<-left_join(DJKey,showCounts)
-#save(DJKey,file="DJKey.rdata")
+#dj_key<-left_join(dj_key,showCounts)
+#save(dj_key,file="dj_key.rdata")
 
 #limit analysis to DJs with at least numShows shows.
 # This also excludes DJs where we couldn't extract valid playlist URLs.
 #numShows <- 10
 # non-music shows
-#djList <- DJKey %>% 
+#djList <- dj_key %>% 
 #  filter(showCount > numShows, !(DJ %in% excludeDJs)) %>%
 #  pull(DJ)
 
@@ -693,6 +692,7 @@ fix_rows_gk <- function(playlist){
     separate(Artist, into = c("Artist2","Title2"),remove = FALSE,sep=" - ") %>% 
     mutate(Title = ifelse(Title == "" & !is.na(Title2),Title2,Title)) %>% 
     mutate(Title = ifelse(Title=="",Artist2,Title)) %>% 
+    mutate(Artist = ifelse((Artist =="" & Title
     mutate(Artist = ifelse((Artist =="" & Title == "Greasy Kid Stuff"),"The Jack Mormons",Artist)) %>%
     mutate(Artist = str_remove(Artist,"^[0-9]{1,2}\\. ")) %>% 
     select(-Artist2,-Title2) %>% 
@@ -708,7 +708,7 @@ fix_rows_gk <- function(playlist){
 #bad_Tables<-anti_join(tibble(DJ=djList),playlists_raw)
 
 
-# Add first show and last show to DJKey
+# Add first show and last show to dj_key
 #FirstShow<-playlists %>% 
 #  group_by(DJ) %>% 
 #  select(DJ,AirDate) %>% 
@@ -721,7 +721,7 @@ fix_rows_gk <- function(playlist){
 #  distinct() %>% 
 #  top_n(1) %>% rename(LastShow=AirDate)
 
-#DJKey <- DJKey %>% 
+#dj_key <- dj_key %>% 
 #  left_join(FirstShow,by="DJ") %>% 
 #  left_join(LastShow,by="DJ")
 
