@@ -22,11 +22,12 @@ execute:
 ```{r setup}
 library(tidyverse)
 library(duckplyr)
+library(here)
 
-show_urls <- read_parquet_duckdb("data/playlistURLs.parquet")
-dj_key    <- read_parquet_duckdb("data/dj_key.parquet")
+show_urls <- read_parquet_duckdb(here("data/playlistURLs.parquet"))
+dj_key    <- read_parquet_duckdb(here("data/dj_key.parquet"))
 
-all_pledges <- readRDS("data/pledge_info.rds")
+all_pledges <- readRDS(here("data/pledge_info.rds"))
 ```
 
 ## Overview
@@ -52,7 +53,7 @@ all_pledges |>
     pct = progress_amount / goal_amount,
     program_name = fct_reorder(program_name, pct)
   ) |>
-  # filter(pct <= quantile(pct, 0.99)) |>
+  filter(pct <= quantile(pct, 0.99)) |>
   ggplot(aes(x = pct, y = program_name, fill = pledge_rank)) +
   geom_col() +
   geom_vline(xintercept = 1, linetype = "dashed", color = "grey30") +
@@ -74,7 +75,7 @@ all_pledges |>
 #  ) +
   labs(
     title = "WFMU Marathon 2026: Amount Raised as % of Goal",
-    subtitle = "Dashed line = 100% goal | Outlier "Music of Mind Control",
+    subtitle = "Dashed line = 100% goal | Outlier `Music of Mind Control` Omitted",
     x = "% of Goal Raised",
     y = NULL,
     fill = "Dollar Rank"
@@ -99,7 +100,8 @@ The dashed line at \$1,000 helps normalize the scale across channels.Virtually e
 ```{r dollars-raised}
 all_pledges |>
   collect() |>
-  filter(!is.na(Channel), Channel != "Archive", program_name != "Wake") |>
+  filter(!is.na(Channel), Channel != "Archive") |> 
+  filter(program_name != "Wake") |>
   mutate(program_name = fct_reorder(program_name, progress_amount)) |>
   ggplot(aes(x = progress_amount, y = program_name, fill = Channel)) +
   geom_col() +
@@ -216,15 +218,16 @@ The previous charts compare programs on raw totals, but shows vary widely in len
 Programs that could not be matched to a time slot are excluded.
 
 ```{r norm-setup}
-time_slots <- readRDS("data/time_slots.rds")
+time_slots <- readRDS(here("data/time_slots.rds"))
 
 pledges_norm <- all_pledges |>
   collect() |>
-  inner_join(time_slots |> select(DJ, duration), join_by(DJ)) |>
+  # inner_join(time_slots |> select(DJ, duration), join_by(DJ)) |>
   mutate(
     pledges_per_hour = pledge_count / duration,
     dollars_per_hour = progress_amount / duration
-  )
+  ) |> 
+  filter(!is.na(pledges_per_hour), !is.na(dollars_per_hour))
 ```
 
 
