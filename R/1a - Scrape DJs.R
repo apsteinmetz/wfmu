@@ -120,7 +120,7 @@ show_names <- all_show_names %>%
 # refreshed show URLs for all DJs, or just update existing ones?
 NO_REFRESH <- FALSE
 # do we need to scrape prior years or just update existing shows?
-UPDATE_ONLY <- FALSE
+UPDATE_ONLY <- TRUE
 
 # get all show URLs for all music DJs
 # if show_urls.rds exists, load it instead of re-fetching
@@ -195,11 +195,11 @@ show_names <- show_names %>%
 
 dj_key <- dj_profiles |>
   left_join(show_names, by = "DJ") |>
-  left_join(showCount, by = "DJ") | > 
+  left_join(showCount, by = "DJ") |> 
   left_join(showDates, by = "DJ")  |>
   # remove ShowName string from other_shownames
   mutate(
-    other_shownames = str_trim(str_remove(other_shownames, ShowName))
+    other_shownames = str_trim(str_remove(other_shownames, replace_na(ShowName, "")))
   ) |>
   mutate(other_shownames = str_remove(other_shownames, "'s show")) |>
   mutate(other_shownames = str_remove(other_shownames, "^\\\n")) |>
